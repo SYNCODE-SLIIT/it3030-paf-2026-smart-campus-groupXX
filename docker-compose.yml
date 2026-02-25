@@ -1,0 +1,47 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: smart_campus_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      # This ensures your database tables aren't deleted when Docker stops
+      - db_data:/var/lib/mysql
+
+  backend:
+    # 1. Ignore the Dockerfile and use a full Maven environment instead
+    image: maven:3.9.6-eclipse-temurin-21
+    working_dir: /app
+    # 2. Now this command will actually work!
+    command: mvn spring-boot:run
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/smart_campus_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+    volumes:
+      - ./backend:/app
+      - ~/.m2:/root/.m2
+
+  frontend:
+    build: ./frontend
+    command: npm run dev
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      WATCHPACK_POLLING: "true" 
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+# Declare the named volume for the database
+volumes:
+  db_data:
