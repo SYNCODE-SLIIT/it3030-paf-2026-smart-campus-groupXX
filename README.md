@@ -19,6 +19,21 @@ If you are developing features, you will spend most of your time in these folder
 
 ### Backend (Java)
 
+```text
+backend/
+├── src/main/java/com/university/smartcampus/
+│   ├── config/         # Security, CORS, and Global Beans
+│   ├── controller/     # REST Endpoints (e.g., ResourceController.java)
+│   ├── dto/            # Data Transfer Objects (Requests/Responses)
+│   ├── entity/         # Database Models (e.g., Resource.java)
+│   ├── repository/     # JPA Interfaces for database queries
+│   ├── service/        # THE BRAIN: Complex business logic happens here
+│   └── SmartCampusApplication.java
+└── src/main/resources/
+    ├── application.properties  # Database and App settings
+    └── data.sql                # (Optional) Initial test data
+```
+
 - `backend/src/main/java/com/university/smartcampus/entity`:
   Define database tables (JPA entities / POJOs).
 - `backend/src/main/java/com/university/smartcampus/repository`:
@@ -29,6 +44,19 @@ If you are developing features, you will spend most of your time in these folder
   API endpoints (URL mappings like `/api/...`).
 
 ### Frontend (TypeScript / React)
+
+```text
+frontend/
+├── app/
+│   ├── layout.tsx      # Persistent UI like the Sidebar/Navbar
+│   ├── page.tsx        # Homepage (Dashboard)
+│   ├── login/          # Login page (Folder-based routing)
+│   └── resources/      # Facilities & Assets page
+├── components/         # Reusable UI (Buttons, Tables, Cards)
+├── lib/                # API utility functions (fetch, axios)
+├── public/             # Static assets (logos, icons)
+└── tailwind.config.ts  # Styling configurations
+```
 
 - `frontend/app/`: Main pages and routing (App Router).
 - `frontend/components/`: Reusable UI elements (buttons, navbar, modals, etc.) — create this folder if it doesn’t exist yet.
