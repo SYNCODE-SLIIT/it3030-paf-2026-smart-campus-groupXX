@@ -44,7 +44,7 @@ If you are developing features, you will spend most of your time in these folder
 
 ```bash
 # Clone the repository
-git clone https://github.com/YourRepoLink.git
+git clone https://github.com/SYNCODE-SLIIT/it3030-paf-2026-smart-campus-groupXX.git
 
 # Enter the directory
 cd it3030-paf-2026-smart-campus-groupXX
