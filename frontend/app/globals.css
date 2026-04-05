@@ -1,23 +1,213 @@
 @import "tailwindcss";
 
+/* ════════════════════════════════════════════════════
+   COLOUR PALETTE TOKENS
+   Raw values — named by color only, no semantic aliases here.
+════════════════════════════════════════════════════ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Yellow (Primary) */
+  --yellow-50:  #FFFCEB;
+  --yellow-100: #FFF5C2;
+  --yellow-200: #FFE87A;
+  --yellow-300: #F5D84E;
+  --yellow-400: #EECA44;
+  --yellow-500: #D4AE28;
+  --yellow-600: #B08C14;
+  --yellow-700: #87680A;
+  --yellow-800: #5B4408;
+  --yellow-900: #2E2204;
+
+  /* Neutral (Warm Greyscale) */
+  --neutral-0:   #FFFFFF;
+  --neutral-50:  #FAF9F6;
+  --neutral-100: #F4F2EC;
+  --neutral-200: #E8E5DC;
+  --neutral-300: #D2CEC3;
+  --neutral-400: #ABA79C;
+  --neutral-500: #7E7B72;
+  --neutral-600: #5E5B54;
+  --neutral-700: #3E3C37;
+  --neutral-800: #252420;
+  --neutral-900: #161512;
+  --neutral-950: #0E0D0B;
+
+  /* Red */
+  --red-50:  #FFF1F0;
+  --red-100: #FFDEDD;
+  --red-200: #FFB8B5;
+  --red-300: #FF8880;
+  --red-400: #F95A50;
+  --red-500: #E63528;
+  --red-600: #BF1E12;
+  --red-700: #92130A;
+  --red-800: #620D07;
+  --red-900: #320603;
+
+  /* Green */
+  --green-50:  #EDFDF4;
+  --green-100: #D3F9E4;
+  --green-200: #A6F2C8;
+  --green-300: #65E2A0;
+  --green-400: #2DC872;
+  --green-500: #14A457;
+  --green-600: #0D7E41;
+  --green-700: #0A5E30;
+  --green-800: #073D1F;
+  --green-900: #031F10;
+
+  /* Blue */
+  --blue-50:  #EFF5FF;
+  --blue-100: #DAE8FF;
+  --blue-200: #B4D1FF;
+  --blue-300: #82B3FF;
+  --blue-400: #4D8EF7;
+  --blue-500: #2B6DE8;
+  --blue-600: #1851C4;
+  --blue-700: #123A93;
+  --blue-800: #0D2762;
+  --blue-900: #061330;
+
+  /* Orange */
+  --orange-50:  #FFF8EC;
+  --orange-100: #FFEECF;
+  --orange-200: #FFD899;
+  --orange-300: #FFB84D;
+  --orange-400: #FF9520;
+  --orange-500: #F07400;
+  --orange-600: #C45800;
+  --orange-700: #944000;
+  --orange-800: #622A00;
+  --orange-900: #311500;
+
+  /* ── Border Radius ── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  /* ── Typography ── */
+  --font-body:    'Open Sans', sans-serif;
+  --font-display: 'Poppins', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ════════════════════════════════════════════════════
+   LIGHT THEME — SEMANTIC TOKENS
+════════════════════════════════════════════════════ */
+[data-theme="light"] {
+  --bg:           #ECEAE4;
+  --bg-subtle:    #F4F2EC;
+  --surface:      #FFFFFF;
+  --surface-2:    #FAF9F6;
+  --surface-dark: #16140E;
+
+  --border:        #E8E5DC;
+  --border-strong: #D2CEC3;
+
+  --text-h:     #0E0D0B;
+  --text-body:  #5E5B54;
+  --text-muted: #ABA79C;
+  --text-label: #7E7B72;
+
+  --input-bg:     #F7F6F2;
+  --input-border: #E8E5DC;
+  --input-text:   #252420;
+  --input-ph:     #ABA79C;
+
+  --card-shadow:       0 1px 3px rgba(20,18,12,.05), 0 6px 28px rgba(20,18,12,.09);
+  --card-shadow-hover: 0 2px 6px rgba(20,18,12,.07), 0 12px 40px rgba(20,18,12,.13);
+  --chip-shadow:       0 1px 3px rgba(20,18,12,.06);
+  --dark-shadow:       0 4px 24px rgba(0,0,0,.5), 0 1px 4px rgba(0,0,0,.28);
+
+  --skeleton-base:  #E8E5DC;
+  --skeleton-shine: #F4F2EC;
+
+  --nav-bg:    rgba(255,255,255,.8);
+  --nav-inset: rgba(255,255,255,.9);
+}
+
+/* ════════════════════════════════════════════════════
+   DARK THEME — SEMANTIC TOKENS
+════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --bg:           #0A0908;
+  --bg-subtle:    #111009;
+  --surface:      #1C1A14;
+  --surface-2:    #141210;
+  --surface-dark: #100E09;
+
+  --border:        #272420;
+  --border-strong: #3E3C37;
+
+  --text-h:     #F4F2EC;
+  --text-body:  #7E7B72;
+  --text-muted: #5E5B54;
+  --text-label: #5E5B54;
+
+  --input-bg:     #131108;
+  --input-border: #272420;
+  --input-text:   #E8E5DC;
+  --input-ph:     #3E3C37;
+
+  --card-shadow:       0 1px 3px rgba(0,0,0,.4), 0 6px 28px rgba(0,0,0,.55);
+  --card-shadow-hover: 0 2px 6px rgba(0,0,0,.5), 0 14px 44px rgba(0,0,0,.65);
+  --chip-shadow:       0 2px 8px rgba(0,0,0,.35);
+  --dark-shadow:       0 4px 28px rgba(0,0,0,.75), 0 1px 4px rgba(0,0,0,.4);
+
+  --skeleton-base:  #252420;
+  --skeleton-shine: #2E2C26;
+
+  --nav-bg:    rgba(28,26,20,.8);
+  --nav-inset: rgba(255,255,255,.06);
+}
+
+/* ════════════════════════════════════════════════════
+   BASE
+════════════════════════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-body);
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  text-decoration: none;
+}
+
+svg {
+  display: block;
+}
+
+/* ════════════════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+════════════════════════════════════════════════════ */
+@keyframes skeleton-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+@keyframes progress-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(200%); }
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
 }
