@@ -91,7 +91,7 @@
   --font-mono:    'JetBrains Mono', monospace;
 
   /* Light theme defaults (semantic tokens) */
-  --bg:           #ECEAE4;
+  --bg:           #FAF9F6;
   --bg-subtle:    #F4F2EC;
   --surface:      #FFFFFF;
   --surface-2:    #FAF9F6;
@@ -117,6 +117,14 @@
 
   --skeleton-base:  #E8E5DC;
   --skeleton-shine: #F4F2EC;
+
+  --ghost-hover: var(--neutral-200);
+  --ghost-text:  var(--neutral-800);
+
+  --warning:        var(--orange-500);
+  --warning-subtle: var(--orange-50);
+  --warning-text:   var(--orange-900);
+  --warning-border: var(--orange-200);
 
   --nav-bg:    rgba(255,255,255,.8);
   --nav-inset: rgba(255,255,255,.9);
@@ -155,6 +163,14 @@
 
     --skeleton-base:  #252420;
     --skeleton-shine: #2E2C26;
+
+    --ghost-hover: var(--neutral-700);
+    --ghost-text:  var(--neutral-200);
+
+    --warning:        var(--orange-400);
+    --warning-subtle: var(--orange-900);
+    --warning-text:   var(--orange-100);
+    --warning-border: var(--orange-700);
 
     --nav-bg:    rgba(28,26,20,.8);
     --nav-inset: rgba(255,255,255,.06);
@@ -210,4 +226,11 @@ svg {
 
 @keyframes btn-spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes toggle-bounce {
+  0%   { scale: 1; }
+  35%  { scale: 1.28; }
+  65%  { scale: 0.9; }
+  100% { scale: 1; }
 }

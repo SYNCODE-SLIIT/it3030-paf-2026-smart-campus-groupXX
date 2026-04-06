@@ -48,7 +48,7 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   },
   ghost: {
     background: 'transparent',
-    color: 'var(--text-body)',
+    color: 'var(--ghost-text)',
   },
   'ghost-accent': {
     background: 'transparent',
@@ -95,13 +95,13 @@ const hoverVariantStyles: Record<ButtonVariant, React.CSSProperties> = {
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(0,0,0,.12), 0 4px 16px rgba(238,202,68,.38), 0 1px 4px rgba(0,0,0,.18)',
   },
   primary: {
-    background: 'var(--yellow-500)',
+    background: 'var(--yellow-300)',
     transform: 'translateY(-1px)',
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.1), 0 4px 14px rgba(238,202,68,.42), 0 1px 4px rgba(0,0,0,.14)',
   },
   ghost: {
-    background: 'var(--surface-2)',
-    transform: 'scale(1.015)',
+    background: 'var(--ghost-hover)',
+    color: 'var(--ghost-text)',
   },
   'ghost-accent': {
     background: 'rgba(238,202,68,.12)',
@@ -116,7 +116,7 @@ const hoverVariantStyles: Record<ButtonVariant, React.CSSProperties> = {
     transform: 'translateY(-1px)',
   },
   danger: {
-    background: 'var(--red-600)',
+    background: 'var(--red-400)',
     transform: 'translateY(-1px)',
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,.2), 0 4px 14px rgba(230,53,40,.4), 0 1px 4px rgba(0,0,0,.16)',
   },
@@ -125,12 +125,12 @@ const hoverVariantStyles: Record<ButtonVariant, React.CSSProperties> = {
     transform: 'scale(1.015)',
   },
   success: {
-    background: 'var(--green-600)',
+    background: 'var(--green-400)',
     transform: 'translateY(-1px)',
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,.2), 0 4px 14px rgba(20,164,87,.38)',
   },
   info: {
-    background: 'var(--blue-600)',
+    background: 'var(--blue-400)',
     transform: 'translateY(-1px)',
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,.2), 0 4px 14px rgba(43,109,232,.4)',
   },

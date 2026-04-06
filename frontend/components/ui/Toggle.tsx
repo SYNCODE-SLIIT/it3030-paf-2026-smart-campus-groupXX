@@ -22,12 +22,14 @@ export function Toggle({
   const inputId = id ?? React.useId();
   const [internalChecked, setInternalChecked] = React.useState(defaultChecked);
   const isOn = checked !== undefined ? checked : internalChecked;
+  const [bouncing, setBouncing] = React.useState(false);
 
   const handleClick = () => {
     if (disabled) return;
     const next = !isOn;
     if (checked === undefined) setInternalChecked(next);
     onChange?.(next);
+    setBouncing(true);
   };
 
   return (
@@ -59,6 +61,7 @@ export function Toggle({
         }}
       >
         <span
+          onAnimationEnd={() => setBouncing(false)}
           style={{
             position: 'absolute',
             top: 3,
@@ -70,6 +73,7 @@ export function Toggle({
             boxShadow: '0 1px 3px rgba(0,0,0,.2)',
             transition: 'transform .22s ease',
             transform: isOn ? 'translateX(18px)' : 'translateX(0)',
+            animation: bouncing ? 'toggle-bounce .28s ease' : undefined,
             display: 'block',
           }}
         />
