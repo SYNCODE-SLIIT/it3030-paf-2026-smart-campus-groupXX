@@ -49,7 +49,6 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   ghost: {
     background: 'transparent',
     color: 'var(--text-body)',
-    boxShadow: '0 0 0 1.5px var(--border-strong)',
   },
   'ghost-accent': {
     background: 'transparent',
@@ -89,6 +88,54 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   },
 };
 
+const hoverVariantStyles: Record<ButtonVariant, React.CSSProperties> = {
+  glass: {
+    background: 'rgba(238,202,68,.95)',
+    transform: 'translateY(-1px)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(0,0,0,.12), 0 4px 16px rgba(238,202,68,.38), 0 1px 4px rgba(0,0,0,.18)',
+  },
+  primary: {
+    background: 'var(--yellow-500)',
+    transform: 'translateY(-1px)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.1), 0 4px 14px rgba(238,202,68,.42), 0 1px 4px rgba(0,0,0,.14)',
+  },
+  ghost: {
+    background: 'var(--surface-2)',
+    transform: 'scale(1.015)',
+  },
+  'ghost-accent': {
+    background: 'rgba(238,202,68,.12)',
+    transform: 'scale(1.015)',
+  },
+  subtle: {
+    background: 'var(--surface-dark)',
+    transform: 'translateY(-1px)',
+  },
+  dark: {
+    background: 'var(--neutral-900)',
+    transform: 'translateY(-1px)',
+  },
+  danger: {
+    background: 'var(--red-600)',
+    transform: 'translateY(-1px)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.2), 0 4px 14px rgba(230,53,40,.4), 0 1px 4px rgba(0,0,0,.16)',
+  },
+  'ghost-danger': {
+    background: 'rgba(230,53,40,.08)',
+    transform: 'scale(1.015)',
+  },
+  success: {
+    background: 'var(--green-600)',
+    transform: 'translateY(-1px)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.2), 0 4px 14px rgba(20,164,87,.38)',
+  },
+  info: {
+    background: 'var(--blue-600)',
+    transform: 'translateY(-1px)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.2), 0 4px 14px rgba(43,109,232,.4)',
+  },
+};
+
 export function Button({
   variant = 'primary',
   size = 'md',
@@ -103,10 +150,13 @@ export function Button({
   ...props
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const [hovered, setHovered] = React.useState(false);
 
   return (
     <button
       disabled={isDisabled}
+      onMouseEnter={() => !isDisabled && setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -120,13 +170,14 @@ export function Button({
         textTransform: 'uppercase',
         whiteSpace: 'nowrap',
         flexShrink: 0,
-        transition: 'transform .13s ease, box-shadow .13s ease, background .13s, opacity .13s',
+        transition: 'transform .15s ease, box-shadow .15s ease, background .15s, opacity .13s, color .13s',
         opacity: isDisabled && !loading ? 0.38 : 1,
         width: fullWidth ? '100%' : undefined,
         position: 'relative',
         overflow: loading ? 'hidden' : undefined,
         ...sizeStyles[size],
         ...variantStyles[variant],
+        ...(hovered ? hoverVariantStyles[variant] : {}),
         ...style,
       }}
       className={className}

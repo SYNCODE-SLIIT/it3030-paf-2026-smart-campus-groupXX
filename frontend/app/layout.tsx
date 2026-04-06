@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Open_Sans, Poppins, JetBrains_Mono } from "next/font/google";
-import Script from "next/script";
-import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 const openSans = Open_Sans({
@@ -33,13 +31,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body
         className={`${openSans.variable} ${poppins.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        {/* beforeInteractive runs before hydration and is outside React's diff tree */}
-        <Script id="theme-init" strategy="beforeInteractive">{`(function(){try{var t=localStorage.getItem('theme')||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`}</Script>
-        <ThemeProvider>{children}</ThemeProvider>
+        {children}
       </body>
     </html>
   );

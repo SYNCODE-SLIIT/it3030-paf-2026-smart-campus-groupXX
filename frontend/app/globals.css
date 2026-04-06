@@ -89,12 +89,8 @@
   --font-body:    'Open Sans', sans-serif;
   --font-display: 'Poppins', sans-serif;
   --font-mono:    'JetBrains Mono', monospace;
-}
 
-/* ════════════════════════════════════════════════════
-   LIGHT THEME — SEMANTIC TOKENS
-════════════════════════════════════════════════════ */
-[data-theme="light"] {
+  /* Light theme defaults (semantic tokens) */
   --bg:           #ECEAE4;
   --bg-subtle:    #F4F2EC;
   --surface:      #FFFFFF;
@@ -124,41 +120,45 @@
 
   --nav-bg:    rgba(255,255,255,.8);
   --nav-inset: rgba(255,255,255,.9);
+
+  color-scheme: light dark;
 }
 
 /* ════════════════════════════════════════════════════
    DARK THEME — SEMANTIC TOKENS
 ════════════════════════════════════════════════════ */
-[data-theme="dark"] {
-  --bg:           #0A0908;
-  --bg-subtle:    #111009;
-  --surface:      #1C1A14;
-  --surface-2:    #141210;
-  --surface-dark: #100E09;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:           #0A0908;
+    --bg-subtle:    #111009;
+    --surface:      #1C1A14;
+    --surface-2:    #141210;
+    --surface-dark: #100E09;
 
-  --border:        #272420;
-  --border-strong: #3E3C37;
+    --border:        #272420;
+    --border-strong: #3E3C37;
 
-  --text-h:     #F4F2EC;
-  --text-body:  #7E7B72;
-  --text-muted: #5E5B54;
-  --text-label: #5E5B54;
+    --text-h:     #F4F2EC;
+    --text-body:  #7E7B72;
+    --text-muted: #5E5B54;
+    --text-label: #5E5B54;
 
-  --input-bg:     #131108;
-  --input-border: #272420;
-  --input-text:   #E8E5DC;
-  --input-ph:     #3E3C37;
+    --input-bg:     #131108;
+    --input-border: #272420;
+    --input-text:   #E8E5DC;
+    --input-ph:     #3E3C37;
 
-  --card-shadow:       0 1px 3px rgba(0,0,0,.4), 0 6px 28px rgba(0,0,0,.55);
-  --card-shadow-hover: 0 2px 6px rgba(0,0,0,.5), 0 14px 44px rgba(0,0,0,.65);
-  --chip-shadow:       0 2px 8px rgba(0,0,0,.35);
-  --dark-shadow:       0 4px 28px rgba(0,0,0,.75), 0 1px 4px rgba(0,0,0,.4);
+    --card-shadow:       0 1px 3px rgba(0,0,0,.4), 0 6px 28px rgba(0,0,0,.55);
+    --card-shadow-hover: 0 2px 6px rgba(0,0,0,.5), 0 14px 44px rgba(0,0,0,.65);
+    --chip-shadow:       0 2px 8px rgba(0,0,0,.35);
+    --dark-shadow:       0 4px 28px rgba(0,0,0,.75), 0 1px 4px rgba(0,0,0,.4);
 
-  --skeleton-base:  #252420;
-  --skeleton-shine: #2E2C26;
+    --skeleton-base:  #252420;
+    --skeleton-shine: #2E2C26;
 
-  --nav-bg:    rgba(28,26,20,.8);
-  --nav-inset: rgba(255,255,255,.06);
+    --nav-bg:    rgba(28,26,20,.8);
+    --nav-inset: rgba(255,255,255,.06);
+  }
 }
 
 /* ════════════════════════════════════════════════════

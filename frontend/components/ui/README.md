@@ -23,7 +23,7 @@ All colours come from CSS variables defined in `app/globals.css`. Components han
 | `--radius-sm` `--radius-md` `--radius-lg` `--radius-xl` | 8 / 12 / 16 / 22 px |
 | `--font-body` `--font-display` `--font-mono` | Open Sans / Poppins / JetBrains Mono |
 
-Theme switches via `data-theme="light"` or `data-theme="dark"` on `<html>`. Follows system preference automatically; `localStorage` key `theme` persists a manual override.
+Theme follows the system setting via `@media (prefers-color-scheme: dark)`. Light tokens are the default in `:root`, and dark tokens override them automatically in the media query.
 
 ---
 
