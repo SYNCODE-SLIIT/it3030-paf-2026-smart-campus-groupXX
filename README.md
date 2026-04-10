@@ -102,6 +102,38 @@ docker compose down
 
 Persistence is intentionally not configured in the current repository. When you later add Supabase or another database, introduce the required entity/repository packages and the matching backend configuration in the same change.
 
+If you are using Supabase now, put the database connection in the backend container, not in the frontend app.
+
+For Supabase session pooler, use these values from the Supabase "Connect" panel:
+
+- Host: `aws-0-<region>.pooler.supabase.com`
+- Port: `5432`
+- Database: `postgres`
+- Username: `postgres.<project-ref>`
+- Password: your database password
+
+Create a root `.env` file from `.env.example` and fill in:
+
+```dotenv
+SPRING_DATASOURCE_URL=jdbc:postgresql://aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+SPRING_DATASOURCE_USERNAME=postgres.<project-ref>
+SPRING_DATASOURCE_PASSWORD='<your-db-password>'
+```
+
+`docker-compose.yml` passes those variables to the `backend` service.
+
+Only use `frontend/.env.local` for frontend Supabase values:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key> # server-side only
+```
+
+Do not put your pooled Postgres `DATABASE_URL` in `frontend/.env.local` for this project. This repo's database access belongs in the Spring Boot backend.
+
+Note: the current backend still does not include PostgreSQL/JDBC/JPA dependencies, so these environment values set the correct secret locations first. You still need to add the actual persistence layer in the backend before it can query Supabase.
+
 ## 📋 Assignment Compliance Checklist
 
 - ✅ **Demonstrable Locally**: Yes (via Docker Compose).

@@ -5,6 +5,10 @@ services:
     command: mvn spring-boot:run
     ports:
       - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
     volumes:
       - ./backend:/app
       - ~/.m2:/root/.m2
