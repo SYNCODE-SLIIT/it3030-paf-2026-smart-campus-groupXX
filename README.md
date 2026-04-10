@@ -2,7 +2,7 @@
 
 **Project by:** SYNCODE
 
-A full-stack automated campus management system built with a microservice-inspired layered architecture. The entire stack is containerized with Docker so it "works on everyone’s machine".
+A full-stack automated campus management system built with a microservice-inspired layered architecture. The frontend and backend run in Docker, and database integration is deferred for now.
 
 ## 🏗️ Project Structure
 
@@ -10,8 +10,8 @@ The repository is split into three main components (plus a Docker Compose orches
 
 - **`frontend/`**: Next.js 16 (React) application for the user interface.
 - **`backend/`**: Spring Boot (Java 21) REST API handling business logic.
-- **Database**: MySQL 8.0 container (Docker Compose service: `db`).
-- **`docker-compose.yml`**: Runs the full stack (frontend + backend + db).
+- **Database**: Not wired yet.
+- **`docker-compose.yml`**: Runs the frontend and backend locally.
 
 ## 📂 Where the "Actual Code" Happens
 
@@ -25,19 +25,13 @@ backend/
 │   ├── config/         # Security, CORS, and Global Beans
 │   ├── controller/     # REST Endpoints (e.g., ResourceController.java)
 │   ├── dto/            # Data Transfer Objects (Requests/Responses)
-│   ├── entity/         # Database Models (e.g., Resource.java)
-│   ├── repository/     # JPA Interfaces for database queries
 │   ├── service/        # THE BRAIN: Complex business logic happens here
 │   └── SmartCampusApplication.java
 └── src/main/resources/
-    ├── application.properties  # Database and App settings
+    ├── application.properties  # App settings
     └── data.sql                # (Optional) Initial test data
 ```
 
-- `backend/src/main/java/com/university/smartcampus/entity`:
-  Define database tables (JPA entities / POJOs).
-- `backend/src/main/java/com/university/smartcampus/repository`:
-  Interfaces for database queries (Spring Data JPA).
 - `backend/src/main/java/com/university/smartcampus/service`:
   Business logic, calculations, and rules.
 - `backend/src/main/java/com/university/smartcampus/controller`:
@@ -80,21 +74,21 @@ cd it3030-paf-2026-smart-campus-groupXX
 
 ### 3) Running the System
 
-You do not need to install Java, Maven, or MySQL locally. Docker Compose runs everything.
+You do not need to install Java or Maven locally. Docker Compose runs the frontend and backend.
 
 ```bash
-# Start the entire system (build images if needed)
-docker-compose up --build
+# Start the frontend and backend
+docker compose up --build
 ```
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8080/api/health
-- **Database**: `localhost:3306` (User: `root`, Pass: `rootpassword`, DB: `smart_campus_db`)
+- **Database**: Not connected yet
 
 To stop the stack:
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ## 🛠️ Developer Workflow
@@ -104,15 +98,13 @@ docker-compose down
 - **Backend**: Source code is bind-mounted into the container, and Spring Boot DevTools is included; saving a `.java` file triggers an automatic restart.
 - **Frontend**: Saving a `.tsx` file in Next.js dev mode refreshes the browser.
 
-### Adding New Database Tables
+### Database Integration
 
-1. Create a new file in `backend/src/main/java/com/university/smartcampus/entity/`.
-2. Add your JPA annotations (e.g., `@Entity`, `@Table`, `@Id`).
-3. With `spring.jpa.hibernate.ddl-auto=update`, Spring Boot will update the MySQL schema on restart.
+Persistence is intentionally not configured in the current repository. When you later add Supabase or another database, introduce the required entity/repository packages and the matching backend configuration in the same change.
 
 ## 📋 Assignment Compliance Checklist
 
 - ✅ **Demonstrable Locally**: Yes (via Docker Compose).
-- ✅ **Layered Architecture**: Yes (Controller → Service → Repository).
-- ✅ **Persistence**: Yes (MySQL 8.0 + named volume `db_data`).
+- ✅ **Layered Architecture**: Yes (Controller → Service, with room to add persistence later).
+- ⚠️ **Persistence**: Not implemented yet.
 - ⚠️ **CI/CD**: Not included yet (no GitHub Actions workflow found in this repository).
