@@ -237,7 +237,7 @@ svg {
 
 @keyframes nav-bounce {
   0%   { scale: 1; }
-  35%  { scale: 1.08; }
-  65%  { scale: 0.98; }
+  35%  { scale: 1.12; }
+  65%  { scale: 0.97; }
   100% { scale: 1; }
 }
