@@ -4,8 +4,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutDashboard, BookOpen, Calendar, TrendingUp,
   FolderOpen, MessageSquare, BarChart2,
-  Bell, ChevronUp, LogOut, Building2, User, Settings,
+  Bell, ChevronUp, LogOut, Building2, User, Settings, ShieldCheck,
 } from 'lucide-react';
+import type { UserRole } from '@/lib/nav-rbac';
 import { Avatar } from '@/components/ui';
 import { GlassPill } from '@/components/ui/GlassPill';
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu';
@@ -15,6 +16,8 @@ export interface NavItem {
   icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
   badge?: number;
   href?: string;
+  /** Roles that can see this item. Omit to show to everyone. */
+  allowedRoles?: UserRole[];
 }
 
 export interface NavSection {
@@ -29,6 +32,8 @@ export interface SidebarProps {
   notificationCount?: number;
   onNavigate?: (item: NavItem) => void;
   onLogout?: () => void;
+  /** Render as a relative-positioned block for inline demos */
+  inline?: boolean;
 }
 
 export const defaultSidebarSections: NavSection[] = [
@@ -36,17 +41,24 @@ export const defaultSidebarSections: NavSection[] = [
   {
     title: 'Academics',
     items: [
-      { label: 'Courses',   icon: BookOpen,      badge: 3  },
-      { label: 'Schedule',  icon: Calendar               },
-      { label: 'Grades',    icon: TrendingUp             },
-      { label: 'Resources', icon: FolderOpen             },
+      { label: 'Courses',   icon: BookOpen,   badge: 3 },
+      { label: 'Schedule',  icon: Calendar             },
+      { label: 'Grades',    icon: TrendingUp,  allowedRoles: ['student', 'lecturer'] },
+      { label: 'Resources', icon: FolderOpen           },
     ],
   },
   {
     title: 'Communicate',
     items: [
       { label: 'Messages',  icon: MessageSquare, badge: 12 },
-      { label: 'Analytics', icon: BarChart2                },
+      { label: 'Analytics', icon: BarChart2, allowedRoles: ['lecturer', 'admin'] },
+    ],
+  },
+  {
+    title: 'Administration',
+    items: [
+      { label: 'User Management', icon: ShieldCheck, allowedRoles: ['admin'] },
+      { label: 'Settings',        icon: Settings,    allowedRoles: ['admin'] },
     ],
   },
 ];
@@ -131,6 +143,7 @@ export function Sidebar({
   notificationCount = 0,
   onNavigate,
   onLogout,
+  inline = false,
 }: SidebarProps) {
   const [active, setActive] = useState(activePath);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -163,7 +176,14 @@ export function Sidebar({
     <GlassPill
       as="aside"
       radius={22}
-      style={{
+      style={inline ? {
+        position: 'relative',
+        width: 224,
+        height: 480,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'visible',
+      } : {
         position: 'fixed',
         top: 24,
         left: 24,

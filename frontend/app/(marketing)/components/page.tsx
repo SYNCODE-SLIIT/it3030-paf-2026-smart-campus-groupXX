@@ -21,52 +21,18 @@ import {
   Toggle,
   Tooltip,
 } from '@/components/ui';
-import { Navbar } from '@/components/layout/Navbar';
 import { Sidebar, defaultSidebarSections } from '@/components/layout/Sidebar';
 
-export default function Home() {
+export default function ComponentsPage() {
   const [tab1, setTab1] = React.useState('overview');
   const [tab2, setTab2] = React.useState('all');
   const [tab3, setTab3] = React.useState('active');
-  const [navPath, setNavPath] = React.useState('/');
-  const [navUser, setNavUser] = React.useState<{ name: string; initials: string } | null>(null);
-
-  const navItems = [
-    { label: 'Home', href: '/' },
-    { label: 'Courses', href: '/courses' },
-    { label: 'Schedule', href: '/schedule' },
-    { label: 'About', href: '/about' },
-  ];
-
-  const [sidebarPath, setSidebarPath] = React.useState('Dashboard');
 
   return (
-    <div style={{ display: 'flex' }}>
-
-      {/* Live Sidebar — fixed on the left */}
-      <Sidebar
-        sections={defaultSidebarSections}
-        activePath={sidebarPath}
-        user={{ name: 'Jane Doe', initials: 'JD', role: 'BSc Computer Science' }}
-        notificationCount={4}
-        onNavigate={(item) => setSidebarPath(item.label)}
-        onLogout={() => {}}
-      />
-
-    <div style={{ marginLeft: 272, flex: 1, maxWidth: 960, padding: '48px 24px 80px' }}>
-
-      {/* Live Navbar — fixed at top of viewport */}
-      <Navbar
-        items={navItems}
-        currentPath={navPath}
-        user={navUser}
-        onNavigate={setNavPath}
-        onLogin={() => setNavUser({ name: 'Jane Doe', initials: 'JD' })}
-        onLogout={() => setNavUser(null)}
-      />
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px 80px' }}>
 
       {/* Header */}
-      <div style={{ marginBottom: 56, marginTop: 56 }}>
+      <div style={{ marginBottom: 56 }}>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>
           Smart Campus · UI Kit
         </p>
@@ -75,18 +41,15 @@ export default function Home() {
         </h1>
       </div>
 
-      {/* ── NAVBAR ── */}
-      <Section label="00" title="Navbar">
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>
-          Live — fixed at top of viewport
-        </p>
-        <p style={{ fontSize: 12, color: 'var(--text-body)', lineHeight: 1.6 }}>
-          The navbar is rendered live above. Click nav items to toggle active state. Use Sign in / Sign out on the right pill to toggle the auth state.
-        </p>
-        <Row label="Current state">
-          <Chip color={navUser ? 'green' : 'neutral'} dot>{navUser ? `Signed in as ${navUser.name}` : 'Signed out'}</Chip>
-          <Chip color="yellow">Active: {navPath}</Chip>
-        </Row>
+      {/* ── SIDEBAR ── */}
+      <Section label="00" title="Sidebar">
+        <Sidebar
+          inline
+          sections={defaultSidebarSections}
+          activePath="Dashboard"
+          user={{ name: 'Jane Doe', initials: 'JD', role: 'BSc Computer Science' }}
+          notificationCount={4}
+        />
       </Section>
 
       <Divider style={{ margin: '48px 0' }} />
@@ -356,7 +319,6 @@ export default function Home() {
         </Row>
       </Section>
 
-    </div>
     </div>
   );
 }
