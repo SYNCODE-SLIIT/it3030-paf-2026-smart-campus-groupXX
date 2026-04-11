@@ -19,7 +19,8 @@ export function Toggle({
   disabled = false,
   id,
 }: ToggleProps) {
-  const inputId = id ?? React.useId();
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
   const [internalChecked, setInternalChecked] = React.useState(defaultChecked);
   const isOn = checked !== undefined ? checked : internalChecked;
   const [bouncing, setBouncing] = React.useState(false);

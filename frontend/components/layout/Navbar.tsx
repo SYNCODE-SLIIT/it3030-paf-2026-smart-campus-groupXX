@@ -1,12 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Avatar, Button } from '@/components/ui';
+import Link from 'next/link';
+import { Avatar, Button, GlassPill } from '@/components/ui';
 import { Menu, X } from 'lucide-react';
+import type { UserRole } from '@/lib/nav-rbac';
 
 export interface NavItem {
   label: string;
   href: string;
+  /** Roles that can see this item. Omit to show to everyone. */
+  allowedRoles?: UserRole[];
 }
 
 export interface NavUser {
@@ -24,14 +28,6 @@ interface NavbarProps {
   onNavigate?: (href: string) => void;
 }
 
-const glassPill: React.CSSProperties = {
-  background: 'var(--nav-bg)',
-  backdropFilter: 'blur(20px) saturate(1.4)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
-  borderRadius: 100,
-  border: '1px solid var(--border)',
-  boxShadow: 'inset 0 1px 0 var(--nav-inset), 0 2px 16px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05)',
-};
 
 export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -53,9 +49,8 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
         }}
       >
         {/* Left pill: Logo + Nav */}
-        <div
+        <GlassPill
           style={{
-            ...glassPill,
             display: 'flex',
             alignItems: 'center',
             gap: 4,
@@ -84,6 +79,7 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
               <NavLink
                 key={item.href}
                 label={item.label}
+                href={item.href}
                 active={currentPath === item.href}
                 onClick={() => onNavigate?.(item.href)}
               />
@@ -107,12 +103,11 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
           >
             <Menu size={20} strokeWidth={2.5} />
           </button>
-        </div>
+        </GlassPill>
 
         {/* Right pill: Auth */}
-        <div
+        <GlassPill
           style={{
-            ...glassPill,
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -151,7 +146,7 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
               Sign in
             </Button>
           )}
-        </div>
+        </GlassPill>
       </header>
 
       {/* Mobile overlay */}
@@ -170,40 +165,37 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 40 }}>
-            <button
+            <GlassPill
+              as="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close menu"
               style={{
-                ...glassPill,
                 width: 52,
                 height: 52,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                border: '1px solid var(--border)',
                 color: 'var(--text-h)',
                 cursor: 'pointer',
                 flexShrink: 0,
               }}
             >
               <X size={22} strokeWidth={2.5} />
-            </button>
+            </GlassPill>
           </div>
 
           <nav style={{ display: 'flex', flexDirection: 'column' }}>
             {items.map((item) => {
               const active = currentPath === item.href;
               return (
-                <button
+                <Link
                   key={item.href}
+                  href={item.href}
                   onClick={() => { onNavigate?.(item.href); setMobileOpen(false); }}
                   style={{
-                    background: 'none',
-                    border: 'none',
                     borderBottom: '1px solid var(--border-strong)',
                     padding: '20px 0',
-                    textAlign: 'left',
-                    cursor: 'pointer',
+                    textDecoration: 'none',
                     fontFamily: 'var(--font-display)',
                     fontWeight: 800,
                     fontSize: 32,
@@ -213,7 +205,7 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
                   }}
                 >
                   {item.label}
-                </button>
+                </Link>
               );
             })}
           </nav>
@@ -257,28 +249,31 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
   );
 }
 
-function NavLink({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function NavLink({ label, href, active, onClick }: { label: string; href: string; active: boolean; onClick?: () => void }) {
   const [hovered, setHovered] = useState(false);
   const [bouncing, setBouncing] = useState(false);
 
   function handleClick() {
     if (!active) {
       setBouncing(true);
-      onClick();
+      onClick?.();
     }
   }
 
   return (
-    <button
+    <Link
+      href={href}
       onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onAnimationEnd={() => setBouncing(false)}
       style={{
+        display: 'inline-flex',
+        alignItems: 'center',
         height: 34,
         padding: '0 14px',
         borderRadius: 100,
-        border: 'none',
+        textDecoration: 'none',
         cursor: 'pointer',
         fontFamily: 'var(--font-display)',
         fontWeight: 700,
@@ -299,6 +294,6 @@ function NavLink({ label, active, onClick }: { label: string; active: boolean; o
       }}
     >
       {label}
-    </button>
+    </Link>
   );
 }

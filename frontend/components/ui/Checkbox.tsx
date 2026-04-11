@@ -7,7 +7,8 @@ interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Checkbox({ label, id, style, ...props }: CheckboxProps) {
-  const inputId = id ?? React.useId();
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
 
   return (
     <label

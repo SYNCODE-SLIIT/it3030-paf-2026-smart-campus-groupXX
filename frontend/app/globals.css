@@ -139,20 +139,20 @@
   :root {
     --bg:           #0A0908;
     --bg-subtle:    #111009;
-    --surface:      #1C1A14;
-    --surface-2:    #141210;
-    --surface-dark: #100E09;
+    --surface:      var(--neutral-900);
+    --surface-2:    var(--neutral-950);
+    --surface-dark: var(--neutral-950);
 
-    --border:        #272420;
-    --border-strong: #3E3C37;
+    --border:        var(--neutral-800);
+    --border-strong: var(--neutral-700);
 
     --text-h:     #F4F2EC;
     --text-body:  #7E7B72;
     --text-muted: #5E5B54;
     --text-label: #5E5B54;
 
-    --input-bg:     #131108;
-    --input-border: #272420;
+    --input-bg:     var(--neutral-950);
+    --input-border: var(--neutral-800);
     --input-text:   #E8E5DC;
     --input-ph:     #3E3C37;
 
@@ -172,7 +172,7 @@
     --warning-text:   var(--orange-100);
     --warning-border: var(--orange-700);
 
-    --nav-bg:    rgba(28,26,20,.8);
+    --nav-bg:    rgba(14,13,11,.85);
     --nav-inset: rgba(255,255,255,.06);
   }
 }
@@ -232,5 +232,12 @@ svg {
   0%   { scale: 1; }
   35%  { scale: 1.28; }
   65%  { scale: 0.9; }
+  100% { scale: 1; }
+}
+
+@keyframes nav-bounce {
+  0%   { scale: 1; }
+  35%  { scale: 1.12; }
+  65%  { scale: 0.97; }
   100% { scale: 1; }
 }
