@@ -4,10 +4,13 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Avatar, Button, GlassPill } from '@/components/ui';
 import { Menu, X } from 'lucide-react';
+import type { UserRole } from '@/lib/nav-rbac';
 
 export interface NavItem {
   label: string;
   href: string;
+  /** Roles that can see this item. Omit to show to everyone. */
+  allowedRoles?: UserRole[];
 }
 
 export interface NavUser {

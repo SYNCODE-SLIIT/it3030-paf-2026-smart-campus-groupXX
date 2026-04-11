@@ -7,7 +7,8 @@ interface RadioProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Radio({ label, id, style, ...props }: RadioProps) {
-  const inputId = id ?? React.useId();
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
 
   return (
     <label
