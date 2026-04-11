@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Avatar, Button } from '@/components/ui';
+import { Avatar, Button, GlassPill } from '@/components/ui';
 import { Menu, X } from 'lucide-react';
 
 export interface NavItem {
@@ -24,14 +24,6 @@ interface NavbarProps {
   onNavigate?: (href: string) => void;
 }
 
-const glassPill: React.CSSProperties = {
-  background: 'var(--nav-bg)',
-  backdropFilter: 'blur(20px) saturate(1.4)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
-  borderRadius: 100,
-  border: '1px solid var(--border)',
-  boxShadow: 'inset 0 1px 0 var(--nav-inset), 0 2px 16px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05)',
-};
 
 export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -53,9 +45,8 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
         }}
       >
         {/* Left pill: Logo + Nav */}
-        <div
+        <GlassPill
           style={{
-            ...glassPill,
             display: 'flex',
             alignItems: 'center',
             gap: 4,
@@ -107,12 +98,11 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
           >
             <Menu size={20} strokeWidth={2.5} />
           </button>
-        </div>
+        </GlassPill>
 
         {/* Right pill: Auth */}
-        <div
+        <GlassPill
           style={{
-            ...glassPill,
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -151,7 +141,7 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
               Sign in
             </Button>
           )}
-        </div>
+        </GlassPill>
       </header>
 
       {/* Mobile overlay */}
@@ -170,24 +160,23 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 40 }}>
-            <button
+            <GlassPill
+              as="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close menu"
               style={{
-                ...glassPill,
                 width: 52,
                 height: 52,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                border: '1px solid var(--border)',
                 color: 'var(--text-h)',
                 cursor: 'pointer',
                 flexShrink: 0,
               }}
             >
               <X size={22} strokeWidth={2.5} />
-            </button>
+            </GlassPill>
           </div>
 
           <nav style={{ display: 'flex', flexDirection: 'column' }}>

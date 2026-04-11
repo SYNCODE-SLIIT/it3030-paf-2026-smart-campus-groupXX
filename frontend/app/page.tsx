@@ -22,6 +22,7 @@ import {
   Tooltip,
 } from '@/components/ui';
 import { Navbar } from '@/components/layout/Navbar';
+import { Sidebar, defaultSidebarSections } from '@/components/layout/Sidebar';
 
 export default function Home() {
   const [tab1, setTab1] = React.useState('overview');
@@ -37,8 +38,22 @@ export default function Home() {
     { label: 'About', href: '/about' },
   ];
 
+  const [sidebarPath, setSidebarPath] = React.useState('Dashboard');
+
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px 80px' }}>
+    <div style={{ display: 'flex' }}>
+
+      {/* Live Sidebar — fixed on the left */}
+      <Sidebar
+        sections={defaultSidebarSections}
+        activePath={sidebarPath}
+        user={{ name: 'Jane Doe', initials: 'JD', role: 'BSc Computer Science' }}
+        notificationCount={4}
+        onNavigate={(item) => setSidebarPath(item.label)}
+        onLogout={() => {}}
+      />
+
+    <div style={{ marginLeft: 272, flex: 1, maxWidth: 960, padding: '48px 24px 80px' }}>
 
       {/* Live Navbar — fixed at top of viewport */}
       <Navbar
@@ -341,6 +356,7 @@ export default function Home() {
         </Row>
       </Section>
 
+    </div>
     </div>
   );
 }
