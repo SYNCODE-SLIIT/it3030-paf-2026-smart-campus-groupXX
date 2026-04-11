@@ -1,0 +1,57 @@
+package com.university.smartcampus;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+
+import com.university.smartcampus.AppEnums.AuthDeliveryMethod;
+
+@TestConfiguration
+public class TestAuthProviderConfiguration {
+
+    @Bean
+    @Primary
+    RecordingAuthProviderClient recordingAuthProviderClient() {
+        return new RecordingAuthProviderClient();
+    }
+
+    static class RecordingAuthProviderClient implements AuthProviderClient {
+
+        private final List<DeliveryResult> deliveries = new ArrayList<>();
+
+        @Override
+        public DeliveryResult sendInviteLink(String email) {
+            DeliveryResult result = new DeliveryResult(
+                AuthDeliveryMethod.INVITE_EMAIL,
+                "invite-" + UUID.randomUUID(),
+                "http://localhost/invite"
+            );
+            deliveries.add(result);
+            return result;
+        }
+
+        @Override
+        public DeliveryResult sendMagicLink(String email) {
+            DeliveryResult result = new DeliveryResult(
+                AuthDeliveryMethod.LOGIN_LINK_EMAIL,
+                "magic-" + UUID.randomUUID(),
+                "http://localhost/magic"
+            );
+            deliveries.add(result);
+            return result;
+        }
+
+        List<DeliveryResult> deliveries() {
+            return Collections.unmodifiableList(deliveries);
+        }
+
+        void reset() {
+            deliveries.clear();
+        }
+    }
+}
