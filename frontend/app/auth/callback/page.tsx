@@ -10,6 +10,7 @@ import { getPostAuthRedirect } from '@/lib/auth-routing';
 import {
   clearInviteFlowState,
   isInviteFlowEmailMatch,
+  primeInviteFlowState,
   readInviteFlowState,
   recordWrongInviteAccountAttempt,
 } from '@/lib/invite-flow';
@@ -84,9 +85,16 @@ function AuthCallbackClient() {
       const queryType = searchParams.get('type');
       const hashParams = parseHashParams();
       const hashType = hashParams.get('type');
-      const isInviteFlow = queryFlow === 'invite' || queryType === 'invite' || hashType === 'invite';
+      const isInviteGoogleFlow = queryFlow === 'invite-google';
+      const isInviteLinkFlow = queryFlow === 'invite' || queryType === 'invite' || hashType === 'invite';
+      const isInviteFlow = isInviteGoogleFlow || isInviteLinkFlow;
 
-      const toInviteWelcome = (reason?: string, nextPath?: string, remainingAttempts?: number) => {
+      const toInviteWelcome = (
+        reason?: string,
+        nextPath?: string,
+        remainingAttempts?: number,
+        inviteEmail?: string,
+      ) => {
         const params = new URLSearchParams();
         if (reason) {
           params.set('reason', reason);
@@ -96,6 +104,9 @@ function AuthCallbackClient() {
         }
         if (typeof remainingAttempts === 'number') {
           params.set('remaining', String(remainingAttempts));
+        }
+        if (inviteEmail) {
+          params.set('email', inviteEmail);
         }
 
         const query = params.toString();
@@ -210,15 +221,22 @@ function AuthCallbackClient() {
 
         setStatusMessage('Finalizing your Smart Campus access...');
         const synced = await syncSession(accessToken);
+        const syncedUserEmail = synced.user.email;
+        primeInviteFlowState(synced.user.email);
         const nextPath = getPostAuthRedirect(synced.user, synced.nextStep);
 
         if (cancelled) {
           return;
         }
 
-        if (isInviteFlow) {
+        if (isInviteGoogleFlow) {
           clearInviteFlowState();
           router.replace(nextPath);
+          return;
+        }
+
+        if (isInviteLinkFlow) {
+          router.replace(toInviteWelcome(undefined, undefined, undefined, syncedUserEmail));
           return;
         }
 
@@ -242,11 +260,13 @@ function AuthCallbackClient() {
           if (retryState?.exhausted) {
             clearInviteFlowState();
             await supabase.auth.signOut();
-            router.replace(toInviteWelcome('invite_expired'));
+            router.replace(toInviteWelcome('invite_expired', undefined, undefined, inviteFlowState.expectedEmail));
             return;
           }
 
-          router.replace(toInviteWelcome('wrong_account', undefined, retryState?.remainingAttempts));
+          router.replace(
+            toInviteWelcome('wrong_account', undefined, retryState?.remainingAttempts, inviteFlowState.expectedEmail),
+          );
           return;
         }
 

@@ -1,32 +1,18 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, ShieldCheck } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { ShieldCheck } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 import { PasswordSetupCard } from '@/components/account/PasswordSetupCard';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Button, Card, Input } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api-client';
-import { getUserHomePath, needsStudentOnboarding } from '@/lib/auth-routing';
 import {
-  clearInviteFlowState,
   isInviteFlowEmailMatch,
   primeInviteFlowState,
   readInviteFlowState,
 } from '@/lib/invite-flow';
-
-function sanitizeNextPath(path: string | null) {
-  if (!path || !path.startsWith('/')) {
-    return null;
-  }
-
-  if (path.startsWith('//')) {
-    return null;
-  }
-
-  return path;
-}
 
 function inviteReasonNotice(reason: string | null, remainingAttempts: number | null) {
   switch (reason) {
@@ -69,10 +55,10 @@ function inviteReasonNotice(reason: string | null, remainingAttempts: number | n
 }
 
 function AuthWelcomeContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { appUser, loading, refreshMe, session, signInWithGoogle } = useAuth();
   const reason = searchParams.get('reason');
+  const inviteEmailHint = searchParams.get('email');
   const remainingAttempts = React.useMemo(() => {
     const value = searchParams.get('remaining');
     if (!value) {
@@ -109,35 +95,18 @@ function AuthWelcomeContent() {
       return;
     }
 
-    const inviteEmail = appUser?.email ?? session?.user?.email ?? null;
+    const inviteEmail = appUser?.email ?? session?.user?.email ?? inviteEmailHint ?? null;
     if (!inviteEmail) {
       return;
     }
 
     setInviteFlowState(primeInviteFlowState(inviteEmail));
-  }, [appUser?.email, reason, session?.user?.email]);
+  }, [appUser?.email, inviteEmailHint, reason, session?.user?.email]);
 
-  const nextFromQuery = React.useMemo(() => sanitizeNextPath(searchParams.get('next')), [searchParams]);
   const hasInviteRetryState = !!inviteFlowState;
   const mismatchedInviteSession = !isInviteFlowEmailMatch(inviteFlowState, session?.user?.email);
   const shouldHidePasswordSetup = !!session && hasInviteRetryState && mismatchedInviteSession;
-  const canContinueToApp = !!appUser && !shouldHidePasswordSetup;
-
-  const resolvedNextPath = React.useMemo(() => {
-    if (nextFromQuery) {
-      return nextFromQuery;
-    }
-
-    if (!appUser) {
-      return '/portal';
-    }
-
-    if (needsStudentOnboarding(appUser)) {
-      return '/student/onboarding';
-    }
-
-    return getUserHomePath(appUser);
-  }, [appUser, nextFromQuery]);
+  const hasInviteContext = !!(session || inviteFlowState?.expectedEmail || inviteEmailHint);
 
   React.useEffect(() => {
     if (loading || !session?.user?.id) {
@@ -157,16 +126,8 @@ function AuthWelcomeContent() {
     void refreshMe().finally(() => setIsHydratingUser(false));
   }, [appUser, isHydratingUser, lastHydratedSessionUserId, loading, refreshMe, session]);
 
-  React.useEffect(() => {
-    if (loading || isHydratingUser || reason || !canContinueToApp) {
-      return;
-    }
-
-    clearInviteFlowState();
-    router.replace(resolvedNextPath);
-  }, [canContinueToApp, isHydratingUser, loading, reason, resolvedNextPath, router]);
-
-  const displayEmail = inviteFlowState?.expectedEmail ?? session?.user?.email ?? appUser?.email ?? 'Invited account';
+  const displayEmail =
+    inviteFlowState?.expectedEmail ?? inviteEmailHint ?? session?.user?.email ?? appUser?.email ?? 'Invited account';
 
   if (loading || isHydratingUser) {
     return (
@@ -201,7 +162,7 @@ function AuthWelcomeContent() {
     );
   }
 
-  if (!session) {
+  if (!hasInviteContext) {
     return (
       <div
         style={{
@@ -292,7 +253,7 @@ function AuthWelcomeContent() {
 
             <Input label="Invited Email" value={displayEmail} readOnly disabled />
 
-            {!shouldHidePasswordSetup ? (
+            {session && !shouldHidePasswordSetup ? (
               <PasswordSetupCard
                 compact
                 title="Set your password"
@@ -306,7 +267,13 @@ function AuthWelcomeContent() {
               </Alert>
             )}
 
-            {!appUser && !shouldHidePasswordSetup && (
+            {!session ? (
+              <Alert variant="info" title="Invite ready">
+                Continue with Google sign-in below. Password setup will appear once the invite session finishes loading.
+              </Alert>
+            ) : null}
+
+            {!appUser && session && !shouldHidePasswordSetup && (
               <Alert variant="warning" title="Profile still loading">
                 Your invite session is active, but profile sync is still in progress. Wait a moment, or use Google sign-in to continue.
               </Alert>
@@ -323,18 +290,6 @@ function AuthWelcomeContent() {
                 }}
               >
                 Sign in with Google
-              </Button>
-              <Button
-                variant="glass"
-                size="sm"
-                disabled={!canContinueToApp}
-                iconRight={<ArrowRight size={14} />}
-                onClick={() => {
-                  clearInviteFlowState();
-                  router.replace(resolvedNextPath);
-                }}
-              >
-                Continue
               </Button>
             </div>
           </div>

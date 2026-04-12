@@ -202,7 +202,7 @@ export function AuthProvider({
     const redirectUrl = new URL('/auth/callback', window.location.origin);
 
     if (options?.flow === 'invite') {
-      redirectUrl.searchParams.set('flow', 'invite');
+      redirectUrl.searchParams.set('flow', 'invite-google');
     }
 
     const { error } = await supabase.auth.signInWithOAuth({
