@@ -18,15 +18,18 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
     private final SmartCampusProperties properties;
+    private final AuthIdentityClient authIdentityClient;
 
     public BootstrapAdminInitializer(
         UserRepository userRepository,
         CurrentUserService currentUserService,
-        SmartCampusProperties properties
+        SmartCampusProperties properties,
+        AuthIdentityClient authIdentityClient
     ) {
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
         this.properties = properties;
+        this.authIdentityClient = authIdentityClient;
     }
 
     @Override
@@ -38,28 +41,38 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
         }
 
         String email = currentUserService.normalizeEmail(bootstrapAdmin.getEmail());
-        if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
-            return;
+        UserEntity user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+
+        if (user == null) {
+            user = new UserEntity();
+            user.setId(UUID.randomUUID());
+            user.setEmail(email);
+            user.setUserType(UserType.ADMIN);
+            user.setAccountStatus(AccountStatus.ACTIVE);
+            user.setInvitedAt(Instant.now());
+            user.setActivatedAt(Instant.now());
+
+            AdminEntity admin = new AdminEntity();
+            admin.setUser(user);
+            admin.setFirstName(bootstrapAdmin.getFirstName());
+            admin.setLastName(bootstrapAdmin.getLastName());
+            admin.setEmployeeNumber(bootstrapAdmin.getEmployeeNumber());
+            admin.setDepartment(bootstrapAdmin.getDepartment());
+            admin.setJobTitle(bootstrapAdmin.getJobTitle());
+            user.setAdminProfile(admin);
+            userRepository.save(user);
         }
 
-        UserEntity user = new UserEntity();
-        user.setId(UUID.randomUUID());
-        user.setEmail(email);
-        user.setUserType(UserType.ADMIN);
-        user.setAccountStatus(AccountStatus.ACTIVE);
-        user.setOnboardingCompleted(true);
-        user.setInvitedAt(Instant.now());
-        user.setActivatedAt(Instant.now());
-
-        AdminEntity admin = new AdminEntity();
-        admin.setUser(user);
-        admin.setFirstName(bootstrapAdmin.getFirstName());
-        admin.setLastName(bootstrapAdmin.getLastName());
-        admin.setEmployeeNumber(bootstrapAdmin.getEmployeeNumber());
-        admin.setDepartment(bootstrapAdmin.getDepartment());
-        admin.setJobTitle(bootstrapAdmin.getJobTitle());
-        user.setAdminProfile(admin);
-
-        userRepository.save(user);
+        if (user.getUserType() == UserType.ADMIN && StringUtils.hasText(bootstrapAdmin.getPassword())) {
+            AuthIdentityClient.ProvisionedIdentity identity = authIdentityClient.provisionPasswordIdentity(
+                user.getEmail(),
+                user.getAuthUserId(),
+                bootstrapAdmin.getPassword()
+            );
+            if (!identity.authUserId().equals(user.getAuthUserId())) {
+                user.setAuthUserId(identity.authUserId());
+                userRepository.save(user);
+            }
+        }
     }
 }

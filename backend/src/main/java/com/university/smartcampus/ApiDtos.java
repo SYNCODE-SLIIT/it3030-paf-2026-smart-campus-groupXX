@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.university.smartcampus.AppEnums.AccountStatus;
+import com.university.smartcampus.AppEnums.AuthDeliveryMethod;
 import com.university.smartcampus.AppEnums.ManagerRole;
 import com.university.smartcampus.AppEnums.UserType;
 
@@ -20,6 +21,7 @@ public final class ApiDtos {
     }
 
     public record StudentProfileResponse(
+        boolean onboardingCompleted,
         String firstName,
         String lastName,
         String preferredName,
@@ -78,10 +80,14 @@ public final class ApiDtos {
         String email,
         UserType userType,
         AccountStatus accountStatus,
-        boolean onboardingCompleted,
         Instant lastLoginAt,
         Instant invitedAt,
         Instant activatedAt,
+        Instant lastInviteSentAt,
+        int inviteSendCount,
+        AuthDeliveryMethod lastInviteMethod,
+        String lastInviteReference,
+        String lastInviteRedirectUri,
         Set<ManagerRole> managerRoles,
         StudentProfileResponse studentProfile,
         FacultyProfileResponse facultyProfile,

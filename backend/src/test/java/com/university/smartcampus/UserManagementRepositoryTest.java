@@ -29,7 +29,6 @@ class UserManagementRepositoryTest extends AbstractPostgresIntegrationTest {
         user.setEmail("repo-manager@campus.test");
         user.setUserType(UserType.MANAGER);
         user.setAccountStatus(AccountStatus.ACTIVE);
-        user.setOnboardingCompleted(true);
         user.setInvitedAt(Instant.now());
         user.setActivatedAt(Instant.now());
 

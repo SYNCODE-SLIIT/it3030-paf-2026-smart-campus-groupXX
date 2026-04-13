@@ -1,6 +1,7 @@
 package com.university.smartcampus;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.Set;
@@ -34,9 +35,13 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
     @Autowired
     private TestAuthProviderConfiguration.RecordingAuthProviderClient recordingAuthProviderClient;
 
+    @Autowired
+    private TestAuthProviderConfiguration.RecordingAuthIdentityClient recordingAuthIdentityClient;
+
     @BeforeEach
     void resetProvider() {
         recordingAuthProviderClient.reset();
+        recordingAuthIdentityClient.reset();
     }
 
     @Test
@@ -48,16 +53,7 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
             null,
             null,
             null,
-            new AdminDtos.ManagerProfileInput(
-                "Maya",
-                "Manager",
-                null,
-                "0700000000",
-                "EMP-001",
-                "Operations",
-                "Facilities Lead",
-                "Main Office"
-            ),
+            null,
             Set.of(ManagerRole.CATALOG_MANAGER, ManagerRole.TICKET_MANAGER)
         );
 
@@ -69,6 +65,8 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
             ManagerRole.TICKET_MANAGER
         );
         assertThat(recordingAuthProviderClient.deliveries()).hasSize(1);
+        assertThat(response.lastInviteReference()).isNotBlank();
+        assertThat(response.inviteSendCount()).isEqualTo(1);
     }
 
     @Test
@@ -93,9 +91,39 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
             )
         );
 
-        assertThat(response.onboardingCompleted()).isTrue();
+        assertThat(response.studentProfile()).isNotNull();
+        assertThat(response.studentProfile().onboardingCompleted()).isTrue();
         assertThat(response.accountStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(response.studentProfile().registrationNumber()).isEqualTo("ST-2026-001");
+
+        UserEntity persisted = userRepository.findById(studentUser.getId()).orElseThrow();
+        assertThat(persisted.isOnboardingCompleted()).isTrue();
+        assertThat(persisted.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(persisted.getStudentProfile().isOnboardingCompleted()).isTrue();
+        assertThat(persisted.getStudentProfile().getRegistrationNumber()).isEqualTo("ST-2026-001");
+    }
+
+    @Test
+    void deleteUserRemovesUserAndDeletesAuthIdentity() {
+        UserEntity studentUser = seedStudent("delete-me@campus.test");
+        UUID authUserId = UUID.randomUUID();
+        studentUser.setAuthUserId(authUserId);
+        userRepository.saveAndFlush(studentUser);
+
+        var response = userManagementService.deleteUser(studentUser.getId(), UUID.randomUUID());
+
+        assertThat(response.message()).isEqualTo("User deleted.");
+        assertThat(userRepository.findById(studentUser.getId())).isEmpty();
+        assertThat(recordingAuthIdentityClient.deletedIdentityIds()).contains(authUserId);
+    }
+
+    @Test
+    void deleteUserRejectsSelfDelete() {
+        UserEntity studentUser = seedStudent("self-delete@campus.test");
+
+        assertThatThrownBy(() -> userManagementService.deleteUser(studentUser.getId(), studentUser.getId()))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("You cannot delete your own admin account.");
     }
 
     private UserEntity seedStudent(String email) {
@@ -104,11 +132,11 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
         user.setEmail(email);
         user.setUserType(UserType.STUDENT);
         user.setAccountStatus(AccountStatus.INVITED);
-        user.setOnboardingCompleted(false);
         user.setInvitedAt(Instant.now());
 
         StudentEntity student = new StudentEntity();
         student.setUser(user);
+        student.setOnboardingCompleted(false);
         user.setStudentProfile(student);
 
         return userRepository.save(user);

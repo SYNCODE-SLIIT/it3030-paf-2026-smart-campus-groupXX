@@ -20,10 +20,14 @@ public class UserMapper {
             user.getEmail(),
             user.getUserType(),
             user.getAccountStatus(),
-            user.isOnboardingCompleted(),
             user.getLastLoginAt(),
             user.getInvitedAt(),
             user.getActivatedAt(),
+            user.getLastInviteSentAt(),
+            user.getInviteSendCount(),
+            user.getLastInviteMethod(),
+            user.getLastInviteReference(),
+            user.getLastInviteRedirectUri(),
             managerRoles(user),
             toStudentProfile(user.getStudentProfile()),
             toFacultyProfile(user.getFacultyProfile()),
@@ -38,6 +42,7 @@ public class UserMapper {
         }
 
         return new StudentProfileResponse(
+            student.isOnboardingCompleted(),
             student.getFirstName(),
             student.getLastName(),
             student.getPreferredName(),

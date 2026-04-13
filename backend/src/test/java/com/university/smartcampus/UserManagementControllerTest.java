@@ -1,6 +1,7 @@
 package com.university.smartcampus;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -22,7 +23,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
 import com.university.smartcampus.AdminDtos.CreateUserRequest;
-import com.university.smartcampus.AdminDtos.ManagerProfileInput;
 import com.university.smartcampus.AdminDtos.ManagerRolesUpdateRequest;
 import com.university.smartcampus.AppEnums.AccountStatus;
 import com.university.smartcampus.AppEnums.ManagerRole;
@@ -48,12 +48,16 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     private TestAuthProviderConfiguration.RecordingAuthProviderClient recordingAuthProviderClient;
 
     @Autowired
+    private TestAuthProviderConfiguration.RecordingAuthIdentityClient recordingAuthIdentityClient;
+
+    @Autowired
     private WebApplicationContext context;
 
     @BeforeEach
     void setUp() {
         mockMvc = webAppContextSetup(context).apply(springSecurity()).build();
         recordingAuthProviderClient.reset();
+        recordingAuthIdentityClient.reset();
         userRepository.deleteAll();
         seedAdmin("admin@campus.test");
     }
@@ -78,7 +82,8 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.email").value("student@campus.test"))
             .andExpect(jsonPath("$.userType").value("STUDENT"))
-            .andExpect(jsonPath("$.onboardingCompleted").value(false));
+            .andExpect(jsonPath("$.studentProfile.onboardingCompleted").value(false))
+            .andExpect(jsonPath("$.lastInviteReference").isNotEmpty());
 
         assertThat(recordingAuthProviderClient.deliveries()).hasSize(1);
     }
@@ -92,7 +97,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             null,
             null,
             null,
-            new ManagerProfileInput("A", "B", null, null, "EMP", "Ops", "Lead", null),
+            null,
             Set.of()
         );
 
@@ -176,13 +181,39 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         mockMvc.perform(post("/api/admin/users/{id}/invite", student.getId())
                 .with(jwtFor("admin@campus.test")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("Auth email queued."));
+            .andExpect(jsonPath("$.message").value("Access link generated."));
 
         mockMvc.perform(post("/api/auth/login-link/request")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"missing@campus.test\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("If the account exists, a login link has been sent."));
+            .andExpect(jsonPath("$.message").value("If the account exists, an access link has been generated."));
+    }
+
+    @Test
+    void adminCanDeleteUserFromSystem() throws Exception {
+        UserEntity student = seedStudent("delete.user@campus.test", AccountStatus.ACTIVE, true);
+        UUID authUserId = UUID.randomUUID();
+        student.setAuthUserId(authUserId);
+        userRepository.saveAndFlush(student);
+
+        mockMvc.perform(delete("/api/admin/users/{id}", student.getId())
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("User deleted."));
+
+        assertThat(userRepository.findById(student.getId())).isEmpty();
+        assertThat(recordingAuthIdentityClient.deletedIdentityIds()).contains(authUserId);
+    }
+
+    @Test
+    void adminCannotDeleteOwnAccount() throws Exception {
+        UserEntity admin = userRepository.findByEmailIgnoreCase("admin@campus.test").orElseThrow();
+
+        mockMvc.perform(delete("/api/admin/users/{id}", admin.getId())
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("You cannot delete your own admin account."));
     }
 
     @Test
@@ -210,7 +241,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
-            .andExpect(jsonPath("$.onboardingCompleted").value(true))
+            .andExpect(jsonPath("$.studentProfile.onboardingCompleted").value(true))
             .andExpect(jsonPath("$.studentProfile.registrationNumber").value("ST-001"));
     }
 
@@ -220,7 +251,6 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         user.setEmail(email);
         user.setUserType(UserType.ADMIN);
         user.setAccountStatus(AccountStatus.ACTIVE);
-        user.setOnboardingCompleted(true);
         user.setInvitedAt(Instant.now());
         user.setActivatedAt(Instant.now());
 
@@ -242,11 +272,11 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         user.setEmail(email);
         user.setUserType(UserType.STUDENT);
         user.setAccountStatus(status);
-        user.setOnboardingCompleted(onboardingCompleted);
         user.setInvitedAt(Instant.now());
 
         StudentEntity student = new StudentEntity();
         student.setUser(user);
+        student.setOnboardingCompleted(onboardingCompleted);
         user.setStudentProfile(student);
 
         return userRepository.save(user);
@@ -258,7 +288,6 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         user.setEmail(email);
         user.setUserType(UserType.FACULTY);
         user.setAccountStatus(status);
-        user.setOnboardingCompleted(true);
         user.setInvitedAt(Instant.now());
 
         FacultyEntity faculty = new FacultyEntity();
@@ -279,7 +308,6 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         user.setEmail(email);
         user.setUserType(UserType.MANAGER);
         user.setAccountStatus(AccountStatus.ACTIVE);
-        user.setOnboardingCompleted(true);
         user.setInvitedAt(Instant.now());
         user.setActivatedAt(Instant.now());
 

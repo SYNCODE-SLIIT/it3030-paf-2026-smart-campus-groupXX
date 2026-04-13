@@ -24,6 +24,9 @@ public class StudentEntity extends TimestampedEntity {
     @JoinColumn(name = "user_id")
     private UserEntity user;
 
+    @Column(name = "onboarding_completed", nullable = false)
+    private boolean onboardingCompleted;
+
     @Column(name = "first_name", length = 100)
     private String firstName;
 
@@ -74,6 +77,14 @@ public class StudentEntity extends TimestampedEntity {
 
     public void setUser(UserEntity user) {
         this.user = user;
+    }
+
+    public boolean isOnboardingCompleted() {
+        return onboardingCompleted;
+    }
+
+    public void setOnboardingCompleted(boolean onboardingCompleted) {
+        this.onboardingCompleted = onboardingCompleted;
     }
 
     public String getFirstName() {

@@ -25,9 +25,9 @@ import com.university.smartcampus.AppEnums.AuthDeliveryMethod;
 import com.university.smartcampus.AppEnums.ManagerRole;
 import com.university.smartcampus.AppEnums.UserType;
 import com.university.smartcampus.AuthDtos.SessionSyncResponse;
-import com.university.smartcampus.Exceptions.BadRequestException;
-import com.university.smartcampus.Exceptions.ForbiddenException;
-import com.university.smartcampus.Exceptions.NotFoundException;
+import com.university.smartcampus.BadRequestException;
+import com.university.smartcampus.ForbiddenException;
+import com.university.smartcampus.NotFoundException;
 import com.university.smartcampus.StudentDtos.StudentOnboardingRequest;
 import com.university.smartcampus.StudentDtos.StudentOnboardingStateResponse;
 
@@ -41,6 +41,7 @@ public class UserManagementService {
     private final StudentRepository studentRepository;
     private final ManagerRepository managerRepository;
     private final AuthProviderClient authProviderClient;
+    private final AuthIdentityClient authIdentityClient;
     private final UserMapper userMapper;
     private final CurrentUserService currentUserService;
 
@@ -49,6 +50,7 @@ public class UserManagementService {
         StudentRepository studentRepository,
         ManagerRepository managerRepository,
         AuthProviderClient authProviderClient,
+        AuthIdentityClient authIdentityClient,
         UserMapper userMapper,
         CurrentUserService currentUserService
     ) {
@@ -56,6 +58,7 @@ public class UserManagementService {
         this.studentRepository = studentRepository;
         this.managerRepository = managerRepository;
         this.authProviderClient = authProviderClient;
+        this.authIdentityClient = authIdentityClient;
         this.userMapper = userMapper;
         this.currentUserService = currentUserService;
     }
@@ -75,7 +78,6 @@ public class UserManagementService {
         user.setEmail(email);
         user.setUserType(request.userType());
         user.setAccountStatus(AccountStatus.INVITED);
-        user.setOnboardingCompleted(request.userType() != UserType.STUDENT);
         user.setInvitedAt(Instant.now());
 
         attachProfileForCreate(user, request);
@@ -93,7 +95,6 @@ public class UserManagementService {
         String email,
         UserType userType,
         AccountStatus accountStatus,
-        Boolean onboardingCompleted,
         ManagerRole managerRole
     ) {
         Specification<UserEntity> specification = (root, query, cb) -> cb.conjunction();
@@ -110,10 +111,6 @@ public class UserManagementService {
 
         if (accountStatus != null) {
             specification = specification.and((root, query, cb) -> cb.equal(root.get("accountStatus"), accountStatus));
-        }
-
-        if (onboardingCompleted != null) {
-            specification = specification.and((root, query, cb) -> cb.equal(root.get("onboardingCompleted"), onboardingCompleted));
         }
 
         return userRepository.findAll(specification, Sort.by(Sort.Direction.ASC, "email")).stream()
@@ -145,7 +142,6 @@ public class UserManagementService {
             case MANAGER -> updateManagerProfile(user, request.managerProfile());
         }
 
-        validateOnboardingInvariant(user);
         return userMapper.toUserResponse(user);
     }
 
@@ -179,7 +175,7 @@ public class UserManagementService {
             : authProviderClient.sendMagicLink(user.getEmail());
 
         recordDelivery(user, delivery);
-        return new MessageResponse("Auth email queued.");
+        return new MessageResponse("Access link generated.");
     }
 
     @Transactional
@@ -191,7 +187,22 @@ public class UserManagementService {
                 .ifPresent(user -> recordDelivery(user, authProviderClient.sendMagicLink(user.getEmail())));
         }
 
-        return new MessageResponse("If the account exists, a login link has been sent.");
+        return new MessageResponse("If the account exists, an access link has been generated.");
+    }
+
+    @Transactional
+    public MessageResponse deleteUser(UUID id, UUID requestingAdminId) {
+        UserEntity user = getUserEntity(id);
+
+        if (user.getId().equals(requestingAdminId)) {
+            throw new BadRequestException("You cannot delete your own admin account.");
+        }
+
+        authIdentityClient.deleteIdentity(user.getAuthUserId(), user.getEmail());
+        userRepository.delete(user);
+        userRepository.flush();
+
+        return new MessageResponse("User deleted.");
     }
 
     @Transactional
@@ -206,10 +217,8 @@ public class UserManagementService {
             throw new ForbiddenException("This account is suspended.");
         }
 
-        if (user.getAuthUserId() == null) {
+        if (user.getAuthUserId() == null || !Objects.equals(user.getAuthUserId(), subject)) {
             user.setAuthUserId(subject);
-        } else if (!Objects.equals(user.getAuthUserId(), subject)) {
-            throw new ForbiddenException("This identity does not match the provisioned account.");
         }
 
         user.setLastLoginAt(Instant.now());
@@ -232,16 +241,17 @@ public class UserManagementService {
     public StudentOnboardingStateResponse getStudentOnboarding(UserEntity user) {
         ensureStudent(user);
         return new StudentOnboardingStateResponse(
-            user.isOnboardingCompleted(),
+            user.getStudentProfile() != null && user.getStudentProfile().isOnboardingCompleted(),
             userMapper.toStudentProfile(user.getStudentProfile())
         );
     }
 
     @Transactional
     public UserResponse completeStudentOnboarding(UserEntity user, StudentOnboardingRequest request) {
-        ensureStudent(user);
+        UserEntity managedUser = getUserEntity(user.getId());
+        ensureStudent(managedUser);
 
-        StudentEntity student = user.getStudentProfile();
+        StudentEntity student = managedUser.getStudentProfile();
         if (student == null) {
             throw new NotFoundException("Student profile was not found for this user.");
         }
@@ -259,16 +269,17 @@ public class UserManagementService {
         student.setEmailNotificationsEnabled(defaultBoolean(request.emailNotificationsEnabled(), Boolean.TRUE));
         student.setSmsNotificationsEnabled(defaultBoolean(request.smsNotificationsEnabled(), Boolean.FALSE));
 
-        user.setOnboardingCompleted(true);
-        if (user.getAccountStatus() == AccountStatus.INVITED) {
-            user.setAccountStatus(AccountStatus.ACTIVE);
+        student.setOnboardingCompleted(true);
+        if (managedUser.getAccountStatus() == AccountStatus.INVITED) {
+            managedUser.setAccountStatus(AccountStatus.ACTIVE);
         }
-        if (user.getActivatedAt() == null) {
-            user.setActivatedAt(Instant.now());
+        if (managedUser.getActivatedAt() == null) {
+            managedUser.setActivatedAt(Instant.now());
         }
 
         studentRepository.save(student);
-        return userMapper.toUserResponse(user);
+        userRepository.save(managedUser);
+        return userMapper.toUserResponse(managedUser);
     }
 
     private void attachProfileForCreate(UserEntity user, CreateUserRequest request) {
@@ -293,10 +304,13 @@ public class UserManagementService {
                     throw new BadRequestException("Student creation does not accept non-student profile payloads.");
                 }
             }
-            case FACULTY -> require(request.facultyProfile() != null, "Faculty profile data is required.");
-            case ADMIN -> require(request.adminProfile() != null, "Admin profile data is required.");
+            case FACULTY -> require(request.adminProfile() == null && request.managerProfile() == null,
+                "Faculty creation does not accept admin or manager profile payloads.");
+            case ADMIN -> require(request.facultyProfile() == null && request.managerProfile() == null,
+                "Admin creation does not accept faculty or manager profile payloads.");
             case MANAGER -> {
-                require(request.managerProfile() != null, "Manager profile data is required.");
+                require(request.facultyProfile() == null && request.adminProfile() == null,
+                    "Manager creation does not accept faculty or admin profile payloads.");
                 require(request.managerRoles() != null && !request.managerRoles().isEmpty(),
                     "Managers must have at least one manager role.");
             }
@@ -312,6 +326,7 @@ public class UserManagementService {
     private StudentEntity createStudentProfile(UserEntity user) {
         StudentEntity student = new StudentEntity();
         student.setUser(user);
+        student.setOnboardingCompleted(false);
         user.setStudentProfile(student);
         return student;
     }
@@ -319,7 +334,9 @@ public class UserManagementService {
     private FacultyEntity createFacultyProfile(UserEntity user, FacultyProfileInput input) {
         FacultyEntity faculty = new FacultyEntity();
         faculty.setUser(user);
-        applyFacultyProfile(faculty, input);
+        if (input != null) {
+            applyFacultyProfile(faculty, input);
+        }
         user.setFacultyProfile(faculty);
         return faculty;
     }
@@ -327,7 +344,9 @@ public class UserManagementService {
     private AdminEntity createAdminProfile(UserEntity user, AdminProfileInput input) {
         AdminEntity admin = new AdminEntity();
         admin.setUser(user);
-        applyAdminProfile(admin, input);
+        if (input != null) {
+            applyAdminProfile(admin, input);
+        }
         user.setAdminProfile(admin);
         return admin;
     }
@@ -335,7 +354,9 @@ public class UserManagementService {
     private ManagerEntity createManagerProfile(UserEntity user, ManagerProfileInput input, Set<ManagerRole> managerRoles) {
         ManagerEntity manager = new ManagerEntity();
         manager.setUser(user);
-        applyManagerProfile(manager, input);
+        if (input != null) {
+            applyManagerProfile(manager, input);
+        }
         manager.setManagerRoles(managerRoles);
         user.setManagerProfile(manager);
         return manager;
@@ -391,12 +412,6 @@ public class UserManagementService {
         manager.setDepartment(input.department());
         manager.setJobTitle(input.jobTitle());
         manager.setOfficeLocation(input.officeLocation());
-    }
-
-    private void validateOnboardingInvariant(UserEntity user) {
-        if (user.getUserType() != UserType.STUDENT && !user.isOnboardingCompleted()) {
-            throw new BadRequestException("Only student users can have incomplete onboarding.");
-        }
     }
 
     private UserEntity getUserEntity(UUID id) {

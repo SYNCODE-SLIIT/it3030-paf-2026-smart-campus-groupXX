@@ -2,30 +2,52 @@ services:
   backend:
     image: maven:3.9.6-eclipse-temurin-21
     working_dir: /app
-    command: mvn spring-boot:run
+    command: mvn -Dspring-boot.run.excludeDevtools=true spring-boot:run
     ports:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: local
+      SPRING_DEVTOOLS_RESTART_ENABLED: "false"
+      SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      APP_BOOTSTRAP_ADMIN_EMAIL: ${APP_BOOTSTRAP_ADMIN_EMAIL:-}
+      APP_BOOTSTRAP_ADMIN_PASSWORD: ${APP_BOOTSTRAP_ADMIN_PASSWORD:-}
+      APP_BOOTSTRAP_ADMIN_FIRST_NAME: ${APP_BOOTSTRAP_ADMIN_FIRST_NAME:-System}
+      APP_BOOTSTRAP_ADMIN_LAST_NAME: ${APP_BOOTSTRAP_ADMIN_LAST_NAME:-Admin}
+      APP_BOOTSTRAP_ADMIN_EMPLOYEE_NUMBER: ${APP_BOOTSTRAP_ADMIN_EMPLOYEE_NUMBER:-ADM-001}
+      APP_BOOTSTRAP_ADMIN_DEPARTMENT: ${APP_BOOTSTRAP_ADMIN_DEPARTMENT:-Platform Operations}
+      APP_BOOTSTRAP_ADMIN_JOB_TITLE: ${APP_BOOTSTRAP_ADMIN_JOB_TITLE:-Platform Administrator}
     volumes:
       - ./backend:/app
       - ~/.m2:/root/.m2
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/me || true); [ \"$$status\" != \"000\" ]"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
 
   frontend:
     build: ./frontend
-    command: npm run dev
+    command: sh -c "mkdir -p .next/dev/logs .next/dev/types .next/types && npm run dev"
     ports:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8080
-      WATCHPACK_POLLING: "true" 
+      INTERNAL_API_URL: http://backend:8080
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     volumes:
       - ./frontend:/app
       - /app/node_modules

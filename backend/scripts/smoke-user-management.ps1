@@ -1,7 +1,10 @@
 param(
     [string]$BaseUrl = "http://localhost:8080",
     [string]$AdminEmail = "local.admin@smartcampus.local",
-    [string]$JwtSecret = "smart-campus-local-hs256-secret-for-smoke-tests-only"
+    [string]$JwtSecret = "smart-campus-local-hs256-secret-for-smoke-tests-only",
+    [string]$AdminPassword = "",
+    [string]$SupabaseUrl = "",
+    [string]$SupabaseAnonKey = ""
 )
 
 Set-StrictMode -Version Latest
@@ -55,11 +58,37 @@ function Invoke-SmokeApi($Method, $Path, $Token, $Body = $null) {
     Invoke-RestMethod @params
 }
 
-$adminToken = New-HmacJwt -Email $AdminEmail -Secret $JwtSecret
+function Get-AdminToken() {
+    if ($AdminPassword -and $SupabaseUrl -and $SupabaseAnonKey) {
+        $login = Invoke-RestMethod -Method Post `
+            -Uri "$SupabaseUrl/auth/v1/token?grant_type=password" `
+            -Headers @{
+                apikey = $SupabaseAnonKey
+                Authorization = "Bearer $SupabaseAnonKey"
+            } `
+            -ContentType "application/json" `
+            -Body (@{
+                email = $AdminEmail
+                password = $AdminPassword
+            } | ConvertTo-Json)
+
+        return $login.access_token
+    }
+
+    return New-HmacJwt -Email $AdminEmail -Secret $JwtSecret
+}
+
+$adminToken = Get-AdminToken
 
 Write-Host "Checking backend health..."
 $health = Invoke-SmokeApi -Method Get -Path "/api/health" -Token $null
 Write-Host "Health response: $health"
+
+if ($AdminPassword -and $SupabaseUrl -and $SupabaseAnonKey) {
+    Write-Host "Syncing admin session..."
+    $adminSync = Invoke-SmokeApi -Method Post -Path "/api/auth/session/sync" -Token $adminToken
+    Write-Host "Admin next step: $($adminSync.nextStep)"
+}
 
 Write-Host "Listing current users..."
 $initialUsers = Invoke-SmokeApi -Method Get -Path "/api/admin/users" -Token $adminToken
@@ -70,20 +99,14 @@ $managerEmail = "smoke.manager.$([guid]::NewGuid().ToString('N').Substring(0, 8)
 $createResponse = Invoke-SmokeApi -Method Post -Path "/api/admin/users" -Token $adminToken -Body @{
     email = $managerEmail
     userType = "MANAGER"
-    sendInvite = $false
-    managerProfile = @{
-        firstName = "Smoke"
-        lastName = "Manager"
-        preferredName = "SM"
-        phoneNumber = "0700000000"
-        employeeNumber = "SMK-001"
-        department = "Operations"
-        jobTitle = "Smoke Manager"
-        officeLocation = "HQ"
-    }
+    sendInvite = $true
     managerRoles = @("CATALOG_MANAGER", "BOOKING_MANAGER")
 }
 Write-Host "Created user id: $($createResponse.id)"
+if (-not $createResponse.lastInviteReference) {
+    throw "Expected create user response to include a generated access link."
+}
+Write-Host "Generated access link captured."
 
 Write-Host "Replacing manager roles..."
 $updatedRoles = Invoke-SmokeApi -Method Put -Path "/api/admin/users/$($createResponse.id)/manager-roles" -Token $adminToken -Body @{
@@ -139,8 +162,8 @@ $completedStudent = Invoke-SmokeApi -Method Put -Path "/api/students/me/onboardi
     smsNotificationsEnabled = $false
 }
 
-if (-not $completedStudent.onboardingCompleted) {
-    throw "Expected onboardingCompleted=true after onboarding submission."
+if (-not $completedStudent.studentProfile.onboardingCompleted) {
+    throw "Expected studentProfile.onboardingCompleted=true after onboarding submission."
 }
 if ($completedStudent.accountStatus -ne "ACTIVE") {
     throw "Expected student accountStatus to be ACTIVE but got '$($completedStudent.accountStatus)'"

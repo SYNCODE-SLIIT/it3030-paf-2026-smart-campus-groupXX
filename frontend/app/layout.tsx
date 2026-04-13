@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Open_Sans, Poppins, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from '@/components/providers/AuthProvider';
+import { getInitialServerAppUser } from '@/lib/server-auth';
 
 const openSans = Open_Sans({
   variable: "--font-body",
@@ -25,17 +27,20 @@ export const metadata: Metadata = {
   description: "Smart Campus Application",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const initialAppUser = await getInitialServerAppUser();
+
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body
+        suppressHydrationWarning
         className={`${openSans.variable} ${poppins.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        {children}
+        <AuthProvider initialAppUser={initialAppUser}>{children}</AuthProvider>
       </body>
     </html>
   );

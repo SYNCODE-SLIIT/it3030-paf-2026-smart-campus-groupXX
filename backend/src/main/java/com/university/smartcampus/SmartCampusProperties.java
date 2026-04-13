@@ -155,6 +155,7 @@ public class SmartCampusProperties {
         private String employeeNumber;
         private String department;
         private String jobTitle;
+        private String password;
 
         public String getEmail() {
             return email;
@@ -202,6 +203,14 @@ public class SmartCampusProperties {
 
         public void setJobTitle(String jobTitle) {
             this.jobTitle = jobTitle;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
         }
     }
 }

@@ -7,16 +7,21 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.crypto.spec.SecretKeySpec;
 
+import org.springframework.cache.concurrent.ConcurrentMapCache;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestOperations;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -30,6 +35,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/health", "/api/auth/login-link/request").permitAll()
                 .anyRequest().authenticated()
             )
@@ -42,8 +48,9 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource(SmartCampusProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(parseCsv(properties.getSecurity().getCors().getAllowedOrigins()));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setMaxAge(3600L);
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -116,9 +123,28 @@ public class SecurityConfig {
         AtomicReference<JwtDecoder> delegate = new AtomicReference<>();
         return token -> {
             JwtDecoder resolved = delegate.updateAndGet(existing ->
-                existing != null ? existing : JwtDecoders.fromIssuerLocation(issuerUri)
+                existing != null ? existing : buildIssuerDecoder(issuerUri)
             );
             return resolved.decode(token);
         };
+    }
+
+    private JwtDecoder buildIssuerDecoder(String issuerUri) {
+        String normalizedIssuer = trimTrailingSlash(issuerUri);
+        String jwkSetUri = normalizedIssuer + "/.well-known/jwks.json";
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
+            .restOperations(jwtRestOperations())
+            .cache(new ConcurrentMapCache("supabase-jwks"))
+            .discoverJwsAlgorithms()
+            .build();
+        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(normalizedIssuer));
+        return decoder;
+    }
+
+    private RestOperations jwtRestOperations() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(5000);
+        requestFactory.setReadTimeout(30000);
+        return new RestTemplate(requestFactory);
     }
 }

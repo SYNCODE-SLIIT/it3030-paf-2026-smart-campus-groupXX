@@ -6,7 +6,7 @@ import {
   FolderOpen, MessageSquare, BarChart2,
   Bell, ChevronUp, LogOut, Building2, User, Settings, ShieldCheck,
 } from 'lucide-react';
-import type { UserRole } from '@/lib/nav-rbac';
+import type { UserType } from '@/lib/api-types';
 import { Avatar } from '@/components/ui';
 import { GlassPill } from '@/components/ui/GlassPill';
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu';
@@ -17,7 +17,7 @@ export interface NavItem {
   badge?: number;
   href?: string;
   /** Roles that can see this item. Omit to show to everyone. */
-  allowedRoles?: UserRole[];
+  allowedRoles?: UserType[];
 }
 
 export interface NavSection {
@@ -32,6 +32,8 @@ export interface SidebarProps {
   notificationCount?: number;
   onNavigate?: (item: NavItem) => void;
   onLogout?: () => void;
+  profileDropdownItems?: DropdownMenuItem[];
+  brandSubtitle?: string;
   /** Render as a relative-positioned block for inline demos */
   inline?: boolean;
 }
@@ -43,7 +45,7 @@ export const defaultSidebarSections: NavSection[] = [
     items: [
       { label: 'Courses',   icon: BookOpen,   badge: 3 },
       { label: 'Schedule',  icon: Calendar             },
-      { label: 'Grades',    icon: TrendingUp,  allowedRoles: ['student', 'lecturer'] },
+      { label: 'Grades',    icon: TrendingUp,  allowedRoles: ['STUDENT', 'FACULTY'] },
       { label: 'Resources', icon: FolderOpen           },
     ],
   },
@@ -51,14 +53,14 @@ export const defaultSidebarSections: NavSection[] = [
     title: 'Communicate',
     items: [
       { label: 'Messages',  icon: MessageSquare, badge: 12 },
-      { label: 'Analytics', icon: BarChart2, allowedRoles: ['lecturer', 'admin'] },
+      { label: 'Analytics', icon: BarChart2, allowedRoles: ['FACULTY', 'ADMIN'] },
     ],
   },
   {
     title: 'Administration',
     items: [
-      { label: 'User Management', icon: ShieldCheck, allowedRoles: ['admin'] },
-      { label: 'Settings',        icon: Settings,    allowedRoles: ['admin'] },
+      { label: 'User Management', icon: ShieldCheck, allowedRoles: ['ADMIN'] },
+      { label: 'Settings',        icon: Settings,    allowedRoles: ['ADMIN'] },
     ],
   },
 ];
@@ -143,6 +145,8 @@ export function Sidebar({
   notificationCount = 0,
   onNavigate,
   onLogout,
+  profileDropdownItems,
+  brandSubtitle = 'Student Portal',
   inline = false,
 }: SidebarProps) {
   const [active, setActive] = useState(activePath);
@@ -165,7 +169,7 @@ export function Sidebar({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
-  const profileDropdownItems: DropdownMenuItem[] = [
+  const resolvedProfileDropdownItems: DropdownMenuItem[] = profileDropdownItems ?? [
     { label: 'My Organization', icon: Building2 },
     { label: 'My Profile', icon: User },
     { label: 'Settings', icon: Settings },
@@ -223,7 +227,7 @@ export function Sidebar({
                 letterSpacing: '.16em', textTransform: 'uppercase',
                 color: 'var(--text-muted)', marginTop: 2,
               }}>
-                Student Portal
+                {brandSubtitle}
               </div>
             </div>
           </div>
@@ -333,7 +337,7 @@ export function Sidebar({
               />
             </button>
 
-            <DropdownMenu items={profileDropdownItems} open={dropdownOpen} direction="up" />
+            <DropdownMenu items={resolvedProfileDropdownItems} open={dropdownOpen} direction="up" />
           </div>
         </div>
 

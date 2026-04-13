@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +26,7 @@ import com.university.smartcampus.AppEnums.AccountStatus;
 import com.university.smartcampus.AppEnums.ManagerRole;
 import com.university.smartcampus.AppEnums.UserType;
 import com.university.smartcampus.CurrentUserService;
+import com.university.smartcampus.UserEntity;
 import com.university.smartcampus.UserManagementService;
 
 import jakarta.validation.Valid;
@@ -53,12 +55,11 @@ public class AdminUserController {
         @RequestParam(required = false) String email,
         @RequestParam(required = false) UserType userType,
         @RequestParam(required = false) AccountStatus accountStatus,
-        @RequestParam(required = false) Boolean onboardingCompleted,
         @RequestParam(required = false) ManagerRole managerRole,
         Authentication authentication
     ) {
         currentUserService.requireAdmin(authentication);
-        return userManagementService.listUsers(email, userType, accountStatus, onboardingCompleted, managerRole);
+        return userManagementService.listUsers(email, userType, accountStatus, managerRole);
     }
 
     @GetMapping("/{id}")
@@ -91,5 +92,11 @@ public class AdminUserController {
     public MessageResponse resendInvite(@PathVariable UUID id, Authentication authentication) {
         currentUserService.requireAdmin(authentication);
         return userManagementService.resendInvite(id);
+    }
+
+    @DeleteMapping("/{id}")
+    public MessageResponse deleteUser(@PathVariable UUID id, Authentication authentication) {
+        UserEntity admin = currentUserService.requireAdmin(authentication);
+        return userManagementService.deleteUser(id, admin.getId());
     }
 }

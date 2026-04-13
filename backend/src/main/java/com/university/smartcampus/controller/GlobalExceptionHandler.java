@@ -13,11 +13,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.university.smartcampus.ApiDtos.ErrorResponse;
-import com.university.smartcampus.Exceptions.BadRequestException;
-import com.university.smartcampus.Exceptions.ExternalServiceException;
-import com.university.smartcampus.Exceptions.ForbiddenException;
-import com.university.smartcampus.Exceptions.NotFoundException;
-import com.university.smartcampus.Exceptions.UnauthorizedException;
+import com.university.smartcampus.BadRequestException;
+import com.university.smartcampus.ExternalServiceException;
+import com.university.smartcampus.ForbiddenException;
+import com.university.smartcampus.NotFoundException;
+import com.university.smartcampus.UnauthorizedException;
 
 import jakarta.servlet.http.HttpServletRequest;
 

@@ -36,9 +36,6 @@ public class UserEntity extends TimestampedEntity {
     @Column(name = "account_status", nullable = false, length = 20)
     private AccountStatus accountStatus;
 
-    @Column(name = "onboarding_completed", nullable = false)
-    private boolean onboardingCompleted;
-
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
@@ -58,7 +55,7 @@ public class UserEntity extends TimestampedEntity {
     @Column(name = "last_invite_method", length = 30)
     private AppEnums.AuthDeliveryMethod lastInviteMethod;
 
-    @Column(name = "last_invite_reference", length = 255)
+    @Column(name = "last_invite_reference", columnDefinition = "text")
     private String lastInviteReference;
 
     @Column(name = "last_invite_redirect_uri", length = 500)
@@ -117,11 +114,11 @@ public class UserEntity extends TimestampedEntity {
     }
 
     public boolean isOnboardingCompleted() {
-        return onboardingCompleted;
-    }
+        if (userType != UserType.STUDENT) {
+            return true;
+        }
 
-    public void setOnboardingCompleted(boolean onboardingCompleted) {
-        this.onboardingCompleted = onboardingCompleted;
+        return studentProfile != null && studentProfile.isOnboardingCompleted();
     }
 
     public Instant getLastLoginAt() {

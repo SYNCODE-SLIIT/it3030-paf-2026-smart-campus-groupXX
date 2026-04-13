@@ -10,8 +10,8 @@ import org.springframework.util.StringUtils;
 
 import com.university.smartcampus.AppEnums.AccountStatus;
 import com.university.smartcampus.AppEnums.UserType;
-import com.university.smartcampus.Exceptions.ForbiddenException;
-import com.university.smartcampus.Exceptions.UnauthorizedException;
+import com.university.smartcampus.ForbiddenException;
+import com.university.smartcampus.UnauthorizedException;
 
 @Service
 public class CurrentUserService {

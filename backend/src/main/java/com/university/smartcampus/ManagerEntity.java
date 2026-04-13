@@ -31,10 +31,10 @@ public class ManagerEntity extends TimestampedEntity {
     @JoinColumn(name = "user_id")
     private UserEntity user;
 
-    @Column(name = "first_name", nullable = false, length = 100)
+    @Column(name = "first_name", length = 100)
     private String firstName;
 
-    @Column(name = "last_name", nullable = false, length = 100)
+    @Column(name = "last_name", length = 100)
     private String lastName;
 
     @Column(name = "preferred_name", length = 100)
@@ -43,13 +43,13 @@ public class ManagerEntity extends TimestampedEntity {
     @Column(name = "phone_number", length = 30)
     private String phoneNumber;
 
-    @Column(name = "employee_number", nullable = false, length = 100)
+    @Column(name = "employee_number", length = 100)
     private String employeeNumber;
 
-    @Column(nullable = false, length = 150)
+    @Column(length = 150)
     private String department;
 
-    @Column(name = "job_title", nullable = false, length = 150)
+    @Column(name = "job_title", length = 150)
     private String jobTitle;
 
     @Column(name = "office_location", length = 150)

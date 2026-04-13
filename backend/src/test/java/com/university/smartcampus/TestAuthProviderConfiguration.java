@@ -20,6 +20,12 @@ public class TestAuthProviderConfiguration {
         return new RecordingAuthProviderClient();
     }
 
+    @Bean
+    @Primary
+    RecordingAuthIdentityClient recordingAuthIdentityClient() {
+        return new RecordingAuthIdentityClient();
+    }
+
     static class RecordingAuthProviderClient implements AuthProviderClient {
 
         private final List<DeliveryResult> deliveries = new ArrayList<>();
@@ -52,6 +58,40 @@ public class TestAuthProviderConfiguration {
 
         void reset() {
             deliveries.clear();
+        }
+    }
+
+    static class RecordingAuthIdentityClient implements AuthIdentityClient {
+
+        private final List<ProvisionedIdentity> identities = new ArrayList<>();
+        private final List<UUID> deletedIdentityIds = new ArrayList<>();
+
+        @Override
+        public ProvisionedIdentity provisionPasswordIdentity(String email, UUID existingAuthUserId, String password) {
+            UUID authUserId = existingAuthUserId != null ? existingAuthUserId : UUID.randomUUID();
+            ProvisionedIdentity result = new ProvisionedIdentity(authUserId, existingAuthUserId == null);
+            identities.add(result);
+            return result;
+        }
+
+        @Override
+        public void deleteIdentity(UUID authUserId, String email) {
+            if (authUserId != null) {
+                deletedIdentityIds.add(authUserId);
+            }
+        }
+
+        List<ProvisionedIdentity> identities() {
+            return Collections.unmodifiableList(identities);
+        }
+
+        List<UUID> deletedIdentityIds() {
+            return Collections.unmodifiableList(deletedIdentityIds);
+        }
+
+        void reset() {
+            identities.clear();
+            deletedIdentityIds.clear();
         }
     }
 }
