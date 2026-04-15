@@ -14,6 +14,7 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.university.smartcampus.ApiDtos.ErrorResponse;
 import com.university.smartcampus.BadRequestException;
+import com.university.smartcampus.ConflictException;
 import com.university.smartcampus.ExternalServiceException;
 import com.university.smartcampus.ForbiddenException;
 import com.university.smartcampus.NotFoundException;
@@ -37,6 +38,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException exception, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(ConflictException exception, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, exception.getMessage(), request);
     }
 
     @ExceptionHandler({ ForbiddenException.class, AccessDeniedException.class })

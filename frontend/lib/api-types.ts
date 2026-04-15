@@ -8,9 +8,16 @@ export type ManagerRole = 'CATALOG_MANAGER' | 'BOOKING_MANAGER' | 'TICKET_MANAGE
 
 export type NextStep = 'ONBOARDING' | 'DASHBOARD';
 
-export type ResourceCategory = 'SPACE' | 'EQUIPMENT' | 'SPORTS' | 'EVENT' | 'UTILITY';
+export type ResourceCategory =
+  | 'SPACES'
+  | 'TECHNICAL_EQUIPMENT'
+  | 'MAINTENANCE_AND_CLEANING'
+  | 'SPORTS'
+  | 'EVENT_AND_DECORATION'
+  | 'GENERAL_UTILITY'
+  | 'TRANSPORT_AND_LOGISTICS';
 
-export type ResourceStatus = 'ACTIVE' | 'INACTIVE' | 'OUT_OF_SERVICE';
+export type ResourceStatus = 'ACTIVE' | 'OUT_OF_SERVICE' | 'MAINTENANCE' | 'INACTIVE';
 
 export interface MessageResponse {
   message: string;
@@ -111,6 +118,7 @@ export interface ResourceResponse {
   name: string;
   category: ResourceCategory;
   subcategory: string | null;
+  description: string | null;
   location: string | null;
   capacity: number | null;
   quantity: number | null;
@@ -126,6 +134,7 @@ export interface CreateResourceRequest {
   name: string;
   category: ResourceCategory;
   subcategory?: string | null;
+  description?: string | null;
   location?: string | null;
   capacity?: number | null;
   quantity?: number | null;
@@ -141,6 +150,7 @@ export interface UpdateResourceRequest {
   name?: string;
   category?: ResourceCategory;
   subcategory?: string | null;
+  description?: string | null;
   location?: string | null;
   capacity?: number | null;
   quantity?: number | null;

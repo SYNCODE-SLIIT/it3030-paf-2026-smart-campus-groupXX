@@ -27,7 +27,7 @@ type ResourceFormErrors = Partial<Record<keyof ResourceFormValues, string>>;
 const defaultValues: ResourceFormValues = {
   code: '',
   name: '',
-  category: 'SPACE',
+  category: 'SPACES',
   subcategory: '',
   location: '',
   capacity: '',
