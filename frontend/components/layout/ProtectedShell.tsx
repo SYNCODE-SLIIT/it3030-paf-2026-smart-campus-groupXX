@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { KeyRound, LayoutDashboard, LogOut, ShieldCheck } from 'lucide-react';
+import { KeyRound, LayoutDashboard, LayoutGrid, LogOut, ShieldCheck } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
@@ -22,6 +22,9 @@ export function ProtectedShell({
   const { signOut } = useAuth();
 
   const sections = React.useMemo<NavSection[]>(() => {
+    const canAccessResourceCatalogue =
+      user.userType === 'ADMIN' || (user.userType === 'MANAGER' && user.managerRoles.includes('CATALOG_MANAGER'));
+
     const portalSections: NavSection[] = [
       {
         title: 'Workspace',
@@ -40,21 +43,34 @@ export function ProtectedShell({
       },
     ];
 
-    if (user.userType === 'ADMIN') {
+    if (user.userType === 'ADMIN' || canAccessResourceCatalogue) {
       portalSections.push({
         title: 'Administration',
         items: [
-          {
-            label: 'User Management',
-            icon: ShieldCheck,
-            href: '/admin/users',
-          },
+          ...(user.userType === 'ADMIN'
+            ? [
+                {
+                  label: 'User Management',
+                  icon: ShieldCheck,
+                  href: '/admin/users',
+                },
+              ]
+            : []),
+          ...(canAccessResourceCatalogue
+            ? [
+                {
+                  label: 'Resource Catalogue',
+                  icon: LayoutGrid,
+                  href: '/admin/resources',
+                },
+              ]
+            : []),
         ],
       });
     }
 
     return portalSections;
-  }, [user.userType]);
+  }, [user.managerRoles, user.userType]);
 
   return (
     <div

@@ -8,6 +8,10 @@ export type ManagerRole = 'CATALOG_MANAGER' | 'BOOKING_MANAGER' | 'TICKET_MANAGE
 
 export type NextStep = 'ONBOARDING' | 'DASHBOARD';
 
+export type ResourceCategory = 'SPACE' | 'EQUIPMENT' | 'SPORTS' | 'EVENT' | 'UTILITY';
+
+export type ResourceStatus = 'ACTIVE' | 'INACTIVE' | 'OUT_OF_SERVICE';
+
 export interface MessageResponse {
   message: string;
 }
@@ -99,6 +103,52 @@ export interface SessionSyncResponse {
 export interface StudentOnboardingStateResponse {
   onboardingCompleted: boolean;
   profile: StudentProfileResponse | null;
+}
+
+export interface ResourceResponse {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  subcategory: string | null;
+  location: string | null;
+  capacity: number | null;
+  quantity: number | null;
+  status: ResourceStatus;
+  bookable: boolean;
+  movable: boolean;
+  availableFrom: string | null;
+  availableTo: string | null;
+}
+
+export interface CreateResourceRequest {
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  subcategory?: string | null;
+  location?: string | null;
+  capacity?: number | null;
+  quantity?: number | null;
+  status: ResourceStatus;
+  bookable: boolean;
+  movable: boolean;
+  availableFrom?: string | null;
+  availableTo?: string | null;
+}
+
+export interface UpdateResourceRequest {
+  code?: string;
+  name?: string;
+  category?: ResourceCategory;
+  subcategory?: string | null;
+  location?: string | null;
+  capacity?: number | null;
+  quantity?: number | null;
+  status?: ResourceStatus;
+  bookable?: boolean;
+  movable?: boolean;
+  availableFrom?: string | null;
+  availableTo?: string | null;
 }
 
 export interface FacultyProfileInput {

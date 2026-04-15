@@ -1,13 +1,18 @@
 import {
   AccountStatus,
+  type CreateResourceRequest,
   type CreateUserRequest,
   type ErrorResponse,
   type ManagerRole,
   type ManagerRolesUpdateRequest,
   type MessageResponse,
+  type ResourceCategory,
+  type ResourceResponse,
+  type ResourceStatus,
   type SessionSyncResponse,
   type StudentOnboardingRequest,
   type StudentOnboardingStateResponse,
+  type UpdateResourceRequest,
   type UpdateUserRequest,
   type UserResponse,
   type UserType,
@@ -181,6 +186,13 @@ export interface UserFilters {
   managerRole?: ManagerRole | '';
 }
 
+export interface ResourceFilters {
+  search?: string;
+  category?: ResourceCategory | '';
+  status?: ResourceStatus | '';
+  location?: string;
+}
+
 export async function listUsers(accessToken: string, filters: UserFilters = {}) {
   const params = new URLSearchParams();
 
@@ -240,6 +252,51 @@ export async function resendInvite(accessToken: string, userId: string) {
 
 export async function deleteUser(accessToken: string, userId: string) {
   return request<MessageResponse>(`/api/admin/users/${userId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export async function listResources(accessToken: string, filters: ResourceFilters = {}) {
+  const params = new URLSearchParams();
+
+  if (filters.search) {
+    params.set('search', filters.search);
+  }
+  if (filters.category) {
+    params.set('category', filters.category);
+  }
+  if (filters.status) {
+    params.set('status', filters.status);
+  }
+  if (filters.location) {
+    params.set('location', filters.location);
+  }
+
+  const query = params.toString();
+  return request<ResourceResponse[]>(`/api/resources${query ? `?${query}` : ''}`, {
+    accessToken,
+  });
+}
+
+export async function createResource(accessToken: string, payload: CreateResourceRequest) {
+  return request<ResourceResponse>('/api/resources', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function updateResource(accessToken: string, resourceId: string, payload: UpdateResourceRequest) {
+  return request<ResourceResponse>(`/api/resources/${resourceId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function deleteResource(accessToken: string, resourceId: string) {
+  return request<MessageResponse>(`/api/resources/${resourceId}`, {
     method: 'DELETE',
     accessToken,
   });
