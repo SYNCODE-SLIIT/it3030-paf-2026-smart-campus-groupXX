@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
-import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 import com.university.smartcampus.AdminDtos.CreateUserRequest;
 import com.university.smartcampus.ApiDtos.UserResponse;
 import com.university.smartcampus.AppEnums.AccountStatus;
+import com.university.smartcampus.AppEnums.AcademicYear;
 import com.university.smartcampus.AppEnums.ManagerRole;
+import com.university.smartcampus.AppEnums.Semester;
+import com.university.smartcampus.AppEnums.StudentFaculty;
+import com.university.smartcampus.AppEnums.StudentProgram;
 import com.university.smartcampus.AppEnums.UserType;
 import com.university.smartcampus.StudentDtos.StudentOnboardingRequest;
 
@@ -45,7 +48,7 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void createUserCreatesManagerWithMultipleRolesAndInvite() {
+    void createUserCreatesManagerWithSingleRoleAndInvite() {
         CreateUserRequest request = new CreateUserRequest(
             "manager@campus.test",
             UserType.MANAGER,
@@ -54,16 +57,13 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
             null,
             null,
             null,
-            Set.of(ManagerRole.CATALOG_MANAGER, ManagerRole.TICKET_MANAGER)
+            ManagerRole.CATALOG_MANAGER
         );
 
         UserResponse response = userManagementService.createUser(request);
 
         assertThat(response.userType()).isEqualTo(UserType.MANAGER);
-        assertThat(response.managerRoles()).containsExactlyInAnyOrder(
-            ManagerRole.CATALOG_MANAGER,
-            ManagerRole.TICKET_MANAGER
-        );
+        assertThat(response.managerRole()).isEqualTo(ManagerRole.CATALOG_MANAGER);
         assertThat(recordingAuthProviderClient.deliveries()).hasSize(1);
         assertThat(response.lastInviteReference()).isNotBlank();
         assertThat(response.inviteSendCount()).isEqualTo(1);
@@ -81,10 +81,10 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
                 "SS",
                 "0711111111",
                 "ST-2026-001",
-                "Engineering",
-                "Software Engineering",
-                2,
-                "Semester 1",
+                StudentFaculty.FACULTY_OF_COMPUTING,
+                StudentProgram.BSC_HONS_IT_SOFTWARE_ENGINEERING,
+                AcademicYear.YEAR_2,
+                Semester.SEMESTER_1,
                 null,
                 true,
                 false
@@ -101,6 +101,31 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
         assertThat(persisted.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(persisted.getStudentProfile().isOnboardingCompleted()).isTrue();
         assertThat(persisted.getStudentProfile().getRegistrationNumber()).isEqualTo("ST-2026-001");
+    }
+
+    @Test
+    void completeStudentOnboardingRejectsProgramFromAnotherFaculty() {
+        UserEntity studentUser = seedStudent("invalid-program@campus.test");
+
+        assertThatThrownBy(() -> userManagementService.completeStudentOnboarding(
+            studentUser,
+            new StudentOnboardingRequest(
+                "Sara",
+                "Student",
+                null,
+                "0711111111",
+                "ST-2026-002",
+                StudentFaculty.FACULTY_OF_ENGINEERING,
+                StudentProgram.BSC_HONS_IT_SOFTWARE_ENGINEERING,
+                AcademicYear.YEAR_2,
+                Semester.SEMESTER_1,
+                null,
+                true,
+                false
+            )
+        ))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Program does not belong to the selected faculty.");
     }
 
     @Test
