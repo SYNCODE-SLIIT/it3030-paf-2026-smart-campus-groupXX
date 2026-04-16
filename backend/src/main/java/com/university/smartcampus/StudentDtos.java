@@ -1,7 +1,10 @@
 package com.university.smartcampus;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import com.university.smartcampus.AppEnums.AcademicYear;
+import com.university.smartcampus.AppEnums.Semester;
+import com.university.smartcampus.AppEnums.StudentFaculty;
+import com.university.smartcampus.AppEnums.StudentProgram;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -16,10 +19,10 @@ public final class StudentDtos {
         String preferredName,
         @NotBlank String phoneNumber,
         @NotBlank String registrationNumber,
-        @NotBlank String facultyName,
-        @NotBlank String programName,
-        @NotNull @Min(1) @Max(12) Integer academicYear,
-        String semester,
+        @NotNull StudentFaculty facultyName,
+        @NotNull StudentProgram programName,
+        @NotNull AcademicYear academicYear,
+        @NotNull Semester semester,
         String profileImageUrl,
         Boolean emailNotificationsEnabled,
         Boolean smsNotificationsEnabled

@@ -3,7 +3,6 @@ package com.university.smartcampus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.domain.Sort;
@@ -140,9 +139,9 @@ public class UserManagementService {
     }
 
     @Transactional
-    public UserResponse replaceManagerRoles(UUID id, Set<ManagerRole> managerRoles) {
-        if (managerRoles == null || managerRoles.isEmpty()) {
-            throw new BadRequestException("Managers must have at least one manager role.");
+    public UserResponse replaceManagerRole(UUID id, ManagerRole managerRole) {
+        if (managerRole == null) {
+            throw new BadRequestException("Managers must have one manager role.");
         }
 
         UserEntity user = getUserEntity(id);
@@ -151,7 +150,7 @@ public class UserManagementService {
         }
 
         ManagerEntity manager = user.getManagerProfile();
-        manager.setManagerRoles(managerRoles);
+        manager.setManagerRole(managerRole);
         managerRepository.save(manager);
 
         return userMapper.toUserResponse(user);
@@ -248,6 +247,9 @@ public class UserManagementService {
         if (student == null) {
             throw new NotFoundException("Student profile was not found for this user.");
         }
+        if (request.programName().faculty() != request.facultyName()) {
+            throw new BadRequestException("Program does not belong to the selected faculty.");
+        }
 
         student.setFirstName(request.firstName());
         student.setLastName(request.lastName());
@@ -282,14 +284,12 @@ public class UserManagementService {
             case STUDENT -> user.setStudentProfile(createStudentProfile(user));
             case FACULTY -> user.setFacultyProfile(createFacultyProfile(user, request.facultyProfile()));
             case ADMIN -> user.setAdminProfile(createAdminProfile(user, request.adminProfile()));
-            case MANAGER ->
-                user.setManagerProfile(createManagerProfile(user, request.managerProfile(), request.managerRoles()));
+            case MANAGER -> user.setManagerProfile(createManagerProfile(user, request.managerProfile(), request.managerRole()));
         }
     }
 
     private void ensureProfileCombinationsForCreate(CreateUserRequest request) {
-        if (request.userType() != UserType.MANAGER && request.managerRoles() != null
-                && !request.managerRoles().isEmpty()) {
+        if (request.userType() != UserType.MANAGER && request.managerRole() != null) {
             throw new BadRequestException("Manager roles can only be assigned to manager users.");
         }
 
@@ -306,9 +306,8 @@ public class UserManagementService {
                     "Admin creation does not accept faculty or manager profile payloads.");
             case MANAGER -> {
                 require(request.facultyProfile() == null && request.adminProfile() == null,
-                        "Manager creation does not accept faculty or admin profile payloads.");
-                require(request.managerRoles() != null && !request.managerRoles().isEmpty(),
-                        "Managers must have at least one manager role.");
+                    "Manager creation does not accept faculty or admin profile payloads.");
+                require(request.managerRole() != null, "Managers must have one manager role.");
             }
         }
     }
@@ -347,14 +346,13 @@ public class UserManagementService {
         return admin;
     }
 
-    private ManagerEntity createManagerProfile(UserEntity user, ManagerProfileInput input,
-            Set<ManagerRole> managerRoles) {
+    private ManagerEntity createManagerProfile(UserEntity user, ManagerProfileInput input, ManagerRole managerRole) {
         ManagerEntity manager = new ManagerEntity();
         manager.setUser(user);
         if (input != null) {
             applyManagerProfile(manager, input);
         }
-        manager.setManagerRoles(managerRoles);
+        manager.setManagerRole(managerRole);
         user.setManagerProfile(manager);
         return manager;
     }
@@ -385,19 +383,12 @@ public class UserManagementService {
         faculty.setEmployeeNumber(input.employeeNumber());
         faculty.setDepartment(input.department());
         faculty.setDesignation(input.designation());
-        faculty.setOfficeLocation(input.officeLocation());
-        faculty.setOfficePhone(input.officePhone());
     }
 
     private void applyAdminProfile(AdminEntity admin, AdminProfileInput input) {
-        admin.setFirstName(input.firstName());
-        admin.setLastName(input.lastName());
-        admin.setPreferredName(input.preferredName());
+        admin.setFullName(input.fullName());
         admin.setPhoneNumber(input.phoneNumber());
         admin.setEmployeeNumber(input.employeeNumber());
-        admin.setDepartment(input.department());
-        admin.setJobTitle(input.jobTitle());
-        admin.setOfficePhone(input.officePhone());
     }
 
     private void applyManagerProfile(ManagerEntity manager, ManagerProfileInput input) {
@@ -406,9 +397,6 @@ public class UserManagementService {
         manager.setPreferredName(input.preferredName());
         manager.setPhoneNumber(input.phoneNumber());
         manager.setEmployeeNumber(input.employeeNumber());
-        manager.setDepartment(input.department());
-        manager.setJobTitle(input.jobTitle());
-        manager.setOfficeLocation(input.officeLocation());
     }
 
     private UserEntity getUserEntity(UUID id) {

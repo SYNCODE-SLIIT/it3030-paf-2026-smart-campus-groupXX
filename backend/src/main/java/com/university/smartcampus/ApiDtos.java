@@ -1,12 +1,15 @@
 package com.university.smartcampus;
 
 import java.time.Instant;
-import java.util.Set;
 import java.util.UUID;
 
 import com.university.smartcampus.AppEnums.AccountStatus;
+import com.university.smartcampus.AppEnums.AcademicYear;
 import com.university.smartcampus.AppEnums.AuthDeliveryMethod;
 import com.university.smartcampus.AppEnums.ManagerRole;
+import com.university.smartcampus.AppEnums.Semester;
+import com.university.smartcampus.AppEnums.StudentFaculty;
+import com.university.smartcampus.AppEnums.StudentProgram;
 import com.university.smartcampus.AppEnums.UserType;
 
 public final class ApiDtos {
@@ -27,10 +30,10 @@ public final class ApiDtos {
         String preferredName,
         String phoneNumber,
         String registrationNumber,
-        String facultyName,
-        String programName,
-        Integer academicYear,
-        String semester,
+        StudentFaculty facultyName,
+        StudentProgram programName,
+        AcademicYear academicYear,
+        Semester semester,
         String profileImageUrl,
         Boolean emailNotificationsEnabled,
         Boolean smsNotificationsEnabled
@@ -44,21 +47,14 @@ public final class ApiDtos {
         String phoneNumber,
         String employeeNumber,
         String department,
-        String designation,
-        String officeLocation,
-        String officePhone
+        String designation
     ) {
     }
 
     public record AdminProfileResponse(
-        String firstName,
-        String lastName,
-        String preferredName,
+        String fullName,
         String phoneNumber,
-        String employeeNumber,
-        String department,
-        String jobTitle,
-        String officePhone
+        String employeeNumber
     ) {
     }
 
@@ -67,10 +63,7 @@ public final class ApiDtos {
         String lastName,
         String preferredName,
         String phoneNumber,
-        String employeeNumber,
-        String department,
-        String jobTitle,
-        String officeLocation
+        String employeeNumber
     ) {
     }
 
@@ -88,7 +81,7 @@ public final class ApiDtos {
         AuthDeliveryMethod lastInviteMethod,
         String lastInviteReference,
         String lastInviteRedirectUri,
-        Set<ManagerRole> managerRoles,
+        ManagerRole managerRole,
         StudentProfileResponse studentProfile,
         FacultyProfileResponse facultyProfile,
         AdminProfileResponse adminProfile,

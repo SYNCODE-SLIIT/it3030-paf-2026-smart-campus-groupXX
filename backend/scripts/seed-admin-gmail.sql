@@ -58,38 +58,23 @@ begin
 
     insert into admins (
         user_id,
-        first_name,
-        last_name,
-        preferred_name,
+        full_name,
         phone_number,
         employee_number,
-        department,
-        job_title,
-        office_phone,
         created_at,
         updated_at
     )
     values (
         v_user_id,
-        'System',
-        'Admin',
-        null,
+        'System Admin',
         null,
         'ADM-GMAIL-001',
-        'Platform Operations',
-        'Platform Administrator',
-        null,
         v_now,
         v_now
     )
     on conflict (user_id) do update
-       set first_name = excluded.first_name,
-           last_name = excluded.last_name,
-           preferred_name = excluded.preferred_name,
+       set full_name = excluded.full_name,
            phone_number = excluded.phone_number,
            employee_number = excluded.employee_number,
-           department = excluded.department,
-           job_title = excluded.job_title,
-           office_phone = excluded.office_phone,
            updated_at = excluded.updated_at;
 end $$;

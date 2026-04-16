@@ -1,7 +1,5 @@
 package com.university.smartcampus;
 
-import java.util.Set;
-
 import com.university.smartcampus.AppEnums.AccountStatus;
 import com.university.smartcampus.AppEnums.ManagerRole;
 import com.university.smartcampus.AppEnums.UserType;
@@ -26,21 +24,14 @@ public final class AdminDtos {
         String phoneNumber,
         @NotBlank String employeeNumber,
         @NotBlank String department,
-        @NotBlank String designation,
-        String officeLocation,
-        String officePhone
+        @NotBlank String designation
     ) {
     }
 
     public record AdminProfileInput(
-        @NotBlank String firstName,
-        @NotBlank String lastName,
-        String preferredName,
+        @NotBlank String fullName,
         String phoneNumber,
-        @NotBlank String employeeNumber,
-        @NotBlank String department,
-        @NotBlank String jobTitle,
-        String officePhone
+        @NotBlank String employeeNumber
     ) {
     }
 
@@ -49,10 +40,7 @@ public final class AdminDtos {
         @NotBlank String lastName,
         String preferredName,
         String phoneNumber,
-        @NotBlank String employeeNumber,
-        @NotBlank String department,
-        @NotBlank String jobTitle,
-        String officeLocation
+        @NotBlank String employeeNumber
     ) {
     }
 
@@ -64,7 +52,7 @@ public final class AdminDtos {
         @Valid FacultyProfileInput facultyProfile,
         @Valid AdminProfileInput adminProfile,
         @Valid ManagerProfileInput managerProfile,
-        Set<ManagerRole> managerRoles
+        ManagerRole managerRole
     ) {
     }
 
@@ -76,6 +64,6 @@ public final class AdminDtos {
     ) {
     }
 
-    public record ManagerRolesUpdateRequest(Set<ManagerRole> managerRoles) {
+    public record ManagerRoleUpdateRequest(@NotNull ManagerRole managerRole) {
     }
 }

@@ -1,7 +1,5 @@
 package com.university.smartcampus;
 
-import java.util.Set;
-
 import org.springframework.stereotype.Component;
 
 import com.university.smartcampus.ApiDtos.AdminProfileResponse;
@@ -28,7 +26,7 @@ public class UserMapper {
             user.getLastInviteMethod(),
             user.getLastInviteReference(),
             user.getLastInviteRedirectUri(),
-            managerRoles(user),
+            managerRole(user),
             toStudentProfile(user.getStudentProfile()),
             toFacultyProfile(user.getFacultyProfile()),
             toAdminProfile(user.getAdminProfile()),
@@ -70,9 +68,7 @@ public class UserMapper {
             faculty.getPhoneNumber(),
             faculty.getEmployeeNumber(),
             faculty.getDepartment(),
-            faculty.getDesignation(),
-            faculty.getOfficeLocation(),
-            faculty.getOfficePhone()
+            faculty.getDesignation()
         );
     }
 
@@ -82,14 +78,9 @@ public class UserMapper {
         }
 
         return new AdminProfileResponse(
-            admin.getFirstName(),
-            admin.getLastName(),
-            admin.getPreferredName(),
+            admin.getFullName(),
             admin.getPhoneNumber(),
-            admin.getEmployeeNumber(),
-            admin.getDepartment(),
-            admin.getJobTitle(),
-            admin.getOfficePhone()
+            admin.getEmployeeNumber()
         );
     }
 
@@ -103,18 +94,15 @@ public class UserMapper {
             manager.getLastName(),
             manager.getPreferredName(),
             manager.getPhoneNumber(),
-            manager.getEmployeeNumber(),
-            manager.getDepartment(),
-            manager.getJobTitle(),
-            manager.getOfficeLocation()
+            manager.getEmployeeNumber()
         );
     }
 
-    private Set<AppEnums.ManagerRole> managerRoles(UserEntity user) {
+    private AppEnums.ManagerRole managerRole(UserEntity user) {
         if (user.getManagerProfile() == null) {
-            return Set.of();
+            return null;
         }
 
-        return user.getManagerProfile().getManagerRoles();
+        return user.getManagerProfile().getManagerRole();
     }
 }

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.university.smartcampus.AdminDtos.CreateUserRequest;
-import com.university.smartcampus.AdminDtos.ManagerRolesUpdateRequest;
+import com.university.smartcampus.AdminDtos.ManagerRoleUpdateRequest;
 import com.university.smartcampus.AdminDtos.UpdateUserRequest;
 import com.university.smartcampus.ApiDtos.MessageResponse;
 import com.university.smartcampus.ApiDtos.UserResponse;
@@ -78,14 +78,14 @@ public class AdminUserController {
         return userManagementService.updateUser(id, request);
     }
 
-    @PutMapping("/{id}/manager-roles")
-    public UserResponse replaceManagerRoles(
+    @PutMapping("/{id}/manager-role")
+    public UserResponse replaceManagerRole(
         @PathVariable UUID id,
-        @RequestBody ManagerRolesUpdateRequest request,
+        @Valid @RequestBody ManagerRoleUpdateRequest request,
         Authentication authentication
     ) {
         currentUserService.requireAdmin(authentication);
-        return userManagementService.replaceManagerRoles(id, request.managerRoles());
+        return userManagementService.replaceManagerRole(id, request.managerRole());
     }
 
     @PostMapping("/{id}/invite")

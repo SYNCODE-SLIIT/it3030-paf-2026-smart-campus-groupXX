@@ -11,24 +11,20 @@ export interface SharedPersonFields {
   preferredName: string;
   phoneNumber: string;
   employeeNumber: string;
-  department: string;
 }
 
 export interface FacultyFormState extends SharedPersonFields {
+  department: string;
   designation: string;
-  officeLocation: string;
-  officePhone: string;
 }
 
-export interface AdminFormState extends SharedPersonFields {
-  jobTitle: string;
-  officePhone: string;
+export interface AdminFormState {
+  fullName: string;
+  phoneNumber: string;
+  employeeNumber: string;
 }
 
-export interface ManagerFormState extends SharedPersonFields {
-  jobTitle: string;
-  officeLocation: string;
-}
+export type ManagerFormState = SharedPersonFields;
 
 export function createEmptyFacultyForm(): FacultyFormState {
   return {
@@ -39,21 +35,14 @@ export function createEmptyFacultyForm(): FacultyFormState {
     employeeNumber: '',
     department: '',
     designation: '',
-    officeLocation: '',
-    officePhone: '',
   };
 }
 
 export function createEmptyAdminForm(): AdminFormState {
   return {
-    firstName: '',
-    lastName: '',
-    preferredName: '',
+    fullName: '',
     phoneNumber: '',
     employeeNumber: '',
-    department: '',
-    jobTitle: '',
-    officePhone: '',
   };
 }
 
@@ -64,9 +53,6 @@ export function createEmptyManagerForm(): ManagerFormState {
     preferredName: '',
     phoneNumber: '',
     employeeNumber: '',
-    department: '',
-    jobTitle: '',
-    officeLocation: '',
   };
 }
 
@@ -79,21 +65,14 @@ export function facultyFormFromUser(user: UserResponse): FacultyFormState {
     employeeNumber: user.facultyProfile?.employeeNumber ?? '',
     department: user.facultyProfile?.department ?? '',
     designation: user.facultyProfile?.designation ?? '',
-    officeLocation: user.facultyProfile?.officeLocation ?? '',
-    officePhone: user.facultyProfile?.officePhone ?? '',
   };
 }
 
 export function adminFormFromUser(user: UserResponse): AdminFormState {
   return {
-    firstName: user.adminProfile?.firstName ?? '',
-    lastName: user.adminProfile?.lastName ?? '',
-    preferredName: user.adminProfile?.preferredName ?? '',
+    fullName: user.adminProfile?.fullName ?? '',
     phoneNumber: user.adminProfile?.phoneNumber ?? '',
     employeeNumber: user.adminProfile?.employeeNumber ?? '',
-    department: user.adminProfile?.department ?? '',
-    jobTitle: user.adminProfile?.jobTitle ?? '',
-    officePhone: user.adminProfile?.officePhone ?? '',
   };
 }
 
@@ -104,9 +83,6 @@ export function managerFormFromUser(user: UserResponse): ManagerFormState {
     preferredName: user.managerProfile?.preferredName ?? '',
     phoneNumber: user.managerProfile?.phoneNumber ?? '',
     employeeNumber: user.managerProfile?.employeeNumber ?? '',
-    department: user.managerProfile?.department ?? '',
-    jobTitle: user.managerProfile?.jobTitle ?? '',
-    officeLocation: user.managerProfile?.officeLocation ?? '',
   };
 }
 
@@ -119,21 +95,14 @@ export function toFacultyProfileInput(form: FacultyFormState): FacultyProfileInp
     employeeNumber: form.employeeNumber.trim(),
     department: form.department.trim(),
     designation: form.designation.trim(),
-    officeLocation: form.officeLocation.trim() || undefined,
-    officePhone: form.officePhone.trim() || undefined,
   };
 }
 
 export function toAdminProfileInput(form: AdminFormState): AdminProfileInput {
   return {
-    firstName: form.firstName.trim(),
-    lastName: form.lastName.trim(),
-    preferredName: form.preferredName.trim() || undefined,
+    fullName: form.fullName.trim(),
     phoneNumber: form.phoneNumber.trim() || undefined,
     employeeNumber: form.employeeNumber.trim(),
-    department: form.department.trim(),
-    jobTitle: form.jobTitle.trim(),
-    officePhone: form.officePhone.trim() || undefined,
   };
 }
 
@@ -144,8 +113,5 @@ export function toManagerProfileInput(form: ManagerFormState): ManagerProfileInp
     preferredName: form.preferredName.trim() || undefined,
     phoneNumber: form.phoneNumber.trim() || undefined,
     employeeNumber: form.employeeNumber.trim(),
-    department: form.department.trim(),
-    jobTitle: form.jobTitle.trim(),
-    officeLocation: form.officeLocation.trim() || undefined,
   };
 }

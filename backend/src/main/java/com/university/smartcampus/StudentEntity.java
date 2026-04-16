@@ -2,8 +2,18 @@ package com.university.smartcampus;
 
 import java.util.UUID;
 
+import com.university.smartcampus.AppEnums.AcademicYear;
+import com.university.smartcampus.AppEnums.Semester;
+import com.university.smartcampus.AppEnums.StudentFaculty;
+import com.university.smartcampus.AppEnums.StudentProgram;
+
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -42,17 +52,25 @@ public class StudentEntity extends TimestampedEntity {
     @Column(name = "registration_number", length = 100)
     private String registrationNumber;
 
-    @Column(name = "faculty_name", length = 150)
-    private String facultyName;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "faculty_name", columnDefinition = "student_faculty_enum")
+    private StudentFaculty facultyName;
 
-    @Column(name = "program_name", length = 150)
-    private String programName;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "program_name", columnDefinition = "student_program_enum")
+    private StudentProgram programName;
 
-    @Column(name = "academic_year")
-    private Integer academicYear;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "academic_year", columnDefinition = "student_academic_year_enum")
+    private AcademicYear academicYear;
 
-    @Column(length = 50)
-    private String semester;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(columnDefinition = "student_semester_enum")
+    private Semester semester;
 
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
@@ -127,35 +145,35 @@ public class StudentEntity extends TimestampedEntity {
         this.registrationNumber = registrationNumber;
     }
 
-    public String getFacultyName() {
+    public StudentFaculty getFacultyName() {
         return facultyName;
     }
 
-    public void setFacultyName(String facultyName) {
+    public void setFacultyName(StudentFaculty facultyName) {
         this.facultyName = facultyName;
     }
 
-    public String getProgramName() {
+    public StudentProgram getProgramName() {
         return programName;
     }
 
-    public void setProgramName(String programName) {
+    public void setProgramName(StudentProgram programName) {
         this.programName = programName;
     }
 
-    public Integer getAcademicYear() {
+    public AcademicYear getAcademicYear() {
         return academicYear;
     }
 
-    public void setAcademicYear(Integer academicYear) {
+    public void setAcademicYear(AcademicYear academicYear) {
         this.academicYear = academicYear;
     }
 
-    public String getSemester() {
+    public Semester getSemester() {
         return semester;
     }
 
-    public void setSemester(String semester) {
+    public void setSemester(Semester semester) {
         this.semester = semester;
     }
 

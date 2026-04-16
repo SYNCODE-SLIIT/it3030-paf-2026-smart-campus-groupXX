@@ -54,11 +54,8 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
 
             AdminEntity admin = new AdminEntity();
             admin.setUser(user);
-            admin.setFirstName(bootstrapAdmin.getFirstName());
-            admin.setLastName(bootstrapAdmin.getLastName());
+            admin.setFullName(bootstrapAdmin.fullNameOrDefault(email));
             admin.setEmployeeNumber(bootstrapAdmin.getEmployeeNumber());
-            admin.setDepartment(bootstrapAdmin.getDepartment());
-            admin.setJobTitle(bootstrapAdmin.getJobTitle());
             user.setAdminProfile(admin);
             userRepository.save(user);
         }

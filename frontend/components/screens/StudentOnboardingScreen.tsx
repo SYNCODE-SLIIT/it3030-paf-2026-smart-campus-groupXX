@@ -11,13 +11,22 @@ import {
   getStudentOnboarding,
 } from '@/lib/api-client';
 import { getUserHomePath } from '@/lib/auth-routing';
-import type { StudentOnboardingRequest, UserResponse } from '@/lib/api-types';
+import type {
+  AcademicYear,
+  Semester,
+  StudentFaculty,
+  StudentOnboardingRequest,
+  StudentProgram,
+  UserResponse,
+} from '@/lib/api-types';
+import {
+  academicYearOptions,
+  facultyOptions,
+  programBelongsToFaculty,
+  programOptionsByFaculty,
+  semesterOptions,
+} from '@/lib/student-catalog';
 import { getUserTypeLabel } from '@/lib/user-display';
-
-const academicYearOptions = Array.from({ length: 12 }, (_, index) => ({
-  value: String(index + 1),
-  label: `Year ${index + 1}`,
-}));
 
 interface OnboardingFormState {
   firstName: string;
@@ -25,10 +34,10 @@ interface OnboardingFormState {
   preferredName: string;
   phoneNumber: string;
   registrationNumber: string;
-  facultyName: string;
-  programName: string;
-  academicYear: string;
-  semester: string;
+  facultyName: StudentFaculty | '';
+  programName: StudentProgram | '';
+  academicYear: AcademicYear | '';
+  semester: Semester | '';
   profileImageUrl: string;
   emailNotificationsEnabled: boolean;
   smsNotificationsEnabled: boolean;
@@ -43,7 +52,7 @@ function toFormState(profile: UserResponse['studentProfile']): OnboardingFormSta
     registrationNumber: profile?.registrationNumber ?? '',
     facultyName: profile?.facultyName ?? '',
     programName: profile?.programName ?? '',
-    academicYear: profile?.academicYear ? String(profile.academicYear) : '',
+    academicYear: profile?.academicYear ?? '',
     semester: profile?.semester ?? '',
     profileImageUrl: profile?.profileImageUrl ?? '',
     emailNotificationsEnabled: profile?.emailNotificationsEnabled ?? true,
@@ -125,6 +134,17 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }));
   }
 
+  function handleFacultyChange(facultyName: StudentFaculty | '') {
+    setFormState((current) => ({
+      ...current,
+      facultyName,
+      programName:
+        facultyName && current.programName && programBelongsToFaculty(current.programName, facultyName)
+          ? current.programName
+          : '',
+    }));
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -146,11 +166,16 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       return;
     }
 
-    if (!formState.facultyName || !formState.programName || !formState.academicYear) {
+    const facultyName = formState.facultyName;
+    const programName = formState.programName;
+    const academicYear = formState.academicYear;
+    const semester = formState.semester;
+
+    if (!facultyName || !programName || !academicYear || !semester) {
       setAlert({
         variant: 'error',
         title: 'Academic details required',
-        message: 'Faculty, program, and academic year are required for student onboarding.',
+        message: 'Faculty, program, academic year, and semester are required for student onboarding.',
       });
       return;
     }
@@ -163,10 +188,10 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           preferredName: formState.preferredName.trim() || undefined,
           phoneNumber: formState.phoneNumber.trim(),
           registrationNumber: formState.registrationNumber.trim(),
-          facultyName: formState.facultyName.trim(),
-          programName: formState.programName.trim(),
-          academicYear: Number(formState.academicYear),
-          semester: formState.semester.trim() || undefined,
+          facultyName,
+          programName,
+          academicYear,
+          semester,
           profileImageUrl: formState.profileImageUrl.trim() || undefined,
           emailNotificationsEnabled: formState.emailNotificationsEnabled,
           smsNotificationsEnabled: formState.smsNotificationsEnabled,
@@ -189,6 +214,8 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       }
     });
   }
+
+  const programOptions = formState.facultyName ? programOptionsByFaculty[formState.facultyName] : [];
 
   return (
     <div
@@ -322,30 +349,38 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                   onChange={(event) => setField('registrationNumber', event.target.value)}
                   required
                 />
-                <Input
+                <Select
                   label="Faculty / School"
                   value={formState.facultyName}
-                  onChange={(event) => setField('facultyName', event.target.value)}
+                  onChange={(event) => handleFacultyChange(event.target.value as StudentFaculty | '')}
+                  options={facultyOptions}
+                  placeholder="Choose faculty"
                   required
                 />
-                <Input
+                <Select
                   label="Program"
                   value={formState.programName}
-                  onChange={(event) => setField('programName', event.target.value)}
+                  onChange={(event) => setField('programName', event.target.value as StudentProgram | '')}
+                  options={programOptions}
+                  placeholder="Choose program"
+                  disabled={!formState.facultyName}
                   required
                 />
                 <Select
                   label="Academic Year"
                   value={formState.academicYear}
-                  onChange={(event) => setField('academicYear', event.target.value)}
+                  onChange={(event) => setField('academicYear', event.target.value as AcademicYear | '')}
                   options={academicYearOptions}
                   placeholder="Choose year"
                   required
                 />
-                <Input
+                <Select
                   label="Semester"
                   value={formState.semester}
-                  onChange={(event) => setField('semester', event.target.value)}
+                  onChange={(event) => setField('semester', event.target.value as Semester | '')}
+                  options={semesterOptions}
+                  placeholder="Choose semester"
+                  required
                 />
                 <Input
                   label="Profile Image URL"

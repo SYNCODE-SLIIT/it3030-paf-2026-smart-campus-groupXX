@@ -1,16 +1,14 @@
 package com.university.smartcampus;
 
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -46,18 +44,10 @@ public class ManagerEntity extends TimestampedEntity {
     @Column(name = "employee_number", length = 100)
     private String employeeNumber;
 
-    @Column(length = 150)
-    private String department;
-
-    @Column(name = "job_title", length = 150)
-    private String jobTitle;
-
-    @Column(name = "office_location", length = 150)
-    private String officeLocation;
-
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "manager_roles", nullable = false, columnDefinition = "varchar(30)[]")
-    private String[] managerRoleCodes = new String[0];
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "manager_role", nullable = false, columnDefinition = "manager_role_enum")
+    private AppEnums.ManagerRole managerRole;
 
     public UUID getUserId() {
         return userId;
@@ -115,55 +105,15 @@ public class ManagerEntity extends TimestampedEntity {
         this.employeeNumber = employeeNumber;
     }
 
-    public String getDepartment() {
-        return department;
+    public AppEnums.ManagerRole getManagerRole() {
+        return managerRole;
     }
 
-    public void setDepartment(String department) {
-        this.department = department;
-    }
-
-    public String getJobTitle() {
-        return jobTitle;
-    }
-
-    public void setJobTitle(String jobTitle) {
-        this.jobTitle = jobTitle;
-    }
-
-    public String getOfficeLocation() {
-        return officeLocation;
-    }
-
-    public void setOfficeLocation(String officeLocation) {
-        this.officeLocation = officeLocation;
-    }
-
-    public Set<AppEnums.ManagerRole> getManagerRoles() {
-        if (managerRoleCodes == null || managerRoleCodes.length == 0) {
-            return Set.of();
-        }
-
-        Set<AppEnums.ManagerRole> roles = new LinkedHashSet<>();
-        Arrays.stream(managerRoleCodes)
-            .filter(Objects::nonNull)
-            .map(AppEnums.ManagerRole::valueOf)
-            .forEach(roles::add);
-        return roles;
-    }
-
-    public void setManagerRoles(Set<AppEnums.ManagerRole> managerRoles) {
-        this.managerRoleCodes = managerRoles == null
-            ? new String[0]
-            : managerRoles.stream()
-                .filter(Objects::nonNull)
-                .map(Enum::name)
-                .sorted()
-                .toArray(String[]::new);
+    public void setManagerRole(AppEnums.ManagerRole managerRole) {
+        this.managerRole = managerRole;
     }
 
     public boolean hasManagerRole(AppEnums.ManagerRole role) {
-        return role != null && Arrays.stream(managerRoleCodes == null ? new String[0] : managerRoleCodes)
-            .anyMatch(role.name()::equals);
+        return managerRole != null && managerRole == role;
     }
 }

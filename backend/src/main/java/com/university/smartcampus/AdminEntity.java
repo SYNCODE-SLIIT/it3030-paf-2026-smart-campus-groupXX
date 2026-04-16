@@ -24,29 +24,14 @@ public class AdminEntity extends TimestampedEntity {
     @JoinColumn(name = "user_id")
     private UserEntity user;
 
-    @Column(name = "first_name", length = 100)
-    private String firstName;
-
-    @Column(name = "last_name", length = 100)
-    private String lastName;
-
-    @Column(name = "preferred_name", length = 100)
-    private String preferredName;
+    @Column(name = "full_name", length = 200)
+    private String fullName;
 
     @Column(name = "phone_number", length = 30)
     private String phoneNumber;
 
     @Column(name = "employee_number", length = 100)
     private String employeeNumber;
-
-    @Column(length = 150)
-    private String department;
-
-    @Column(name = "job_title", length = 150)
-    private String jobTitle;
-
-    @Column(name = "office_phone", length = 30)
-    private String officePhone;
 
     public UUID getUserId() {
         return userId;
@@ -64,28 +49,12 @@ public class AdminEntity extends TimestampedEntity {
         this.user = user;
     }
 
-    public String getFirstName() {
-        return firstName;
+    public String getFullName() {
+        return fullName;
     }
 
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public String getPreferredName() {
-        return preferredName;
-    }
-
-    public void setPreferredName(String preferredName) {
-        this.preferredName = preferredName;
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
     }
 
     public String getPhoneNumber() {
@@ -102,29 +71,5 @@ public class AdminEntity extends TimestampedEntity {
 
     public void setEmployeeNumber(String employeeNumber) {
         this.employeeNumber = employeeNumber;
-    }
-
-    public String getDepartment() {
-        return department;
-    }
-
-    public void setDepartment(String department) {
-        this.department = department;
-    }
-
-    public String getJobTitle() {
-        return jobTitle;
-    }
-
-    public void setJobTitle(String jobTitle) {
-        this.jobTitle = jobTitle;
-    }
-
-    public String getOfficePhone() {
-        return officePhone;
-    }
-
-    public void setOfficePhone(String officePhone) {
-        this.officePhone = officePhone;
     }
 }

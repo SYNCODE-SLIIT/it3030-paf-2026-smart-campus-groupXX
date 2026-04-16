@@ -45,12 +45,6 @@ public class FacultyEntity extends TimestampedEntity {
     @Column(length = 150)
     private String designation;
 
-    @Column(name = "office_location", length = 150)
-    private String officeLocation;
-
-    @Column(name = "office_phone", length = 30)
-    private String officePhone;
-
     public UUID getUserId() {
         return userId;
     }
@@ -123,19 +117,4 @@ public class FacultyEntity extends TimestampedEntity {
         this.designation = designation;
     }
 
-    public String getOfficeLocation() {
-        return officeLocation;
-    }
-
-    public void setOfficeLocation(String officeLocation) {
-        this.officeLocation = officeLocation;
-    }
-
-    public String getOfficePhone() {
-        return officePhone;
-    }
-
-    public void setOfficePhone(String officePhone) {
-        this.officePhone = officePhone;
-    }
 }

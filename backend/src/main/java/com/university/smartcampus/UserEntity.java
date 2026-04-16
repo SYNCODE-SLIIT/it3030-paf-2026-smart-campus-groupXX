@@ -6,6 +6,9 @@ import java.util.UUID;
 import com.university.smartcampus.AppEnums.AccountStatus;
 import com.university.smartcampus.AppEnums.UserType;
 
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,11 +32,13 @@ public class UserEntity extends TimestampedEntity {
     private String email;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "user_type", nullable = false, length = 20)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "user_type", nullable = false, columnDefinition = "user_type_enum")
     private UserType userType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "account_status", nullable = false, length = 20)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "account_status", nullable = false, columnDefinition = "account_status_enum")
     private AccountStatus accountStatus;
 
     @Column(name = "last_login_at")
