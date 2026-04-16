@@ -6,6 +6,66 @@ export type AuthDeliveryMethod = 'INVITE_EMAIL' | 'LOGIN_LINK_EMAIL';
 
 export type ManagerRole = 'CATALOG_MANAGER' | 'BOOKING_MANAGER' | 'TICKET_MANAGER';
 
+export type StudentFaculty =
+  | 'FACULTY_OF_COMPUTING'
+  | 'FACULTY_OF_ENGINEERING'
+  | 'SLIIT_BUSINESS_SCHOOL'
+  | 'FACULTY_OF_HUMANITIES_AND_SCIENCES'
+  | 'SCHOOL_OF_ARCHITECTURE'
+  | 'WILLIAM_ANGLISS_AT_SLIIT'
+  | 'FACULTY_OF_GRADUATE_STUDIES_AND_RESEARCH';
+
+export type StudentProgram =
+  | 'BSC_HONS_INFORMATION_TECHNOLOGY'
+  | 'BSC_HONS_COMPUTER_SCIENCE'
+  | 'BSC_HONS_COMPUTER_SYSTEMS_ENGINEERING'
+  | 'BSC_HONS_IT_ARTIFICIAL_INTELLIGENCE'
+  | 'BSC_HONS_IT_SOFTWARE_ENGINEERING'
+  | 'BSC_HONS_IT_COMPUTER_SYSTEMS_NETWORK_ENGINEERING'
+  | 'BSC_HONS_IT_INFORMATION_SYSTEMS_ENGINEERING'
+  | 'BSC_HONS_IT_CYBER_SECURITY'
+  | 'BSC_HONS_IT_INTERACTIVE_MEDIA'
+  | 'BSC_HONS_IT_DATA_SCIENCE'
+  | 'BSC_ENG_HONS_CIVIL_ENGINEERING'
+  | 'BSC_ENG_HONS_ELECTRICAL_ELECTRONIC_ENGINEERING'
+  | 'BSC_ENG_HONS_MECHANICAL_ENGINEERING'
+  | 'BSC_ENG_HONS_MECHANICAL_ENGINEERING_MECHATRONICS'
+  | 'BSC_ENG_HONS_MATERIALS_ENGINEERING'
+  | 'BBA_HONS_ACCOUNTING_FINANCE'
+  | 'BBA_HONS_BUSINESS_ANALYTICS'
+  | 'BBA_HONS_HUMAN_CAPITAL_MANAGEMENT'
+  | 'BBA_HONS_MARKETING_MANAGEMENT'
+  | 'BBA_HONS_LOGISTICS_SUPPLY_CHAIN_MANAGEMENT'
+  | 'BBA_HONS_BUSINESS_MANAGEMENT'
+  | 'BBA_HONS_MANAGEMENT_INFORMATION_SYSTEMS'
+  | 'BBA_HONS_QUALITY_MANAGEMENT'
+  | 'BSC_HONS_FINANCIAL_MATHS_APPLIED_STATISTICS'
+  | 'BSC_HONS_BIOTECHNOLOGY'
+  | 'BSC_HONS_PSYCHOLOGY'
+  | 'BSC_HONS_NURSING'
+  | 'BA_HONS_ENGLISH_STUDIES'
+  | 'BED_HONS_SCIENCES_ENGLISH_SOCIAL_SCIENCES_IT'
+  | 'BSC_HONS_ARCHITECTURE'
+  | 'BA_HONS_INTERIOR_DESIGN'
+  | 'MSC_ARCHITECTURE'
+  | 'ADVANCED_DIPLOMA_HOSPITALITY_MANAGEMENT'
+  | 'ADVANCED_DIPLOMA_TRAVEL_TOURISM_MANAGEMENT'
+  | 'DIPLOMA_EVENT_MANAGEMENT'
+  | 'CERTIFICATE_IV_PATISSERIE'
+  | 'COMMERCIAL_COOKERY'
+  | 'POSTGRADUATE_DIPLOMA_EDUCATION'
+  | 'MASTER_OF_EDUCATION'
+  | 'MASTER_BUSINESS_ADMINISTRATION'
+  | 'MSC_INFORMATION_TECHNOLOGY'
+  | 'MSC_INFORMATION_MANAGEMENT'
+  | 'MSC_INFORMATION_SYSTEMS'
+  | 'MSC_NETWORK_ENGINEERING'
+  | 'MSC_ARTIFICIAL_INTELLIGENCE';
+
+export type AcademicYear = 'YEAR_1' | 'YEAR_2' | 'YEAR_3' | 'YEAR_4';
+
+export type Semester = 'SEMESTER_1' | 'SEMESTER_2';
+
 export type NextStep = 'ONBOARDING' | 'DASHBOARD';
 
 export interface MessageResponse {
@@ -27,10 +87,10 @@ export interface StudentProfileResponse {
   preferredName: string | null;
   phoneNumber: string | null;
   registrationNumber: string | null;
-  facultyName: string | null;
-  programName: string | null;
-  academicYear: number | null;
-  semester: string | null;
+  facultyName: StudentFaculty | null;
+  programName: StudentProgram | null;
+  academicYear: AcademicYear | null;
+  semester: Semester | null;
   profileImageUrl: string | null;
   emailNotificationsEnabled: boolean | null;
   smsNotificationsEnabled: boolean | null;
@@ -44,19 +104,12 @@ export interface FacultyProfileResponse {
   employeeNumber: string | null;
   department: string | null;
   designation: string | null;
-  officeLocation: string | null;
-  officePhone: string | null;
 }
 
 export interface AdminProfileResponse {
-  firstName: string | null;
-  lastName: string | null;
-  preferredName: string | null;
+  fullName: string | null;
   phoneNumber: string | null;
   employeeNumber: string | null;
-  department: string | null;
-  jobTitle: string | null;
-  officePhone: string | null;
 }
 
 export interface ManagerProfileResponse {
@@ -65,9 +118,6 @@ export interface ManagerProfileResponse {
   preferredName: string | null;
   phoneNumber: string | null;
   employeeNumber: string | null;
-  department: string | null;
-  jobTitle: string | null;
-  officeLocation: string | null;
 }
 
 export interface UserResponse {
@@ -84,7 +134,7 @@ export interface UserResponse {
   lastInviteMethod: AuthDeliveryMethod | null;
   lastInviteReference: string | null;
   lastInviteRedirectUri: string | null;
-  managerRoles: ManagerRole[];
+  managerRole: ManagerRole | null;
   studentProfile: StudentProfileResponse | null;
   facultyProfile: FacultyProfileResponse | null;
   adminProfile: AdminProfileResponse | null;
@@ -109,19 +159,12 @@ export interface FacultyProfileInput {
   employeeNumber: string;
   department: string;
   designation: string;
-  officeLocation?: string;
-  officePhone?: string;
 }
 
 export interface AdminProfileInput {
-  firstName: string;
-  lastName: string;
-  preferredName?: string;
+  fullName: string;
   phoneNumber?: string;
   employeeNumber: string;
-  department: string;
-  jobTitle: string;
-  officePhone?: string;
 }
 
 export interface ManagerProfileInput {
@@ -130,9 +173,6 @@ export interface ManagerProfileInput {
   preferredName?: string;
   phoneNumber?: string;
   employeeNumber: string;
-  department: string;
-  jobTitle: string;
-  officeLocation?: string;
 }
 
 export interface CreateUserRequest {
@@ -143,7 +183,7 @@ export interface CreateUserRequest {
   facultyProfile?: FacultyProfileInput | null;
   adminProfile?: AdminProfileInput | null;
   managerProfile?: ManagerProfileInput | null;
-  managerRoles?: ManagerRole[] | null;
+  managerRole?: ManagerRole | null;
 }
 
 export interface UpdateUserRequest {
@@ -153,8 +193,8 @@ export interface UpdateUserRequest {
   managerProfile?: ManagerProfileInput | null;
 }
 
-export interface ManagerRolesUpdateRequest {
-  managerRoles: ManagerRole[];
+export interface ManagerRoleUpdateRequest {
+  managerRole: ManagerRole;
 }
 
 export interface StudentOnboardingRequest {
@@ -163,10 +203,10 @@ export interface StudentOnboardingRequest {
   preferredName?: string;
   phoneNumber: string;
   registrationNumber: string;
-  facultyName: string;
-  programName: string;
-  academicYear: number;
-  semester?: string;
+  facultyName: StudentFaculty;
+  programName: StudentProgram;
+  academicYear: AcademicYear;
+  semester: Semester;
   profileImageUrl?: string;
   emailNotificationsEnabled?: boolean;
   smsNotificationsEnabled?: boolean;

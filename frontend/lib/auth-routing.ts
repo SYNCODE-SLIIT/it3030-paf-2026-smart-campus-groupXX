@@ -34,12 +34,6 @@ export function getLoginReasonAlert(reason: string | null) {
         title: 'Authentication failed',
         message: 'We could not complete the sign-in flow. Please try again.',
       };
-    case 'auth_required':
-      return {
-        variant: 'warning' as const,
-        title: 'Sign in required',
-        message: 'Please authenticate to continue.',
-      };
     case 'signed_out':
       return {
         variant: 'info' as const,

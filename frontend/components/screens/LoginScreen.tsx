@@ -101,7 +101,7 @@ export function LoginScreen({ reason }: { reason: string | null }) {
     } catch (error) {
       setAlert({
         variant: 'error',
-        title: 'Password sign-in failed',
+        title: 'Unable to sign in',
         message: getErrorMessage(error, 'We could not sign you in with email and password.'),
       });
     } finally {

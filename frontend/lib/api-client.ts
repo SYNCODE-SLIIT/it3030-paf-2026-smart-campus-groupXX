@@ -1,9 +1,9 @@
 import {
-  AccountStatus,
+  type AccountStatus,
   type CreateUserRequest,
   type ErrorResponse,
   type ManagerRole,
-  type ManagerRolesUpdateRequest,
+  type ManagerRoleUpdateRequest,
   type MessageResponse,
   type SessionSyncResponse,
   type StudentOnboardingRequest,
@@ -49,6 +49,46 @@ interface RequestOptions {
 }
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
+
+const STATUS_MESSAGES: Partial<Record<number, string>> = {
+  0: 'Cannot reach the backend service. Please check that the backend is running and try again.',
+  400: 'Some information is missing or invalid. Please review the form and try again.',
+  401: 'Your session has expired. Please sign in again.',
+  403: 'You do not have permission to perform this action.',
+  404: 'The requested item could not be found.',
+  409: 'This record conflicts with an existing item.',
+  500: 'The server hit an unexpected problem. Please try again.',
+  502: 'The frontend cannot reach the backend service. Please make sure the backend is running.',
+  503: 'The service is temporarily unavailable. Please try again shortly.',
+  504: 'The backend took too long to respond. Please try again.',
+};
+
+function normalizeErrorMessage(message: string) {
+  const trimmed = message.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (lower.includes('invalid login credentials')) {
+    return 'The email or password is incorrect.';
+  }
+
+  if (lower.includes('email not confirmed')) {
+    return 'Confirm your email before signing in.';
+  }
+
+  if (lower.includes('networkerror') || lower.includes('failed to fetch') || lower.includes('load failed')) {
+    return 'The request could not reach the service. Check your connection and try again.';
+  }
+
+  if (lower.includes('jwt expired') || lower.includes('invalid jwt') || lower.includes('unauthorized')) {
+    return 'Your session has expired. Please sign in again.';
+  }
+
+  return trimmed;
+}
 
 function shouldRetryRequest(response: Response, options: RequestOptions, attempt: number) {
   const method = options.method ?? 'GET';
@@ -147,11 +187,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
-    return error.message;
+    return normalizeErrorMessage(error.details?.message ?? error.message)
+      ?? STATUS_MESSAGES[error.status]
+      ?? fallback;
   }
 
   if (error instanceof Error && error.message) {
-    return error.message;
+    return normalizeErrorMessage(error.message) ?? fallback;
   }
 
   return fallback;
@@ -223,12 +265,12 @@ export async function updateUser(accessToken: string, userId: string, payload: U
   });
 }
 
-export async function replaceManagerRoles(
+export async function replaceManagerRole(
   accessToken: string,
   userId: string,
-  payload: ManagerRolesUpdateRequest,
+  payload: ManagerRoleUpdateRequest,
 ) {
-  return request<UserResponse>(`/api/admin/users/${userId}/manager-roles`, {
+  return request<UserResponse>(`/api/admin/users/${userId}/manager-role`, {
     method: 'PUT',
     accessToken,
     body: payload,

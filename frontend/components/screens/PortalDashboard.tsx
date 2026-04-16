@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Button, Card, Chip, Table, TableBody, TableCell, TableRow } from '@/components/ui';
 import type { UserResponse } from '@/lib/api-types';
+import { getStudentFacultyLabel, getStudentProgramLabel } from '@/lib/student-catalog';
 import {
   getAccountStatusChipColor,
   getAccountStatusLabel,
@@ -18,7 +19,9 @@ import {
 
 function getProfileSummary(user: UserResponse) {
   if (user.studentProfile) {
-    return user.studentProfile.programName ?? user.studentProfile.facultyName ?? 'Student profile pending';
+    return getStudentProgramLabel(user.studentProfile.programName)
+      || getStudentFacultyLabel(user.studentProfile.facultyName)
+      || 'Student profile pending';
   }
 
   if (user.facultyProfile) {
@@ -26,11 +29,11 @@ function getProfileSummary(user: UserResponse) {
   }
 
   if (user.adminProfile) {
-    return user.adminProfile.jobTitle ?? user.adminProfile.department ?? 'Admin profile';
+    return user.adminProfile.fullName ?? 'Admin profile';
   }
 
   if (user.managerProfile) {
-    return user.managerProfile.jobTitle ?? user.managerProfile.department ?? 'Manager profile';
+    return user.managerRole ? getManagerRoleLabel(user.managerRole) : 'Manager profile';
   }
 
   return 'Provisioned account';
@@ -67,11 +70,11 @@ export function PortalDashboard({ user }: { user?: UserResponse }) {
           <Chip color={getUserTypeChipColor(resolvedUser.userType)} dot>
             {getUserTypeLabel(resolvedUser.userType)}
           </Chip>
-          {resolvedUser.managerRoles.map((role) => (
-            <Chip key={role} color="blue">
-              {getManagerRoleLabel(role)}
+          {resolvedUser.managerRole && (
+            <Chip color="blue">
+              {getManagerRoleLabel(resolvedUser.managerRole)}
             </Chip>
-          ))}
+          )}
         </div>
         <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: 0 }}>
           {getProfileSummary(resolvedUser)}

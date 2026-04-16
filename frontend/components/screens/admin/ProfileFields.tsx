@@ -49,8 +49,6 @@ export function ProfileFields({
         <Input label="Employee Number" value={facultyForm.employeeNumber} onChange={(e) => setFacultyForm((c) => ({ ...c, employeeNumber: e.target.value }))} required />
         <Input label="Department" value={facultyForm.department} onChange={(e) => setFacultyForm((c) => ({ ...c, department: e.target.value }))} required />
         <Input label="Designation" value={facultyForm.designation} onChange={(e) => setFacultyForm((c) => ({ ...c, designation: e.target.value }))} required />
-        <Input label="Office Location" value={facultyForm.officeLocation} onChange={(e) => setFacultyForm((c) => ({ ...c, officeLocation: e.target.value }))} />
-        <Input label="Office Phone" value={facultyForm.officePhone} onChange={(e) => setFacultyForm((c) => ({ ...c, officePhone: e.target.value }))} />
       </div>
     );
   }
@@ -58,14 +56,9 @@ export function ProfileFields({
   if (userType === 'ADMIN') {
     return (
       <div className="admin-editor-grid">
-        <Input label="First Name" value={adminForm.firstName} onChange={(e) => setAdminForm((c) => ({ ...c, firstName: e.target.value }))} required />
-        <Input label="Last Name" value={adminForm.lastName} onChange={(e) => setAdminForm((c) => ({ ...c, lastName: e.target.value }))} required />
-        <Input label="Preferred Name" value={adminForm.preferredName} onChange={(e) => setAdminForm((c) => ({ ...c, preferredName: e.target.value }))} />
+        <Input label="Full Name" value={adminForm.fullName} onChange={(e) => setAdminForm((c) => ({ ...c, fullName: e.target.value }))} required />
         <Input label="Phone Number" value={adminForm.phoneNumber} onChange={(e) => setAdminForm((c) => ({ ...c, phoneNumber: e.target.value }))} />
         <Input label="Employee Number" value={adminForm.employeeNumber} onChange={(e) => setAdminForm((c) => ({ ...c, employeeNumber: e.target.value }))} required />
-        <Input label="Department" value={adminForm.department} onChange={(e) => setAdminForm((c) => ({ ...c, department: e.target.value }))} required />
-        <Input label="Job Title" value={adminForm.jobTitle} onChange={(e) => setAdminForm((c) => ({ ...c, jobTitle: e.target.value }))} required />
-        <Input label="Office Phone" value={adminForm.officePhone} onChange={(e) => setAdminForm((c) => ({ ...c, officePhone: e.target.value }))} />
       </div>
     );
   }
@@ -77,9 +70,6 @@ export function ProfileFields({
       <Input label="Preferred Name" value={managerForm.preferredName} onChange={(e) => setManagerForm((c) => ({ ...c, preferredName: e.target.value }))} />
       <Input label="Phone Number" value={managerForm.phoneNumber} onChange={(e) => setManagerForm((c) => ({ ...c, phoneNumber: e.target.value }))} />
       <Input label="Employee Number" value={managerForm.employeeNumber} onChange={(e) => setManagerForm((c) => ({ ...c, employeeNumber: e.target.value }))} required />
-      <Input label="Department" value={managerForm.department} onChange={(e) => setManagerForm((c) => ({ ...c, department: e.target.value }))} required />
-      <Input label="Job Title" value={managerForm.jobTitle} onChange={(e) => setManagerForm((c) => ({ ...c, jobTitle: e.target.value }))} required />
-      <Input label="Office Location" value={managerForm.officeLocation} onChange={(e) => setManagerForm((c) => ({ ...c, officeLocation: e.target.value }))} />
     </div>
   );
 }

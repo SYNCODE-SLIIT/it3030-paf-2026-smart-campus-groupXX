@@ -108,7 +108,7 @@ export function ProtectedAppFrame({
     }
 
     if (!session) {
-      return '/login?reason=auth_required';
+      return '/login';
     }
 
     if (!appUser) {
@@ -181,7 +181,7 @@ export function StudentOnboardingFrame({ children }: { children: React.ReactNode
     }
 
     if (!session) {
-      return '/login?reason=auth_required';
+      return '/login';
     }
 
     if (!appUser) {

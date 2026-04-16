@@ -87,7 +87,7 @@ export async function requireProtectedUser() {
   const authState = await getServerAuthState();
 
   if (!authState.isAuthenticated) {
-    redirect('/login?reason=auth_required');
+    redirect('/login');
   }
 
   if (!authState.appUser) {
@@ -115,7 +115,7 @@ export async function requireStudentOnboardingUser() {
   const authState = await getServerAuthState();
 
   if (!authState.isAuthenticated) {
-    redirect('/login?reason=auth_required');
+    redirect('/login');
   }
 
   if (!authState.appUser) {

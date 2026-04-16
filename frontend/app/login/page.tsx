@@ -10,7 +10,8 @@ export default async function LoginPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [params, authState] = await Promise.all([searchParams, getServerAuthState()]);
-  const reason = typeof params.reason === 'string' ? params.reason : null;
+  const rawReason = typeof params.reason === 'string' ? params.reason : null;
+  const reason = rawReason === 'auth_required' ? null : rawReason;
 
   if (authState.appUser) {
     if (needsStudentOnboarding(authState.appUser)) {
@@ -18,6 +19,10 @@ export default async function LoginPage({
     }
 
     redirect(getUserHomePath(authState.appUser));
+  }
+
+  if (rawReason === 'auth_required') {
+    redirect('/login');
   }
 
   return <LoginScreen reason={reason} />;

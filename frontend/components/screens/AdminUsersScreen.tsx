@@ -241,9 +241,15 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
           <div style={{ width: 240, maxWidth: '100%' }}>
             <Input
               label=""
+              id="admin-user-search"
+              name="admin-user-search"
+              type="search"
               value={emailFilter}
               onChange={(e) => setEmailFilter(e.target.value)}
-              placeholder="Search users by email…"
+              placeholder="Search users by email..."
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               iconLeft={<Search size={15} />}
             />
           </div>
@@ -322,6 +328,7 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
                 embedded
                 accessToken={accessToken}
                 onCreated={async (createdUser) => {
+                  setEmailFilter('');
                   await reloadUsers();
                   setIsCreateDialogOpen(false);
                   if (createdUser.lastInviteReference) {
@@ -389,7 +396,14 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
               </Alert>
 
               <div style={{ display: 'grid', gap: 14 }}>
-                <Input label="User Email" value={createdInvite.email} readOnly />
+                <Input
+                  label="User Email"
+                  id="generated-invite-email"
+                  name="generated-invite-email"
+                  value={createdInvite.email}
+                  readOnly
+                  autoComplete="off"
+                />
                 <Textarea
                   label="Generated Access Link"
                   value={createdInvite.link}
