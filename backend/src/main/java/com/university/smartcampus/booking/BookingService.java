@@ -9,9 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.university.smartcampus.AppEnums.BookingStatus;
-import com.university.smartcampus.Exceptions.BadRequestException;
-import com.university.smartcampus.Exceptions.ForbiddenException;
-import com.university.smartcampus.Exceptions.NotFoundException;
+import com.university.smartcampus.BadRequestException;
+import com.university.smartcampus.ForbiddenException;
+import com.university.smartcampus.NotFoundException;
 import com.university.smartcampus.UserEntity;
 
 @Service

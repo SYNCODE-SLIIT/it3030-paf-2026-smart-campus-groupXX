@@ -7,8 +7,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.university.smartcampus.AppEnums.ResourceStatus;
-import com.university.smartcampus.Exceptions.BadRequestException;
-import com.university.smartcampus.Exceptions.NotFoundException;
+import com.university.smartcampus.BadRequestException;
+import com.university.smartcampus.NotFoundException;
 
 @Service
 public class ResourceService {

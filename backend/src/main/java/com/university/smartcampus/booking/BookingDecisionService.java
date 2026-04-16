@@ -10,7 +10,7 @@ import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.booking.BookingDtos.BookingDecisionRequest;
 import com.university.smartcampus.booking.BookingDtos.CancelBookingRequest;
 import com.university.smartcampus.booking.BookingDtos.BookingResponse;
-import com.university.smartcampus.Exceptions.BadRequestException;
+import com.university.smartcampus.BadRequestException;
 import com.university.smartcampus.UserEntity;
 
 @Service

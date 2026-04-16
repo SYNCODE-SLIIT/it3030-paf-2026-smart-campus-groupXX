@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.AppEnums.ResourceStatus;
-import com.university.smartcampus.Exceptions.BadRequestException;
+import com.university.smartcampus.BadRequestException;
 
 @Component
 public class BookingValidator {
