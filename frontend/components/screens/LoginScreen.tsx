@@ -122,7 +122,7 @@ export function LoginScreen({ reason }: { reason: string | null }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '64px 24px 80px',
+          padding: '112px 24px 80px',
         }}
       >
         <section
