@@ -10,7 +10,6 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.university.smartcampus.ApiDtos.ErrorResponse;
 import com.university.smartcampus.BadRequestException;
@@ -25,11 +24,12 @@ import jakarta.servlet.http.HttpServletRequest;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException exception, HttpServletRequest request) {
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException exception,
+            HttpServletRequest request) {
         String message = exception.getBindingResult().getFieldErrors().stream()
-            .findFirst()
-            .map(FieldError::getDefaultMessage)
-            .orElse("Validation failed.");
+                .findFirst()
+                .map(FieldError::getDefaultMessage)
+                .orElse("Validation failed.");
 
         return build(HttpStatus.BAD_REQUEST, message, request);
     }
@@ -55,7 +55,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ExternalServiceException.class)
-    public ResponseEntity<ErrorResponse> handleExternal(ExternalServiceException exception, HttpServletRequest request) {
+    public ResponseEntity<ErrorResponse> handleExternal(ExternalServiceException exception,
+            HttpServletRequest request) {
         return build(HttpStatus.BAD_GATEWAY, exception.getMessage(), request);
     }
 
@@ -66,12 +67,11 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, HttpServletRequest request) {
         ErrorResponse body = new ErrorResponse(
-            Instant.now(),
-            status.value(),
-            status.getReasonPhrase(),
-            message,
-            request.getRequestURI()
-        );
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                message,
+                request.getRequestURI());
         return ResponseEntity.status(status).body(body);
     }
 }

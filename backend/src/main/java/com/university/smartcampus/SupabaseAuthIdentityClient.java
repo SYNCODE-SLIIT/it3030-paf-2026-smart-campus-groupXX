@@ -14,8 +14,6 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
-import com.university.smartcampus.ExternalServiceException;
-
 @Component
 public class SupabaseAuthIdentityClient implements AuthIdentityClient {
 
@@ -42,25 +40,26 @@ public class SupabaseAuthIdentityClient implements AuthIdentityClient {
 
             if (targetAuthUserId == null) {
                 response = restClient().post()
-                    .uri("/admin/users")
-                    .headers(this::applyAdminHeaders)
-                    .body(body)
-                    .retrieve()
-                    .body(Map.class);
+                        .uri("/admin/users")
+                        .headers(this::applyAdminHeaders)
+                        .body(body)
+                        .retrieve()
+                        .body(Map.class);
                 created = true;
             } else {
                 response = restClient().put()
-                    .uri("/admin/users/{id}", targetAuthUserId)
-                    .headers(this::applyAdminHeaders)
-                    .body(body)
-                    .retrieve()
-                    .body(Map.class);
+                        .uri("/admin/users/{id}", targetAuthUserId)
+                        .headers(this::applyAdminHeaders)
+                        .body(body)
+                        .retrieve()
+                        .body(Map.class);
             }
 
             UUID authUserId = extractAuthUserId(response, targetAuthUserId);
             return new ProvisionedIdentity(authUserId, created);
         } catch (RestClientException exception) {
-            throw new ExternalServiceException("Failed to provision email and password access through Supabase.", exception);
+            throw new ExternalServiceException("Failed to provision email and password access through Supabase.",
+                    exception);
         }
     }
 
@@ -79,10 +78,10 @@ public class SupabaseAuthIdentityClient implements AuthIdentityClient {
 
         try {
             restClient().delete()
-                .uri("/admin/users/{id}", targetAuthUserId)
-                .headers(this::applyAdminHeaders)
-                .retrieve()
-                .toBodilessEntity();
+                    .uri("/admin/users/{id}", targetAuthUserId)
+                    .headers(this::applyAdminHeaders)
+                    .retrieve()
+                    .toBodilessEntity();
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == 404) {
                 return;
@@ -95,8 +94,8 @@ public class SupabaseAuthIdentityClient implements AuthIdentityClient {
 
     private RestClient restClient() {
         return RestClient.builder()
-            .baseUrl(trimTrailingSlash(properties.getAuth().getSupabase().getUrl()) + "/auth/v1")
-            .build();
+                .baseUrl(trimTrailingSlash(properties.getAuth().getSupabase().getUrl()) + "/auth/v1")
+                .build();
     }
 
     private void applyAdminHeaders(HttpHeaders headers) {
@@ -123,14 +122,14 @@ public class SupabaseAuthIdentityClient implements AuthIdentityClient {
     @SuppressWarnings("unchecked")
     private Optional<UUID> findAuthUserIdByEmail(String email) {
         Map<String, Object> response = restClient().get()
-            .uri(uriBuilder -> uriBuilder
-                .path("/admin/users")
-                .queryParam("page", 1)
-                .queryParam("per_page", 1000)
-                .build())
-            .headers(this::applyAdminHeaders)
-            .retrieve()
-            .body(Map.class);
+                .uri(uriBuilder -> uriBuilder
+                        .path("/admin/users")
+                        .queryParam("page", 1)
+                        .queryParam("per_page", 1000)
+                        .build())
+                .headers(this::applyAdminHeaders)
+                .retrieve()
+                .body(Map.class);
 
         if (response == null) {
             return Optional.empty();
@@ -142,20 +141,20 @@ public class SupabaseAuthIdentityClient implements AuthIdentityClient {
         }
 
         return users.stream()
-            .filter(Map.class::isInstance)
-            .map(Map.class::cast)
-            .filter(user -> email.equalsIgnoreCase((String) user.get("email")))
-            .map(user -> user.get("id"))
-            .filter(String.class::isInstance)
-            .map(String.class::cast)
-            .filter(StringUtils::hasText)
-            .map(UUID::fromString)
-            .findFirst();
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .filter(user -> email.equalsIgnoreCase((String) user.get("email")))
+                .map(user -> user.get("id"))
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .filter(StringUtils::hasText)
+                .map(UUID::fromString)
+                .findFirst();
     }
 
     private void ensureConfigured() {
         if (!StringUtils.hasText(properties.getAuth().getSupabase().getUrl())
-            || !StringUtils.hasText(properties.getAuth().getSupabase().getServiceRoleKey())) {
+                || !StringUtils.hasText(properties.getAuth().getSupabase().getServiceRoleKey())) {
             throw new ExternalServiceException("Supabase auth identity provisioning is not configured.");
         }
     }

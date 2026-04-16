@@ -10,8 +10,6 @@ import org.springframework.util.StringUtils;
 
 import com.university.smartcampus.AppEnums.AccountStatus;
 import com.university.smartcampus.AppEnums.UserType;
-import com.university.smartcampus.ForbiddenException;
-import com.university.smartcampus.UnauthorizedException;
 
 @Service
 public class CurrentUserService {
@@ -36,8 +34,9 @@ public class CurrentUserService {
         UUID subject = subjectFromJwt(jwt);
 
         UserEntity user = userRepository.findByAuthUserId(subject)
-            .orElseGet(() -> userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ForbiddenException("This authenticated account has not been provisioned.")));
+                .orElseGet(() -> userRepository.findByEmailIgnoreCase(email)
+                        .orElseThrow(
+                                () -> new ForbiddenException("This authenticated account has not been provisioned.")));
 
         if (user.getAuthUserId() != null && !user.getAuthUserId().equals(subject)) {
             throw new ForbiddenException("This identity does not match the provisioned account.");

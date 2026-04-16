@@ -21,13 +21,9 @@ import com.university.smartcampus.AdminDtos.UpdateUserRequest;
 import com.university.smartcampus.ApiDtos.MessageResponse;
 import com.university.smartcampus.ApiDtos.UserResponse;
 import com.university.smartcampus.AppEnums.AccountStatus;
-import com.university.smartcampus.AppEnums.AuthDeliveryMethod;
 import com.university.smartcampus.AppEnums.ManagerRole;
 import com.university.smartcampus.AppEnums.UserType;
 import com.university.smartcampus.AuthDtos.SessionSyncResponse;
-import com.university.smartcampus.BadRequestException;
-import com.university.smartcampus.ForbiddenException;
-import com.university.smartcampus.NotFoundException;
 import com.university.smartcampus.StudentDtos.StudentOnboardingRequest;
 import com.university.smartcampus.StudentDtos.StudentOnboardingStateResponse;
 
@@ -46,14 +42,13 @@ public class UserManagementService {
     private final CurrentUserService currentUserService;
 
     public UserManagementService(
-        UserRepository userRepository,
-        StudentRepository studentRepository,
-        ManagerRepository managerRepository,
-        AuthProviderClient authProviderClient,
-        AuthIdentityClient authIdentityClient,
-        UserMapper userMapper,
-        CurrentUserService currentUserService
-    ) {
+            UserRepository userRepository,
+            StudentRepository studentRepository,
+            ManagerRepository managerRepository,
+            AuthProviderClient authProviderClient,
+            AuthIdentityClient authIdentityClient,
+            UserMapper userMapper,
+            CurrentUserService currentUserService) {
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
         this.managerRepository = managerRepository;
@@ -92,17 +87,16 @@ public class UserManagementService {
 
     @Transactional(readOnly = true)
     public List<UserResponse> listUsers(
-        String email,
-        UserType userType,
-        AccountStatus accountStatus,
-        ManagerRole managerRole
-    ) {
+            String email,
+            UserType userType,
+            AccountStatus accountStatus,
+            ManagerRole managerRole) {
         Specification<UserEntity> specification = (root, query, cb) -> cb.conjunction();
 
         if (StringUtils.hasText(email)) {
             String normalizedEmail = currentUserService.normalizeEmail(email);
-            specification = specification.and((root, query, cb) ->
-                cb.like(cb.lower(root.get("email")), "%" + normalizedEmail + "%"));
+            specification = specification
+                    .and((root, query, cb) -> cb.like(cb.lower(root.get("email")), "%" + normalizedEmail + "%"));
         }
 
         if (userType != null) {
@@ -114,9 +108,9 @@ public class UserManagementService {
         }
 
         return userRepository.findAll(specification, Sort.by(Sort.Direction.ASC, "email")).stream()
-            .filter(user -> managerRole == null || hasManagerRole(user, managerRole))
-            .map(userMapper::toUserResponse)
-            .toList();
+                .filter(user -> managerRole == null || hasManagerRole(user, managerRole))
+                .map(userMapper::toUserResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -171,8 +165,8 @@ public class UserManagementService {
         }
 
         AuthProviderClient.DeliveryResult delivery = user.getAccountStatus() == AccountStatus.INVITED
-            ? authProviderClient.sendInviteLink(user.getEmail())
-            : authProviderClient.sendMagicLink(user.getEmail());
+                ? authProviderClient.sendInviteLink(user.getEmail())
+                : authProviderClient.sendMagicLink(user.getEmail());
 
         recordDelivery(user, delivery);
         return new MessageResponse("Access link generated.");
@@ -183,8 +177,8 @@ public class UserManagementService {
         if (StringUtils.hasText(email)) {
             String normalizedEmail = currentUserService.normalizeEmail(email);
             userRepository.findByEmailIgnoreCase(normalizedEmail)
-                .filter(user -> user.getAccountStatus() != AccountStatus.SUSPENDED)
-                .ifPresent(user -> recordDelivery(user, authProviderClient.sendMagicLink(user.getEmail())));
+                    .filter(user -> user.getAccountStatus() != AccountStatus.SUSPENDED)
+                    .ifPresent(user -> recordDelivery(user, authProviderClient.sendMagicLink(user.getEmail())));
         }
 
         return new MessageResponse("If the account exists, an access link has been generated.");
@@ -211,7 +205,7 @@ public class UserManagementService {
         UUID subject = currentUserService.subjectFromJwt(jwt);
 
         UserEntity user = userRepository.findByEmailIgnoreCase(email)
-            .orElseThrow(() -> new ForbiddenException("This authenticated account has not been provisioned."));
+                .orElseThrow(() -> new ForbiddenException("This authenticated account has not been provisioned."));
 
         if (user.getAccountStatus() == AccountStatus.SUSPENDED) {
             throw new ForbiddenException("This account is suspended.");
@@ -241,9 +235,8 @@ public class UserManagementService {
     public StudentOnboardingStateResponse getStudentOnboarding(UserEntity user) {
         ensureStudent(user);
         return new StudentOnboardingStateResponse(
-            user.getStudentProfile() != null && user.getStudentProfile().isOnboardingCompleted(),
-            userMapper.toStudentProfile(user.getStudentProfile())
-        );
+                user.getStudentProfile() != null && user.getStudentProfile().isOnboardingCompleted(),
+                userMapper.toStudentProfile(user.getStudentProfile()));
     }
 
     @Transactional
@@ -289,30 +282,33 @@ public class UserManagementService {
             case STUDENT -> user.setStudentProfile(createStudentProfile(user));
             case FACULTY -> user.setFacultyProfile(createFacultyProfile(user, request.facultyProfile()));
             case ADMIN -> user.setAdminProfile(createAdminProfile(user, request.adminProfile()));
-            case MANAGER -> user.setManagerProfile(createManagerProfile(user, request.managerProfile(), request.managerRoles()));
+            case MANAGER ->
+                user.setManagerProfile(createManagerProfile(user, request.managerProfile(), request.managerRoles()));
         }
     }
 
     private void ensureProfileCombinationsForCreate(CreateUserRequest request) {
-        if (request.userType() != UserType.MANAGER && request.managerRoles() != null && !request.managerRoles().isEmpty()) {
+        if (request.userType() != UserType.MANAGER && request.managerRoles() != null
+                && !request.managerRoles().isEmpty()) {
             throw new BadRequestException("Manager roles can only be assigned to manager users.");
         }
 
         switch (request.userType()) {
             case STUDENT -> {
-                if (request.facultyProfile() != null || request.adminProfile() != null || request.managerProfile() != null) {
+                if (request.facultyProfile() != null || request.adminProfile() != null
+                        || request.managerProfile() != null) {
                     throw new BadRequestException("Student creation does not accept non-student profile payloads.");
                 }
             }
             case FACULTY -> require(request.adminProfile() == null && request.managerProfile() == null,
-                "Faculty creation does not accept admin or manager profile payloads.");
+                    "Faculty creation does not accept admin or manager profile payloads.");
             case ADMIN -> require(request.facultyProfile() == null && request.managerProfile() == null,
-                "Admin creation does not accept faculty or manager profile payloads.");
+                    "Admin creation does not accept faculty or manager profile payloads.");
             case MANAGER -> {
                 require(request.facultyProfile() == null && request.adminProfile() == null,
-                    "Manager creation does not accept faculty or admin profile payloads.");
+                        "Manager creation does not accept faculty or admin profile payloads.");
                 require(request.managerRoles() != null && !request.managerRoles().isEmpty(),
-                    "Managers must have at least one manager role.");
+                        "Managers must have at least one manager role.");
             }
         }
     }
@@ -351,7 +347,8 @@ public class UserManagementService {
         return admin;
     }
 
-    private ManagerEntity createManagerProfile(UserEntity user, ManagerProfileInput input, Set<ManagerRole> managerRoles) {
+    private ManagerEntity createManagerProfile(UserEntity user, ManagerProfileInput input,
+            Set<ManagerRole> managerRoles) {
         ManagerEntity manager = new ManagerEntity();
         manager.setUser(user);
         if (input != null) {
@@ -416,7 +413,7 @@ public class UserManagementService {
 
     private UserEntity getUserEntity(UUID id) {
         return userRepository.findById(id)
-            .orElseThrow(() -> new NotFoundException("User not found."));
+                .orElseThrow(() -> new NotFoundException("User not found."));
     }
 
     private void ensureStudent(UserEntity user) {
@@ -439,8 +436,8 @@ public class UserManagementService {
 
     private String nextStep(UserEntity user) {
         return user.getUserType() == UserType.STUDENT && !user.isOnboardingCompleted()
-            ? NEXT_STEP_ONBOARDING
-            : NEXT_STEP_DASHBOARD;
+                ? NEXT_STEP_ONBOARDING
+                : NEXT_STEP_DASHBOARD;
     }
 
     private boolean hasManagerRole(UserEntity user, ManagerRole managerRole) {
