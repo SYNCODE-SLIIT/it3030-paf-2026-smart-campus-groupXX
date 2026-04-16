@@ -10,9 +10,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.university.smartcampus.AppEnums.AccountStatus;
-import com.university.smartcampus.AppEnums.ManagerRole;
-import com.university.smartcampus.AppEnums.UserType;
+import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
+import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
+import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.user.entity.ManagerEntity;
+import com.university.smartcampus.user.entity.UserEntity;
+import com.university.smartcampus.user.repository.UserRepository;
 
 @SpringBootTest
 @Transactional

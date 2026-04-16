@@ -21,11 +21,18 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
-import com.university.smartcampus.AdminDtos.CreateUserRequest;
-import com.university.smartcampus.AdminDtos.ManagerRoleUpdateRequest;
-import com.university.smartcampus.AppEnums.AccountStatus;
-import com.university.smartcampus.AppEnums.ManagerRole;
-import com.university.smartcampus.AppEnums.UserType;
+import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
+import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
+import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.user.dto.AdminDtos;
+import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
+import com.university.smartcampus.user.dto.AdminDtos.ManagerRoleUpdateRequest;
+import com.university.smartcampus.user.entity.AdminEntity;
+import com.university.smartcampus.user.entity.FacultyEntity;
+import com.university.smartcampus.user.entity.ManagerEntity;
+import com.university.smartcampus.user.entity.StudentEntity;
+import com.university.smartcampus.user.entity.UserEntity;
+import com.university.smartcampus.user.repository.UserRepository;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
