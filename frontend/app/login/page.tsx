@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { MarketingNavbar } from '@/components/layout/MarketingNavbar';
 import { LoginScreen } from '@/components/screens/LoginScreen';
 import { getUserHomePath, needsStudentOnboarding, STUDENT_ONBOARDING_PATH } from '@/lib/auth-routing';
 import { getServerAuthState } from '@/lib/server-auth';
@@ -25,5 +26,10 @@ export default async function LoginPage({
     redirect('/login');
   }
 
-  return <LoginScreen reason={reason} />;
+  return (
+    <>
+      <MarketingNavbar />
+      <LoginScreen reason={reason} />
+    </>
+  );
 }
