@@ -25,12 +25,12 @@ services:
       test:
         [
           "CMD-SHELL",
-          "status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/me || true); [ \"$$status\" != \"000\" ]"
+          "status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/health || true); [ \"$$status\" = \"200\" ]"
         ]
       interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 40s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
 
   frontend:
     build: ./frontend

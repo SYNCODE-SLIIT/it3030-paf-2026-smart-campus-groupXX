@@ -112,6 +112,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSecti
               allowedUserTypes: ['STUDENT'],
             },
             {
+              label: 'Bookings',
+              icon: Calendar,
+              href: '/students/bookings',
+              allowedUserTypes: ['STUDENT'],
+            },
+            {
               label: 'Account Security',
               icon: KeyRound,
               href: '/account/security',
@@ -129,6 +135,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSecti
               label: 'Dashboard',
               icon: LayoutDashboard,
               href: '/faculty',
+              allowedUserTypes: ['FACULTY'],
+            },
+            {
+              label: 'Bookings',
+              icon: Calendar,
+              href: '/faculty/bookings',
               allowedUserTypes: ['FACULTY'],
             },
             {
