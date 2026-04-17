@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.university.smartcampus.common.exception.ExternalServiceException;
@@ -30,32 +31,38 @@ public class SupabaseProfileImageStorageClient implements ProfileImageStorageCli
         ensureConfigured();
 
         String bucket = properties.getStorage().getProfileImages().getBucket();
-        String contentType = file.getContentType();
+        String contentType = StringUtils.hasText(file.getContentType())
+                ? file.getContentType()
+                : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        String serviceRoleKey = properties.getAuth().getSupabase().getServiceRoleKey();
         String extension = extensionFor(contentType);
         String objectPath = "students/%s/profile.%s".formatted(userId, extension);
 
         try {
             restClient().post()
                     .uri("/object/" + bucket + "/" + objectPath)
-                    .headers(headers -> applyStorageHeaders(headers, contentType))
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header("apikey", serviceRoleKey)
+                    .header("authorization", "Bearer " + serviceRoleKey)
+                    .header("x-upsert", "true")
+                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
                     .body(file.getBytes())
                     .retrieve()
                     .toBodilessEntity();
         } catch (IOException exception) {
             throw new ExternalServiceException("Failed to read the uploaded profile image.", exception);
+        } catch (RestClientResponseException exception) {
+            String response = StringUtils.hasText(exception.getResponseBodyAsString())
+                    ? exception.getResponseBodyAsString()
+                    : exception.getStatusText();
+            throw new ExternalServiceException(
+                    "Failed to upload the profile image to Supabase Storage: " + response,
+                    exception);
         } catch (RestClientException exception) {
             throw new ExternalServiceException("Failed to upload the profile image to Supabase Storage.", exception);
         }
 
         return new StoredProfileImage(publicUrl(bucket, objectPath), objectPath);
-    }
-
-    private void applyStorageHeaders(HttpHeaders headers, String contentType) {
-        headers.setContentType(MediaType.parseMediaType(contentType));
-        headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getAuth().getSupabase().getServiceRoleKey());
-        headers.set("apikey", properties.getAuth().getSupabase().getServiceRoleKey());
-        headers.set("x-upsert", "true");
-        headers.set(HttpHeaders.CACHE_CONTROL, "public, max-age=3600");
     }
 
     private String publicUrl(String bucket, String objectPath) {

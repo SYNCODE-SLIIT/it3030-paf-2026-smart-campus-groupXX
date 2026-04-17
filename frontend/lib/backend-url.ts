@@ -9,7 +9,9 @@ function normalizeBaseUrl(value: string | undefined) {
 }
 
 export function getServerApiBaseUrl() {
-  return normalizeBaseUrl(process.env.INTERNAL_API_URL) ?? normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL);
+  return normalizeBaseUrl(process.env.INTERNAL_API_URL)
+    ?? normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL)
+    ?? (process.env.NODE_ENV === 'production' ? null : 'http://localhost:8080');
 }
 
 export function requireServerApiBaseUrl() {

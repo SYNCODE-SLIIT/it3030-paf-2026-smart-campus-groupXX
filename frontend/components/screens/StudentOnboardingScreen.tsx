@@ -243,11 +243,20 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     startSubmitTransition(async () => {
       try {
         let profileImageUrl = formState.profileImageUrl.trim() || undefined;
+        let profileImageUploadWarning: string | null = null;
 
         if (selectedImageFile) {
           setSubmitStage('Uploading profile image...');
-          const imageUser = await uploadStudentProfileImage(session.access_token, selectedImageFile);
-          profileImageUrl = imageUser.studentProfile?.profileImageUrl ?? profileImageUrl;
+
+          try {
+            const imageUser = await uploadStudentProfileImage(session.access_token, selectedImageFile);
+            profileImageUrl = imageUser.studentProfile?.profileImageUrl ?? profileImageUrl;
+          } catch (error) {
+            profileImageUploadWarning = getErrorMessage(
+              error,
+              'We could not upload your profile image right now. You can upload it later from your account settings.',
+            );
+          }
         }
 
         setSubmitStage('Completing onboarding...');
@@ -269,6 +278,14 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
         await completeStudentOnboarding(session.access_token, payload);
         const refreshedUser = await refreshMe();
         const redirectUser = refreshedUser ?? resolvedUser;
+
+        if (profileImageUploadWarning && !redirectUser) {
+          setAlert({
+            variant: 'warning',
+            title: 'Onboarding completed with warning',
+            message: profileImageUploadWarning,
+          });
+        }
 
         // Use a full navigation so role/onboarding guards rehydrate from the latest backend state.
         if (redirectUser) {
