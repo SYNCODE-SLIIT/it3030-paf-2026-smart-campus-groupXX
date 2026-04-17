@@ -409,18 +409,32 @@ export async function cancelApprovedBookingAsManager(
 }
 
 export async function uploadStudentProfileImage(accessToken: string, file: File) {
+  const path = '/api/students/me/profile-image';
   const formData = new FormData();
   formData.set('file', file);
 
-  const response = await fetch('/api/students/me/profile-image', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: formData,
-    cache: 'no-store',
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: formData,
+      cache: 'no-store',
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError(
+        0,
+        'Cannot reach the backend API. Make sure the backend service is running and reachable at NEXT_PUBLIC_API_URL.',
+      );
+    }
+
+    throw error;
+  }
 
   if (!response.ok) {
     let details: ErrorResponse | null = null;
