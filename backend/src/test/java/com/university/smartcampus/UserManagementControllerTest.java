@@ -27,6 +27,13 @@ import org.springframework.web.context.WebApplicationContext;
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.AppEnums.BookingStatus;
+import com.university.smartcampus.AppEnums.ResourceCategory;
+import com.university.smartcampus.AppEnums.ResourceStatus;
+import com.university.smartcampus.booking.BookingEntity;
+import com.university.smartcampus.booking.BookingRepository;
+import com.university.smartcampus.resource.ResourceEntity;
+import com.university.smartcampus.resource.ResourceRepository;
 import com.university.smartcampus.user.dto.AdminDtos;
 import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
 import com.university.smartcampus.user.dto.AdminDtos.ManagerRoleUpdateRequest;
@@ -52,6 +59,12 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private ResourceRepository resourceRepository;
 
     @Autowired
     private TestAuthProviderConfiguration.RecordingAuthProviderClient recordingAuthProviderClient;
@@ -309,6 +322,35 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void adminCanDeleteUserWithRequesterBookings() throws Exception {
+        UserEntity student = seedStudent("delete.with.bookings@campus.test", AccountStatus.ACTIVE, true);
+        UUID authUserId = UUID.randomUUID();
+        student.setAuthUserId(authUserId);
+        userRepository.saveAndFlush(student);
+
+        ResourceEntity resource = seedResource("DEL-" + UUID.randomUUID());
+        Instant startTime = Instant.now().plusSeconds(3600);
+
+        BookingEntity booking = new BookingEntity();
+        booking.setId(UUID.randomUUID());
+        booking.setRequester(student);
+        booking.setResource(resource);
+        booking.setStartTime(startTime);
+        booking.setEndTime(startTime.plusSeconds(3600));
+        booking.setStatus(BookingStatus.PENDING);
+        bookingRepository.saveAndFlush(booking);
+
+        mockMvc.perform(delete("/api/admin/users/{id}", student.getId())
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("User deleted."));
+
+        assertThat(userRepository.findById(student.getId())).isEmpty();
+        assertThat(bookingRepository.findById(booking.getId())).isEmpty();
+        assertThat(recordingAuthIdentityClient.deletedIdentityIds()).contains(authUserId);
+    }
+
+    @Test
     void adminCannotDeleteOwnAccount() throws Exception {
         UserEntity admin = userRepository.findByEmailIgnoreCase("admin@campus.test").orElseThrow();
 
@@ -511,5 +553,22 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
 
         user.setManagerProfile(manager);
         return userRepository.save(user);
+    }
+
+    private ResourceEntity seedResource(String code) {
+        ResourceEntity resource = new ResourceEntity();
+        resource.setId(UUID.randomUUID());
+        resource.setCode(code);
+        resource.setName("Delete Test Resource");
+        resource.setCategory(ResourceCategory.SPACES);
+        resource.setSubcategory("Seeded");
+        resource.setDescription("Resource used by delete-user tests");
+        resource.setLocation("Test Wing");
+        resource.setCapacity(10);
+        resource.setQuantity(1);
+        resource.setStatus(ResourceStatus.ACTIVE);
+        resource.setBookable(true);
+        resource.setMovable(false);
+        return resourceRepository.save(resource);
     }
 }

@@ -223,9 +223,12 @@ public class UserManagementService {
             throw new BadRequestException("You cannot delete your own admin account.");
         }
 
-        authIdentityClient.deleteIdentity(user.getAuthUserId(), user.getEmail());
+        UUID authUserId = user.getAuthUserId();
+        String email = user.getEmail();
+
         userRepository.delete(user);
         userRepository.flush();
+        authIdentityClient.deleteIdentity(authUserId, email);
 
         return new MessageResponse("User deleted.");
     }
