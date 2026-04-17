@@ -22,6 +22,23 @@ public final class AppEnums {
         TICKET_MANAGER
     }
 
+     public enum ResourceCategory {
+        SPACES,
+        TECHNICAL_EQUIPMENT,
+        MAINTENANCE_AND_CLEANING,
+        SPORTS,
+        EVENT_AND_DECORATION,
+        GENERAL_UTILITY,
+        TRANSPORT_AND_LOGISTICS
+    }
+
+    public enum ResourceStatus {
+        ACTIVE,
+        OUT_OF_SERVICE,
+        MAINTENANCE,
+        INACTIVE
+    }
+    
     public enum UserType {
         STUDENT,
         FACULTY,
