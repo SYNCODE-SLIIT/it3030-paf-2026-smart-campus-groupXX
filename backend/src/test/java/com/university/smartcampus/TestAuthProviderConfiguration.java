@@ -8,10 +8,12 @@ import java.util.UUID;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.university.smartcampus.auth.identity.AuthIdentityClient;
 import com.university.smartcampus.auth.provider.AuthProviderClient;
 import com.university.smartcampus.common.enums.AppEnums.AuthDeliveryMethod;
+import com.university.smartcampus.user.storage.ProfileImageStorageClient;
 
 @TestConfiguration
 public class TestAuthProviderConfiguration {
@@ -26,6 +28,12 @@ public class TestAuthProviderConfiguration {
     @Primary
     RecordingAuthIdentityClient recordingAuthIdentityClient() {
         return new RecordingAuthIdentityClient();
+    }
+
+    @Bean
+    @Primary
+    RecordingProfileImageStorageClient recordingProfileImageStorageClient() {
+        return new RecordingProfileImageStorageClient();
     }
 
     static class RecordingAuthProviderClient implements AuthProviderClient {
@@ -94,6 +102,29 @@ public class TestAuthProviderConfiguration {
         void reset() {
             identities.clear();
             deletedIdentityIds.clear();
+        }
+    }
+
+    static class RecordingProfileImageStorageClient implements ProfileImageStorageClient {
+
+        private final List<StoredProfileImage> storedImages = new ArrayList<>();
+
+        @Override
+        public StoredProfileImage storeStudentProfileImage(UUID userId, MultipartFile file) {
+            StoredProfileImage image = new StoredProfileImage(
+                "https://storage.test/profile-images/students/" + userId + "/profile.jpg",
+                "students/" + userId + "/profile.jpg"
+            );
+            storedImages.add(image);
+            return image;
+        }
+
+        List<StoredProfileImage> storedImages() {
+            return Collections.unmodifiableList(storedImages);
+        }
+
+        void reset() {
+            storedImages.clear();
         }
     }
 }

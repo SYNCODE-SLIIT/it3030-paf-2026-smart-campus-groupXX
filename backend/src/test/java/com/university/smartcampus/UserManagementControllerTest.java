@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -18,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -57,6 +60,9 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     private TestAuthProviderConfiguration.RecordingAuthIdentityClient recordingAuthIdentityClient;
 
     @Autowired
+    private TestAuthProviderConfiguration.RecordingProfileImageStorageClient recordingProfileImageStorageClient;
+
+    @Autowired
     private WebApplicationContext context;
 
     @BeforeEach
@@ -64,6 +70,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         mockMvc = webAppContextSetup(context).apply(springSecurity()).build();
         recordingAuthProviderClient.reset();
         recordingAuthIdentityClient.reset();
+        recordingProfileImageStorageClient.reset();
         userRepository.deleteAll();
         seedAdmin("admin@campus.test");
     }
@@ -74,7 +81,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             "student@campus.test",
             UserType.STUDENT,
             true,
-            new AdminDtos.StudentProfileInput(),
+            null,
             null,
             null,
             null,
@@ -215,6 +222,61 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void adminCanUpdateStudentProfile() throws Exception {
+        UserEntity student = seedStudent("student.edit@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(patch("/api/admin/users/{id}", student.getId())
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "studentProfile": {
+                        "firstName": "Updated",
+                        "lastName": "Student",
+                        "preferredName": "US",
+                        "phoneNumber": "0711111111",
+                        "registrationNumber": "ST-EDIT-001",
+                        "facultyName": "FACULTY_OF_COMPUTING",
+                        "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                        "academicYear": "YEAR_2",
+                        "semester": "SEMESTER_1",
+                        "emailNotificationsEnabled": true,
+                        "smsNotificationsEnabled": false
+                      }
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.studentProfile.firstName").value("Updated"))
+            .andExpect(jsonPath("$.studentProfile.registrationNumber").value("ST-EDIT-001"))
+            .andExpect(jsonPath("$.studentProfile.programName").value("BSC_HONS_INFORMATION_TECHNOLOGY"));
+    }
+
+    @Test
+    void adminStudentProfileUpdateRejectsProgramFromAnotherFaculty() throws Exception {
+        UserEntity student = seedStudent("student.invalid@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(patch("/api/admin/users/{id}", student.getId())
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "studentProfile": {
+                        "firstName": "Invalid",
+                        "lastName": "Student",
+                        "phoneNumber": "0711111111",
+                        "registrationNumber": "ST-INVALID-001",
+                        "facultyName": "FACULTY_OF_ENGINEERING",
+                        "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                        "academicYear": "YEAR_2",
+                        "semester": "SEMESTER_1"
+                      }
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Program does not belong to the selected faculty."));
+    }
+
+    @Test
     void adminCanResendInviteAndPublicLoginLinkRequestIsSafe() throws Exception {
         UserEntity student = seedStudent("resend@campus.test", AccountStatus.INVITED, false);
 
@@ -283,6 +345,77 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
             .andExpect(jsonPath("$.studentProfile.onboardingCompleted").value(true))
             .andExpect(jsonPath("$.studentProfile.registrationNumber").value("ST-001"));
+    }
+
+    @Test
+    void studentCanUploadProfileImage() throws Exception {
+        seedStudent("image.student@campus.test", AccountStatus.INVITED, false);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            "image/png",
+            new byte[] { 1, 2, 3, 4 }
+        );
+
+        mockMvc.perform(multipart("/api/students/me/profile-image")
+                .file(file)
+                .with(jwtFor("image.student@campus.test")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.studentProfile.profileImageUrl").value(org.hamcrest.Matchers.startsWith("https://storage.test/")));
+
+        assertThat(recordingProfileImageStorageClient.storedImages()).hasSize(1);
+    }
+
+    @Test
+    void profileImageUploadRejectsInvalidMimeType() throws Exception {
+        seedStudent("bad-image.student@campus.test", AccountStatus.INVITED, false);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.txt",
+            "text/plain",
+            new byte[] { 1, 2, 3, 4 }
+        );
+
+        mockMvc.perform(multipart("/api/students/me/profile-image")
+                .file(file)
+                .with(jwtFor("bad-image.student@campus.test")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Profile image must be a JPEG, PNG, or WebP file."));
+    }
+
+    @Test
+    void profileImageUploadRejectsOversizedFile() throws Exception {
+        seedStudent("large-image.student@campus.test", AccountStatus.INVITED, false);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            "image/png",
+            new byte[(2 * 1024 * 1024) + 1]
+        );
+
+        mockMvc.perform(multipart("/api/students/me/profile-image")
+                .file(file)
+                .with(jwtFor("large-image.student@campus.test")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Profile image must be 2 MB or smaller."));
+    }
+
+    @Test
+    void profileImageUploadRejectsNonStudentAndUnauthenticatedUsers() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            "image/png",
+            new byte[] { 1, 2, 3, 4 }
+        );
+
+        mockMvc.perform(multipart("/api/students/me/profile-image")
+                .file(file)
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(multipart("/api/students/me/profile-image").file(file))
+            .andExpect(status().isUnauthorized());
     }
 
     @Test

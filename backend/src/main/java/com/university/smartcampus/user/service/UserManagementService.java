@@ -1,8 +1,10 @@
 package com.university.smartcampus.user.service;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.domain.Sort;
@@ -11,6 +13,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.university.smartcampus.auth.identity.AuthIdentityClient;
 import com.university.smartcampus.auth.provider.AuthProviderClient;
@@ -19,15 +22,21 @@ import com.university.smartcampus.auth.dto.AuthDtos.SessionSyncResponse;
 import com.university.smartcampus.common.dto.ApiDtos.MessageResponse;
 import com.university.smartcampus.common.dto.ApiDtos.UserResponse;
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
+import com.university.smartcampus.common.enums.AppEnums.AcademicYear;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
+import com.university.smartcampus.common.enums.AppEnums.Semester;
+import com.university.smartcampus.common.enums.AppEnums.StudentFaculty;
+import com.university.smartcampus.common.enums.AppEnums.StudentProgram;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.config.SmartCampusProperties;
 import com.university.smartcampus.user.dto.AdminDtos.AdminProfileInput;
 import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
 import com.university.smartcampus.user.dto.AdminDtos.FacultyProfileInput;
 import com.university.smartcampus.user.dto.AdminDtos.ManagerProfileInput;
+import com.university.smartcampus.user.dto.AdminDtos.StudentProfileInput;
 import com.university.smartcampus.user.dto.AdminDtos.UpdateUserRequest;
 import com.university.smartcampus.user.dto.StudentDtos.StudentOnboardingRequest;
 import com.university.smartcampus.user.dto.StudentDtos.StudentOnboardingStateResponse;
@@ -40,12 +49,14 @@ import com.university.smartcampus.user.mapper.UserMapper;
 import com.university.smartcampus.user.repository.ManagerRepository;
 import com.university.smartcampus.user.repository.StudentRepository;
 import com.university.smartcampus.user.repository.UserRepository;
+import com.university.smartcampus.user.storage.ProfileImageStorageClient;
 
 @Service
 public class UserManagementService {
 
     private static final String NEXT_STEP_DASHBOARD = "DASHBOARD";
     private static final String NEXT_STEP_ONBOARDING = "ONBOARDING";
+    private static final Set<String> ALLOWED_PROFILE_IMAGE_TYPES = Set.of("image/jpeg", "image/jpg", "image/png", "image/webp");
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
@@ -54,6 +65,8 @@ public class UserManagementService {
     private final AuthIdentityClient authIdentityClient;
     private final UserMapper userMapper;
     private final CurrentUserService currentUserService;
+    private final ProfileImageStorageClient profileImageStorageClient;
+    private final SmartCampusProperties properties;
 
     public UserManagementService(
             UserRepository userRepository,
@@ -62,7 +75,9 @@ public class UserManagementService {
             AuthProviderClient authProviderClient,
             AuthIdentityClient authIdentityClient,
             UserMapper userMapper,
-            CurrentUserService currentUserService) {
+            CurrentUserService currentUserService,
+            ProfileImageStorageClient profileImageStorageClient,
+            SmartCampusProperties properties) {
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
         this.managerRepository = managerRepository;
@@ -70,6 +85,8 @@ public class UserManagementService {
         this.authIdentityClient = authIdentityClient;
         this.userMapper = userMapper;
         this.currentUserService = currentUserService;
+        this.profileImageStorageClient = profileImageStorageClient;
+        this.properties = properties;
     }
 
     @Transactional
@@ -144,7 +161,7 @@ public class UserManagementService {
         }
 
         switch (user.getUserType()) {
-            case STUDENT -> validateNoUnexpectedProfiles(request);
+            case STUDENT -> updateStudentProfile(user, request);
             case FACULTY -> updateFacultyProfile(user, request.facultyProfile());
             case ADMIN -> updateAdminProfile(user, request.adminProfile());
             case MANAGER -> updateManagerProfile(user, request.managerProfile());
@@ -275,7 +292,9 @@ public class UserManagementService {
         student.setProgramName(request.programName());
         student.setAcademicYear(request.academicYear());
         student.setSemester(request.semester());
-        student.setProfileImageUrl(request.profileImageUrl());
+        if (StringUtils.hasText(request.profileImageUrl())) {
+            student.setProfileImageUrl(request.profileImageUrl().trim());
+        }
         student.setEmailNotificationsEnabled(defaultBoolean(request.emailNotificationsEnabled(), Boolean.TRUE));
         student.setSmsNotificationsEnabled(defaultBoolean(request.smsNotificationsEnabled(), Boolean.FALSE));
 
@@ -289,6 +308,24 @@ public class UserManagementService {
 
         studentRepository.save(student);
         userRepository.save(managedUser);
+        return userMapper.toUserResponse(managedUser);
+    }
+
+    @Transactional
+    public UserResponse uploadStudentProfileImage(UserEntity user, MultipartFile file) {
+        UserEntity managedUser = getUserEntity(user.getId());
+        ensureStudent(managedUser);
+
+        StudentEntity student = managedUser.getStudentProfile();
+        if (student == null) {
+            throw new NotFoundException("Student profile was not found for this user.");
+        }
+
+        validateProfileImage(file);
+        var storedImage = profileImageStorageClient.storeStudentProfileImage(managedUser.getId(), file);
+        student.setProfileImageUrl(storedImage.publicUrl());
+
+        studentRepository.save(student);
         return userMapper.toUserResponse(managedUser);
     }
 
@@ -327,9 +364,13 @@ public class UserManagementService {
         }
     }
 
-    private void validateNoUnexpectedProfiles(UpdateUserRequest request) {
+    private void updateStudentProfile(UserEntity user, UpdateUserRequest request) {
         if (request.facultyProfile() != null || request.adminProfile() != null || request.managerProfile() != null) {
             throw new BadRequestException("Student updates do not accept non-student profile payloads.");
+        }
+
+        if (request.studentProfile() != null) {
+            applyStudentProfile(user.getStudentProfile(), request.studentProfile());
         }
     }
 
@@ -387,6 +428,38 @@ public class UserManagementService {
     private void updateManagerProfile(UserEntity user, ManagerProfileInput input) {
         if (input != null) {
             applyManagerProfile(user.getManagerProfile(), input);
+        }
+    }
+
+    private void applyStudentProfile(StudentEntity student, StudentProfileInput input) {
+        if (student == null) {
+            throw new NotFoundException("Student profile was not found for this user.");
+        }
+
+        requireText(input.firstName(), "First name is required.");
+        requireText(input.lastName(), "Last name is required.");
+        requireText(input.phoneNumber(), "Phone number is required.");
+        requireText(input.registrationNumber(), "Registration number is required.");
+        requireStudentAcademicFields(input.facultyName(), input.programName(), input.academicYear(), input.semester());
+
+        if (input.programName().faculty() != input.facultyName()) {
+            throw new BadRequestException("Program does not belong to the selected faculty.");
+        }
+
+        student.setFirstName(input.firstName().trim());
+        student.setLastName(input.lastName().trim());
+        student.setPreferredName(trimToNull(input.preferredName()));
+        student.setPhoneNumber(input.phoneNumber().trim());
+        student.setRegistrationNumber(input.registrationNumber().trim());
+        student.setFacultyName(input.facultyName());
+        student.setProgramName(input.programName());
+        student.setAcademicYear(input.academicYear());
+        student.setSemester(input.semester());
+        student.setEmailNotificationsEnabled(defaultBoolean(input.emailNotificationsEnabled(), Boolean.TRUE));
+        student.setSmsNotificationsEnabled(defaultBoolean(input.smsNotificationsEnabled(), Boolean.FALSE));
+
+        if (StringUtils.hasText(input.profileImageUrl())) {
+            student.setProfileImageUrl(input.profileImageUrl().trim());
         }
     }
 
@@ -451,6 +524,42 @@ public class UserManagementService {
         if (!condition) {
             throw new BadRequestException(message);
         }
+    }
+
+    private void requireText(String value, String message) {
+        if (!StringUtils.hasText(value)) {
+            throw new BadRequestException(message);
+        }
+    }
+
+    private void requireStudentAcademicFields(
+            StudentFaculty faculty,
+            StudentProgram program,
+            AcademicYear academicYear,
+            Semester semester) {
+        require(faculty != null, "Faculty is required.");
+        require(program != null, "Program is required.");
+        require(academicYear != null, "Academic year is required.");
+        require(semester != null, "Semester is required.");
+    }
+
+    private void validateProfileImage(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Profile image file is required.");
+        }
+
+        if (file.getSize() > properties.getStorage().getProfileImages().getMaxSizeBytes()) {
+            throw new BadRequestException("Profile image must be 2 MB or smaller.");
+        }
+
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (!ALLOWED_PROFILE_IMAGE_TYPES.contains(contentType)) {
+            throw new BadRequestException("Profile image must be a JPEG, PNG, or WebP file.");
+        }
+    }
+
+    private String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private Boolean defaultBoolean(Boolean value, Boolean defaultValue) {

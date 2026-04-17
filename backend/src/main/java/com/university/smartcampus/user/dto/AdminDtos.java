@@ -1,7 +1,11 @@
 package com.university.smartcampus.user.dto;
 
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
+import com.university.smartcampus.common.enums.AppEnums.AcademicYear;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
+import com.university.smartcampus.common.enums.AppEnums.Semester;
+import com.university.smartcampus.common.enums.AppEnums.StudentFaculty;
+import com.university.smartcampus.common.enums.AppEnums.StudentProgram;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
 
 import jakarta.validation.Valid;
@@ -14,7 +18,20 @@ public final class AdminDtos {
     private AdminDtos() {
     }
 
-    public record StudentProfileInput() {
+    public record StudentProfileInput(
+        String firstName,
+        String lastName,
+        String preferredName,
+        String phoneNumber,
+        String registrationNumber,
+        StudentFaculty facultyName,
+        StudentProgram programName,
+        AcademicYear academicYear,
+        Semester semester,
+        String profileImageUrl,
+        Boolean emailNotificationsEnabled,
+        Boolean smsNotificationsEnabled
+    ) {
     }
 
     public record FacultyProfileInput(
@@ -58,6 +75,7 @@ public final class AdminDtos {
 
     public record UpdateUserRequest(
         AccountStatus accountStatus,
+        @Valid StudentProfileInput studentProfile,
         @Valid FacultyProfileInput facultyProfile,
         @Valid AdminProfileInput adminProfile,
         @Valid ManagerProfileInput managerProfile

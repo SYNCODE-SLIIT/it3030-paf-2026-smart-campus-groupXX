@@ -8,6 +8,7 @@ public class SmartCampusProperties {
     private final Auth auth = new Auth();
     private final Security security = new Security();
     private final Bootstrap bootstrap = new Bootstrap();
+    private final Storage storage = new Storage();
 
     public Auth getAuth() {
         return auth;
@@ -19,6 +20,10 @@ public class SmartCampusProperties {
 
     public Bootstrap getBootstrap() {
         return bootstrap;
+    }
+
+    public Storage getStorage() {
+        return storage;
     }
 
     public static class Auth {
@@ -192,6 +197,35 @@ public class SmartCampusProperties {
 
         private boolean hasText(String value) {
             return value != null && !value.isBlank();
+        }
+    }
+
+    public static class Storage {
+        private final ProfileImages profileImages = new ProfileImages();
+
+        public ProfileImages getProfileImages() {
+            return profileImages;
+        }
+    }
+
+    public static class ProfileImages {
+        private String bucket = "profile-images";
+        private long maxSizeBytes = 2 * 1024 * 1024;
+
+        public String getBucket() {
+            return bucket;
+        }
+
+        public void setBucket(String bucket) {
+            this.bucket = bucket;
+        }
+
+        public long getMaxSizeBytes() {
+            return maxSizeBytes;
+        }
+
+        public void setMaxSizeBytes(long maxSizeBytes) {
+            this.maxSizeBytes = maxSizeBytes;
         }
     }
 }
