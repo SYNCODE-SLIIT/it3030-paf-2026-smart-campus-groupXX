@@ -175,11 +175,26 @@ export interface ManagerProfileInput {
   employeeNumber: string;
 }
 
+export interface StudentProfileInput {
+  firstName: string;
+  lastName: string;
+  preferredName?: string;
+  phoneNumber: string;
+  registrationNumber: string;
+  facultyName: StudentFaculty;
+  programName: StudentProgram;
+  academicYear: AcademicYear;
+  semester: Semester;
+  profileImageUrl?: string;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
+}
+
 export interface CreateUserRequest {
   email: string;
   userType: UserType;
   sendInvite: boolean;
-  studentProfile?: Record<string, never>;
+  studentProfile?: Partial<StudentProfileInput>;
   facultyProfile?: FacultyProfileInput | null;
   adminProfile?: AdminProfileInput | null;
   managerProfile?: ManagerProfileInput | null;
@@ -188,6 +203,7 @@ export interface CreateUserRequest {
 
 export interface UpdateUserRequest {
   accountStatus?: AccountStatus;
+  studentProfile?: StudentProfileInput | null;
   facultyProfile?: FacultyProfileInput | null;
   adminProfile?: AdminProfileInput | null;
   managerProfile?: ManagerProfileInput | null;

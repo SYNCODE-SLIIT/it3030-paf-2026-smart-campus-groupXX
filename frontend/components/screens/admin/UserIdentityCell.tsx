@@ -6,12 +6,13 @@ interface UserIdentityCellProps {
   name: string;
   email: string;
   initials: string;
+  src?: string | null;
 }
 
-export function UserIdentityCell({ name, email, initials }: UserIdentityCellProps) {
+export function UserIdentityCell({ name, email, initials, src }: UserIdentityCellProps) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <Avatar initials={initials} size="sm" />
+      <Avatar initials={initials} src={src ?? undefined} size="sm" />
       <div>
         <div
           style={{

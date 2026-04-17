@@ -252,7 +252,10 @@ export function Sidebar({
                 <SidebarNavItem
                   key={item.label}
                   item={item}
-                  active={active === item.label || (!!item.href && item.href === activePath)}
+                  active={
+                    active === item.label
+                    || (!!item.href && (item.href === activePath || (item.href !== '/admin' && activePath.startsWith(`${item.href}/`))))
+                  }
                   onClick={() => handleNav(item)}
                 />
               ))}

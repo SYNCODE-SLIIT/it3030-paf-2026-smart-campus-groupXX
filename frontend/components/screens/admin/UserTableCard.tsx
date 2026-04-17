@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Filter, Trash2 } from 'lucide-react';
+import { Filter, Mail, Trash2 } from 'lucide-react';
 
 import { UserIdentityCell } from '@/components/screens/admin/UserIdentityCell';
 import {
@@ -22,7 +22,7 @@ import {
   getAccountStatusChipColor,
   getAccountStatusLabel,
   getUserDisplayName,
-  getUserInitials,
+  getUserAvatarInitials,
   getUserTypeChipColor,
   getUserTypeLabel,
 } from '@/lib/user-display';
@@ -47,7 +47,9 @@ interface UserTableCardProps {
   onRoleTabChange: (tab: RoleTab) => void;
   statusFilter: AccountStatus | '';
   onStatusFilterChange: (val: AccountStatus | '') => void;
+  onReinviteUser: (user: UserResponse) => void;
   onDeleteUser: (user: UserResponse) => void;
+  reinvitingUserId: string | null;
   deletingUserId: string | null;
   currentUserId?: string | null;
 }
@@ -185,7 +187,9 @@ export function UserTableCard({
   onRoleTabChange,
   statusFilter,
   onStatusFilterChange,
+  onReinviteUser,
   onDeleteUser,
+  reinvitingUserId,
   deletingUserId,
   currentUserId,
 }: UserTableCardProps) {
@@ -360,7 +364,8 @@ export function UserTableCard({
                     <UserIdentityCell
                       name={getUserDisplayName(user)}
                       email={user.email}
-                      initials={getUserInitials(user)}
+                      initials={getUserAvatarInitials(user)}
+                      src={user.userType === 'STUDENT' ? user.studentProfile?.profileImageUrl : undefined}
                     />
                   </TableCell>
                   <TableCell style={{ padding: '12px 20px' }}>
@@ -380,16 +385,30 @@ export function UserTableCard({
                     </Chip>
                   </TableCell>
                   <TableCell style={{ padding: '12px 20px', textAlign: 'right' }}>
-                    <Button
-                      variant="ghost-danger"
-                      size="xs"
-                      loading={deletingUserId === user.id}
-                      disabled={currentUserId === user.id}
-                      iconLeft={<Trash2 size={12} />}
-                      onClick={() => onDeleteUser(user)}
-                    >
-                      Delete
-                    </Button>
+                    <div style={{ display: 'inline-flex', gap: 7, justifyContent: 'flex-end' }}>
+                      <Button
+                        variant="subtle"
+                        size="xs"
+                        title={user.accountStatus === 'SUSPENDED' ? 'Suspended users cannot be reinvited' : 'Reinvite user'}
+                        aria-label={`Reinvite ${user.email}`}
+                        loading={reinvitingUserId === user.id}
+                        disabled={user.accountStatus === 'SUSPENDED'}
+                        iconLeft={<Mail size={13} />}
+                        style={{ width: 32, padding: 0 }}
+                        onClick={() => onReinviteUser(user)}
+                      />
+                      <Button
+                        variant="ghost-danger"
+                        size="xs"
+                        title={currentUserId === user.id ? 'You cannot delete your own account' : 'Delete user'}
+                        aria-label={`Delete ${user.email}`}
+                        loading={deletingUserId === user.id}
+                        disabled={currentUserId === user.id}
+                        iconLeft={<Trash2 size={13} />}
+                        style={{ width: 32, padding: 0 }}
+                        onClick={() => onDeleteUser(user)}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

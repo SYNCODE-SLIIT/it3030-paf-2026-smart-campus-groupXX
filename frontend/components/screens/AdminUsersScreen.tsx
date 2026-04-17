@@ -1,14 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Copy, Search, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, Copy, Mail, Search, Trash2, UserPlus, X } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { CreateUserPanel } from '@/components/screens/admin/CreateUserPanel';
 import { UserStatsGrid } from '@/components/screens/admin/UserStatsGrid';
 import { UserTableCard, type RoleTab } from '@/components/screens/admin/UserTableCard';
-import { Alert, Button, Card, Input, Skeleton, Textarea } from '@/components/ui';
-import { deleteUser, getErrorMessage, listUsers } from '@/lib/api-client';
+import { Alert, Button, Card, Input, Skeleton, Textarea, Toast, ToastStack } from '@/components/ui';
+import { deleteUser, getErrorMessage, getUser, listUsers, resendInvite } from '@/lib/api-client';
 import type { AccountStatus, UserResponse } from '@/lib/api-types';
 
 type NoticeState = {
@@ -20,6 +20,11 @@ type NoticeState = {
 type CreatedInviteState = {
   email: string;
   link: string;
+} | null;
+
+type PendingUserAction = {
+  type: 'reinvite' | 'delete';
+  user: UserResponse;
 } | null;
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -40,8 +45,10 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
   const [notice, setNotice] = React.useState<NoticeState>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
   const [createdInvite, setCreatedInvite] = React.useState<CreatedInviteState>(null);
-  const [isCopyingLink, startCopyLinkTransition] = React.useTransition();
+  const [pendingUserAction, setPendingUserAction] = React.useState<PendingUserAction>(null);
+  const [reinvitingUserId, setReinvitingUserId] = React.useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = React.useState<string | null>(null);
+  const [isCopyingLink, startCopyLinkTransition] = React.useTransition();
 
   const reloadUsers = React.useCallback(async () => {
     if (!accessToken) {
@@ -85,6 +92,17 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [createdInvite, isCreateDialogOpen]);
 
+  React.useEffect(() => {
+    if (!notice) return;
+
+    const timeout = window.setTimeout(
+      () => setNotice(null),
+      notice.variant === 'error' || notice.variant === 'warning' ? 7000 : 4600,
+    );
+
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
   function handleCopyGeneratedLink() {
     if (!createdInvite?.link) return;
     startCopyLinkTransition(async () => {
@@ -97,30 +115,63 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
     });
   }
 
-  async function handleDeleteUser(user: UserResponse) {
+  async function handleReinviteUser(targetUser: UserResponse) {
     if (!accessToken) {
       setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
       return;
     }
-    if (resolvedUser && user.id === resolvedUser.id) {
+
+    if (targetUser.accountStatus === 'SUSPENDED') {
+      setNotice({ variant: 'warning', title: 'Action blocked', message: 'Suspended users cannot receive new links.' });
+      return;
+    }
+
+    setReinvitingUserId(targetUser.id);
+    try {
+      await resendInvite(accessToken, targetUser.id);
+      const refreshed = await getUser(accessToken, targetUser.id);
+      setUsers((current) => current.map((user) => (user.id === refreshed.id ? refreshed : user)));
+      setNotice({ variant: 'success', title: 'Access link generated', message: `A fresh access link is ready for ${targetUser.email}.` });
+    } catch (error) {
+      setNotice({ variant: 'error', title: 'Link generation failed', message: getErrorMessage(error, 'We could not generate a new access link.') });
+    } finally {
+      setReinvitingUserId(null);
+    }
+  }
+
+  async function handleDeleteUser(targetUser: UserResponse) {
+    if (!accessToken) {
+      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      return;
+    }
+
+    if (resolvedUser?.id === targetUser.id) {
       setNotice({ variant: 'warning', title: 'Action blocked', message: 'You cannot delete your own account.' });
       return;
     }
-    const confirmed = window.confirm(
-      `Delete ${user.email} from Smart Campus? This permanently removes the account.`,
-    );
-    if (!confirmed) return;
 
-    setDeletingUserId(user.id);
+    setDeletingUserId(targetUser.id);
     try {
-      await deleteUser(accessToken, user.id);
-      await reloadUsers();
-      setNotice({ variant: 'success', title: 'User deleted', message: `${user.email} was removed.` });
+      await deleteUser(accessToken, targetUser.id);
+      setUsers((current) => current.filter((user) => user.id !== targetUser.id));
+      setNotice({ variant: 'success', title: 'User deleted', message: `${targetUser.email} was removed.` });
     } catch (error) {
       setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete this user.') });
     } finally {
       setDeletingUserId(null);
     }
+  }
+
+  async function handleConfirmPendingUserAction() {
+    if (!pendingUserAction) return;
+
+    const action = pendingUserAction;
+    if (action.type === 'delete') {
+      await handleDeleteUser(action.user);
+    } else {
+      await handleReinviteUser(action.user);
+    }
+    setPendingUserAction(null);
   }
 
   // Derive stats from loaded users
@@ -214,12 +265,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
           </p>
         </div>
 
-        {notice && (
-          <Alert variant={notice.variant} title={notice.title}>
-            {notice.message}
-          </Alert>
-        )}
-
         {/* Stats */}
         <UserStatsGrid
           totalUsers={totalUsers}
@@ -272,11 +317,60 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
           onRoleTabChange={setRoleTab}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
-          onDeleteUser={(user) => { void handleDeleteUser(user); }}
+          onReinviteUser={(user) => {
+            setNotice(null);
+            setPendingUserAction({ type: 'reinvite', user });
+          }}
+          onDeleteUser={(user) => {
+            setNotice(null);
+            setPendingUserAction({ type: 'delete', user });
+          }}
+          reinvitingUserId={reinvitingUserId}
           deletingUserId={deletingUserId}
-          currentUserId={resolvedUser.id}
+          currentUserId={resolvedUser?.id ?? null}
         />
       </div>
+
+      <ToastStack>
+        {pendingUserAction && (
+          <Toast
+            variant={pendingUserAction.type === 'delete' ? 'warning' : 'info'}
+            title={pendingUserAction.type === 'delete' ? 'Confirm delete user' : 'Confirm reinvite user'}
+            icon={pendingUserAction.type === 'delete' ? <AlertTriangle size={18} /> : <Mail size={18} />}
+            dismissible
+            onDismiss={() => setPendingUserAction(null)}
+            actions={
+              <>
+                <Button variant="ghost" size="xs" onClick={() => setPendingUserAction(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant={pendingUserAction.type === 'delete' ? 'danger' : 'primary'}
+                  size="xs"
+                  iconLeft={pendingUserAction.type === 'delete' ? <Trash2 size={12} /> : <Mail size={12} />}
+                  loading={
+                    pendingUserAction.type === 'delete'
+                      ? deletingUserId === pendingUserAction.user.id
+                      : reinvitingUserId === pendingUserAction.user.id
+                  }
+                  onClick={() => { void handleConfirmPendingUserAction(); }}
+                >
+                  Confirm
+                </Button>
+              </>
+            }
+          >
+            {pendingUserAction.type === 'delete'
+              ? `Delete ${pendingUserAction.user.email}? This permanently removes the account.`
+              : `Generate a fresh access link for ${pendingUserAction.user.email}?`}
+          </Toast>
+        )}
+        {notice && (
+          <Toast variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)}>
+            {notice.message}
+          </Toast>
+        )}
+      </ToastStack>
 
       {/* Create user dialog */}
       {isCreateDialogOpen && (

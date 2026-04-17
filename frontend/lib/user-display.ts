@@ -52,6 +52,28 @@ export function getManagerRoleLabel(role: ManagerRole) {
   }
 }
 
+export function getManagerRoleInitials(role: ManagerRole | null | undefined) {
+  if (!role) {
+    return 'MG';
+  }
+
+  return getManagerRoleLabel(role)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+export function getUserAvatarInitials(user: UserResponse) {
+  if (user.userType === 'MANAGER') {
+    return getManagerRoleInitials(user.managerRole);
+  }
+
+  return getUserInitials(user);
+}
+
 export function getAccountStatusLabel(status: AccountStatus) {
   switch (status) {
     case 'INVITED':

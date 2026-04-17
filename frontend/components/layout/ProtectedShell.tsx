@@ -1,7 +1,20 @@
 'use client';
 
 import React from 'react';
-import { BookOpen, Calendar, KeyRound, LayoutDashboard, LogOut, MessageSquare, ShieldCheck } from 'lucide-react';
+import {
+  BarChart2,
+  Bell,
+  BookOpen,
+  Calendar,
+  FileText,
+  GraduationCap,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
@@ -42,12 +55,70 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSecti
     case 'admin':
       return [
         {
-          title: 'Administration',
+          title: 'Console',
           items: [
+            {
+              label: 'Dashboard',
+              icon: LayoutDashboard,
+              href: '/admin',
+              allowedUserTypes: ['ADMIN'],
+            },
             {
               label: 'User Management',
               icon: ShieldCheck,
               href: '/admin/users',
+              allowedUserTypes: ['ADMIN'],
+            },
+          ],
+        },
+        {
+          title: 'Manage',
+          items: [
+            {
+              label: 'Students',
+              icon: GraduationCap,
+              href: '/admin/students',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
+              label: 'Faculty',
+              icon: BookOpen,
+              href: '/admin/faculty',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
+              label: 'Managers',
+              icon: Users,
+              href: '/admin/managers',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
+              label: 'Admins',
+              icon: ShieldCheck,
+              href: '/admin/admins',
+              allowedUserTypes: ['ADMIN'],
+            },
+          ],
+        },
+        {
+          title: 'Insights',
+          items: [
+            {
+              label: 'Analytics',
+              icon: BarChart2,
+              href: '/admin/analytics',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
+              label: 'Notifications',
+              icon: Bell,
+              href: '/admin/notifications',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
+              label: 'Reports',
+              icon: FileText,
+              href: '/admin/reports',
               allowedUserTypes: ['ADMIN'],
             },
             {

@@ -19,3 +19,4 @@ export { Tabs } from './Tabs';
 export { Textarea } from './Textarea';
 export { Toggle } from './Toggle';
 export { Tooltip } from './Tooltip';
+export { Toast, ToastStack } from './Toast';

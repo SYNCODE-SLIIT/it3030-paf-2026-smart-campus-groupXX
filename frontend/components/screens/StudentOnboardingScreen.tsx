@@ -1,14 +1,15 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, GraduationCap } from 'lucide-react';
+import { ArrowRight, GraduationCap, ImageUp, X } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Chip, GlassPill, Input, Select, Skeleton, Toggle } from '@/components/ui';
+import { Alert, Avatar, Button, Card, Chip, GlassPill, Input, Select, Skeleton, Toggle } from '@/components/ui';
 import {
   completeStudentOnboarding,
   getErrorMessage,
   getStudentOnboarding,
+  uploadStudentProfileImage,
 } from '@/lib/api-client';
 import { getUserHomePath } from '@/lib/auth-routing';
 import type {
@@ -73,6 +74,18 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     message: string;
   } | null>(null);
   const [isSubmitting, startSubmitTransition] = React.useTransition();
+  const [selectedImageFile, setSelectedImageFile] = React.useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(null);
+  const [submitStage, setSubmitStage] = React.useState<string | null>(null);
+  const imageInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
 
   React.useEffect(() => {
     if (resolvedUser) {
@@ -145,6 +158,53 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }));
   }
 
+  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+
+    if (!file) {
+      return;
+    }
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      event.currentTarget.value = '';
+      setAlert({
+        variant: 'error',
+        title: 'Unsupported image',
+        message: 'Please choose a JPEG, PNG, or WebP image.',
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      event.currentTarget.value = '';
+      setAlert({
+        variant: 'error',
+        title: 'Image too large',
+        message: 'Profile images must be 2 MB or smaller.',
+      });
+      return;
+    }
+
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setSelectedImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setAlert(null);
+  }
+
+  function handleRemoveImage() {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setSelectedImageFile(null);
+    setImagePreviewUrl(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -182,6 +242,15 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
 
     startSubmitTransition(async () => {
       try {
+        let profileImageUrl = formState.profileImageUrl.trim() || undefined;
+
+        if (selectedImageFile) {
+          setSubmitStage('Uploading profile image...');
+          const imageUser = await uploadStudentProfileImage(session.access_token, selectedImageFile);
+          profileImageUrl = imageUser.studentProfile?.profileImageUrl ?? profileImageUrl;
+        }
+
+        setSubmitStage('Completing onboarding...');
         const payload: StudentOnboardingRequest = {
           firstName: formState.firstName.trim(),
           lastName: formState.lastName.trim(),
@@ -192,7 +261,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           programName,
           academicYear,
           semester,
-          profileImageUrl: formState.profileImageUrl.trim() || undefined,
+          profileImageUrl,
           emailNotificationsEnabled: formState.emailNotificationsEnabled,
           smsNotificationsEnabled: formState.smsNotificationsEnabled,
         };
@@ -211,6 +280,8 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           title: 'Onboarding failed',
           message: getErrorMessage(error, 'We could not complete onboarding.'),
         });
+      } finally {
+        setSubmitStage(null);
       }
     });
   }
@@ -382,12 +453,71 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                   placeholder="Choose semester"
                   required
                 />
-                <Input
-                  label="Profile Image URL"
-                  value={formState.profileImageUrl}
-                  onChange={(event) => setField('profileImageUrl', event.target.value)}
-                  hint="Optional URL because the current backend contract accepts profileImageUrl."
-                />
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <p
+                    style={{
+                      margin: '0 0 8px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 8.5,
+                      letterSpacing: '.18em',
+                      textTransform: 'uppercase',
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Profile Image
+                  </p>
+                  <GlassPill
+                    style={{
+                      padding: '16px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <Avatar
+                        size="lg"
+                        src={(imagePreviewUrl ?? formState.profileImageUrl) || undefined}
+                        initials={`${formState.firstName?.[0] ?? resolvedUser.email[0] ?? 'S'}${formState.lastName?.[0] ?? ''}`.toUpperCase()}
+                      />
+                      <div>
+                        <p style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--text-h)' }}>
+                          {selectedImageFile ? selectedImageFile.name : 'Upload a profile photo'}
+                        </p>
+                        <p style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                          JPEG, PNG, or WebP. Maximum 2 MB.
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                        aria-label="Choose profile image"
+                        onChange={handleImageChange}
+                        style={{ display: 'none' }}
+                      />
+                      <Button
+                        type="button"
+                        variant="subtle"
+                        size="sm"
+                        iconLeft={<ImageUp size={14} />}
+                        disabled={isSubmitting}
+                        onClick={() => imageInputRef.current?.click()}
+                      >
+                        Choose Image
+                      </Button>
+                      {(selectedImageFile || imagePreviewUrl) && (
+                        <Button type="button" variant="ghost" size="sm" iconLeft={<X size={14} />} onClick={handleRemoveImage}>
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </GlassPill>
+                </div>
               </div>
 
               <GlassPill
@@ -424,6 +554,11 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
               </GlassPill>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                {submitStage && (
+                  <p style={{ alignSelf: 'center', marginRight: 12, fontSize: 12.5, color: 'var(--text-muted)' }}>
+                    {submitStage}
+                  </p>
+                )}
                 <Button
                   type="submit"
                   variant="glass"
