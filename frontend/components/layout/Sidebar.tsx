@@ -61,6 +61,7 @@ export const defaultSidebarSections: NavSection[] = [
   {
     title: 'Administration',
     items: [
+      { label: 'Resources', icon: FolderOpen, allowedUserTypes: ['ADMIN'] },
       { label: 'User Management', icon: ShieldCheck, allowedUserTypes: ['ADMIN'] },
       { label: 'Settings',        icon: Settings,    allowedUserTypes: ['ADMIN'] },
     ],
