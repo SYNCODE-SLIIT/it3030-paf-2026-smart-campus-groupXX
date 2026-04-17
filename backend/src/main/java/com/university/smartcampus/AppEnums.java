@@ -36,16 +36,5 @@ public final class AppEnums {
         CANCELLED
     }
 
-    public enum ResourceCategory {
-        ROOM,
-        LAB,
-        VEHICLE,
-        EQUIPMENT,
-        OTHER
-    }
-
-    public enum ResourceStatus {
-        ACTIVE,
-        INACTIVE
-    }
+   
 }
