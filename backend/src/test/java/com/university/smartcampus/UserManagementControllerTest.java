@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
-import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -22,11 +21,18 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
-import com.university.smartcampus.AdminDtos.CreateUserRequest;
-import com.university.smartcampus.AdminDtos.ManagerRolesUpdateRequest;
-import com.university.smartcampus.AppEnums.AccountStatus;
-import com.university.smartcampus.AppEnums.ManagerRole;
-import com.university.smartcampus.AppEnums.UserType;
+import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
+import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
+import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.user.dto.AdminDtos;
+import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
+import com.university.smartcampus.user.dto.AdminDtos.ManagerRoleUpdateRequest;
+import com.university.smartcampus.user.entity.AdminEntity;
+import com.university.smartcampus.user.entity.FacultyEntity;
+import com.university.smartcampus.user.entity.ManagerEntity;
+import com.university.smartcampus.user.entity.StudentEntity;
+import com.university.smartcampus.user.entity.UserEntity;
+import com.university.smartcampus.user.repository.UserRepository;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -95,6 +101,15 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void currentAdminResponseUsesFullNameProfileShape() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.adminProfile.fullName").value("Admin User"))
+            .andExpect(jsonPath("$.adminProfile.firstName").doesNotExist());
+    }
+
+    @Test
     void studentCannotAccessAdminUsersEndpoint() throws Exception {
         seedStudent("student.no.admin@campus.test", AccountStatus.ACTIVE, true);
 
@@ -117,7 +132,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void rejectsManagerCreationWithoutManagerRoles() throws Exception {
+    void rejectsManagerCreationWithoutManagerRole() throws Exception {
         CreateUserRequest request = new CreateUserRequest(
             "manager-no-roles@campus.test",
             UserType.MANAGER,
@@ -126,7 +141,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             null,
             null,
             null,
-            Set.of()
+            null
         );
 
         mockMvc.perform(post("/api/admin/users")
@@ -188,18 +203,15 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void adminCanReplaceManagerRoles() throws Exception {
-        UserEntity manager = seedManager("manager@campus.test", Set.of(ManagerRole.CATALOG_MANAGER));
+    void adminCanReplaceManagerRole() throws Exception {
+        UserEntity manager = seedManager("manager@campus.test", ManagerRole.CATALOG_MANAGER);
 
-        mockMvc.perform(put("/api/admin/users/{id}/manager-roles", manager.getId())
+        mockMvc.perform(put("/api/admin/users/{id}/manager-role", manager.getId())
                 .with(jwtFor("admin@campus.test"))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new ManagerRolesUpdateRequest(Set.of(
-                    ManagerRole.BOOKING_MANAGER,
-                    ManagerRole.TICKET_MANAGER
-                )))))
+                .content(objectMapper.writeValueAsString(new ManagerRoleUpdateRequest(ManagerRole.TICKET_MANAGER))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.managerRoles[0]").exists());
+            .andExpect(jsonPath("$.managerRole").value("TICKET_MANAGER"));
     }
 
     @Test
@@ -258,10 +270,10 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                       "preferredName": "OB",
                       "phoneNumber": "0777777777",
                       "registrationNumber": "ST-001",
-                      "facultyName": "Computing",
-                      "programName": "IT",
-                      "academicYear": 3,
-                      "semester": "Semester 2",
+                      "facultyName": "FACULTY_OF_COMPUTING",
+                      "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                      "academicYear": "YEAR_3",
+                      "semester": "SEMESTER_2",
                       "profileImageUrl": null,
                       "emailNotificationsEnabled": true,
                       "smsNotificationsEnabled": false
@@ -271,6 +283,27 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
             .andExpect(jsonPath("$.studentProfile.onboardingCompleted").value(true))
             .andExpect(jsonPath("$.studentProfile.registrationNumber").value("ST-001"));
+    }
+
+    @Test
+    void studentOnboardingRequiresSemester() throws Exception {
+        seedStudent("missing-semester@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(put("/api/students/me/onboarding")
+                .with(jwtFor("missing-semester@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "firstName": "On",
+                      "lastName": "Board",
+                      "phoneNumber": "0777777777",
+                      "registrationNumber": "ST-002",
+                      "facultyName": "FACULTY_OF_COMPUTING",
+                      "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                      "academicYear": "YEAR_1"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
     }
 
     private void seedAdmin(String email) {
@@ -284,11 +317,8 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
 
         AdminEntity admin = new AdminEntity();
         admin.setUser(user);
-        admin.setFirstName("Admin");
-        admin.setLastName("User");
+        admin.setFullName("Admin User");
         admin.setEmployeeNumber("ADM-001");
-        admin.setDepartment("Operations");
-        admin.setJobTitle("Administrator");
         user.setAdminProfile(admin);
 
         userRepository.save(user);
@@ -330,7 +360,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         userRepository.save(user);
     }
 
-    private UserEntity seedManager(String email, Set<ManagerRole> roles) {
+    private UserEntity seedManager(String email, ManagerRole role) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
         user.setEmail(email);
@@ -344,9 +374,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         manager.setFirstName("Manager");
         manager.setLastName("User");
         manager.setEmployeeNumber("MGR-001");
-        manager.setDepartment("Facilities");
-        manager.setJobTitle("Manager");
-        manager.setManagerRoles(roles);
+        manager.setManagerRole(role);
 
         user.setManagerProfile(manager);
         return userRepository.save(user);

@@ -1,7 +1,7 @@
 import type { ManagerRole, UserResponse, UserType } from '@/lib/api-types';
 
 export type AccessUser =
-  | Pick<UserResponse, 'userType' | 'managerRoles'>
+  | Pick<UserResponse, 'userType' | 'managerRole'>
   | null
   | undefined;
 
@@ -19,7 +19,7 @@ function managerRoleAllowed(item: AccessControlledItem, user: AccessUser) {
     return false;
   }
 
-  return item.allowedManagerRoles.some((role) => user.managerRoles.includes(role));
+  return user.managerRole != null && item.allowedManagerRoles.includes(user.managerRole);
 }
 
 export function canAccessItem(item: AccessControlledItem, user: AccessUser) {

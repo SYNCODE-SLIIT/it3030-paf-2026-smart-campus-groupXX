@@ -5,7 +5,11 @@ function joinNameParts(...parts: Array<string | null | undefined>) {
 }
 
 export function getUserDisplayName(user: UserResponse) {
-  const profile = user.studentProfile ?? user.facultyProfile ?? user.adminProfile ?? user.managerProfile;
+  if (user.adminProfile) {
+    return user.adminProfile.fullName || user.email;
+  }
+
+  const profile = user.studentProfile ?? user.facultyProfile ?? user.managerProfile;
   const preferredName = profile?.preferredName;
   const firstName = profile?.firstName;
   const lastName = profile?.lastName;

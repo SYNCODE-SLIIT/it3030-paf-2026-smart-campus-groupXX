@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 
 import { ApiError, getCurrentUser } from '@/lib/api-client';
-import type { UserResponse } from '@/lib/api-types';
-import { getUserHomePath, needsStudentOnboarding } from '@/lib/auth-routing';
+import type { ManagerRole, UserResponse, UserType } from '@/lib/api-types';
+import { getUserHomePath, needsStudentOnboarding, STUDENT_ONBOARDING_PATH } from '@/lib/auth-routing';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 interface ServerAuthState {
@@ -87,7 +87,7 @@ export async function requireProtectedUser() {
   const authState = await getServerAuthState();
 
   if (!authState.isAuthenticated) {
-    redirect('/login?reason=auth_required');
+    redirect('/login');
   }
 
   if (!authState.appUser) {
@@ -95,16 +95,30 @@ export async function requireProtectedUser() {
   }
 
   if (needsStudentOnboarding(authState.appUser)) {
-    redirect('/student/onboarding');
+    redirect(STUDENT_ONBOARDING_PATH);
   }
 
   return authState.appUser;
 }
 
-export async function requireAdminUser() {
+export async function requireUserType(allowedUserTypes: UserType[]) {
   const appUser = await requireProtectedUser();
 
-  if (appUser.userType !== 'ADMIN') {
+  if (!allowedUserTypes.includes(appUser.userType)) {
+    redirect(getUserHomePath(appUser));
+  }
+
+  return appUser;
+}
+
+export async function requireAdminUser() {
+  return requireUserType(['ADMIN']);
+}
+
+export async function requireManagerRole(allowedManagerRoles: ManagerRole[]) {
+  const appUser = await requireUserType(['MANAGER']);
+
+  if (!appUser.managerRole || !allowedManagerRoles.includes(appUser.managerRole)) {
     redirect(getUserHomePath(appUser));
   }
 
@@ -115,7 +129,7 @@ export async function requireStudentOnboardingUser() {
   const authState = await getServerAuthState();
 
   if (!authState.isAuthenticated) {
-    redirect('/login?reason=auth_required');
+    redirect('/login');
   }
 
   if (!authState.appUser) {

@@ -100,7 +100,7 @@ $createResponse = Invoke-SmokeApi -Method Post -Path "/api/admin/users" -Token $
     email = $managerEmail
     userType = "MANAGER"
     sendInvite = $true
-    managerRoles = @("CATALOG_MANAGER", "BOOKING_MANAGER")
+    managerRole = "CATALOG_MANAGER"
 }
 Write-Host "Created user id: $($createResponse.id)"
 if (-not $createResponse.lastInviteReference) {
@@ -109,10 +109,10 @@ if (-not $createResponse.lastInviteReference) {
 Write-Host "Generated access link captured."
 
 Write-Host "Replacing manager roles..."
-$updatedRoles = Invoke-SmokeApi -Method Put -Path "/api/admin/users/$($createResponse.id)/manager-roles" -Token $adminToken -Body @{
-    managerRoles = @("TICKET_MANAGER")
+$updatedRole = Invoke-SmokeApi -Method Put -Path "/api/admin/users/$($createResponse.id)/manager-role" -Token $adminToken -Body @{
+    managerRole = "TICKET_MANAGER"
 }
-Write-Host "Updated roles: $($updatedRoles.managerRoles -join ', ')"
+Write-Host "Updated role: $($updatedRole.managerRole)"
 
 Write-Host "Resending invite..."
 $inviteResponse = Invoke-SmokeApi -Method Post -Path "/api/admin/users/$($createResponse.id)/invite" -Token $adminToken
@@ -153,10 +153,10 @@ $completedStudent = Invoke-SmokeApi -Method Put -Path "/api/students/me/onboardi
     preferredName = "SS"
     phoneNumber = "0712345678"
     registrationNumber = "SMK-STU-001"
-    facultyName = "Computing"
-    programName = "Information Technology"
-    academicYear = 2
-    semester = "Semester 1"
+    facultyName = "FACULTY_OF_COMPUTING"
+    programName = "BSC_HONS_INFORMATION_TECHNOLOGY"
+    academicYear = "YEAR_2"
+    semester = "SEMESTER_1"
     profileImageUrl = $null
     emailNotificationsEnabled = $true
     smsNotificationsEnabled = $false

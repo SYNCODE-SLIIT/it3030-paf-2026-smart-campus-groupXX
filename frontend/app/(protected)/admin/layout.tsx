@@ -1,3 +1,4 @@
+import { ProtectedAppFrame } from '@/components/auth/ProtectedRouteFrames';
 import { requireAdminUser } from '@/lib/server-auth';
 
 export default async function AdminLayout({
@@ -6,5 +7,10 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   await requireAdminUser();
-  return children;
+
+  return (
+    <ProtectedAppFrame allowedUserTypes={['ADMIN']} workspace="admin">
+      {children}
+    </ProtectedAppFrame>
+  );
 }

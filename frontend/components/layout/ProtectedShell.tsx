@@ -1,25 +1,167 @@
 'use client';
 
 import React from 'react';
-import { KeyRound, LayoutDashboard, LogOut, ShieldCheck } from 'lucide-react';
+import { BookOpen, Calendar, KeyRound, LayoutDashboard, LogOut, MessageSquare, ShieldCheck } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { GlassPill } from '@/components/ui';
 import type { UserResponse } from '@/lib/api-types';
+import { filterSectionsByRole } from '@/lib/nav-rbac';
 import { getUserDisplayName, getUserInitials, getUserTypeLabel } from '@/lib/user-display';
+import type { WorkspaceKind } from '@/lib/workspace';
+
+function getWorkspaceForUser(user: UserResponse): Exclude<WorkspaceKind, 'auto'> {
+  switch (user.userType) {
+    case 'ADMIN':
+      return 'admin';
+    case 'MANAGER':
+      return 'managers';
+    case 'STUDENT':
+      return 'students';
+    case 'FACULTY':
+      return 'faculty';
+  }
+}
+
+function getBrandSubtitle(workspace: Exclude<WorkspaceKind, 'auto'>) {
+  switch (workspace) {
+    case 'admin':
+      return 'Admin Console';
+    case 'managers':
+      return 'Manager Workspace';
+    case 'students':
+      return 'Student Workspace';
+    case 'faculty':
+      return 'Faculty Workspace';
+  }
+}
+
+function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSection[] {
+  switch (workspace) {
+    case 'admin':
+      return [
+        {
+          title: 'Administration',
+          items: [
+            {
+              label: 'User Management',
+              icon: ShieldCheck,
+              href: '/admin/users',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
+              label: 'Account Security',
+              icon: KeyRound,
+              href: '/account/security',
+              allowedUserTypes: ['ADMIN'],
+            },
+          ],
+        },
+      ];
+    case 'managers':
+      return [
+        {
+          title: 'Management',
+          items: [
+            {
+              label: 'Dashboard',
+              icon: LayoutDashboard,
+              href: '/managers',
+              allowedUserTypes: ['MANAGER'],
+            },
+            {
+              label: 'Catalog',
+              icon: BookOpen,
+              href: '/managers/catalog',
+              allowedUserTypes: ['MANAGER'],
+              allowedManagerRoles: ['CATALOG_MANAGER'],
+            },
+            {
+              label: 'Bookings',
+              icon: Calendar,
+              href: '/managers/bookings',
+              allowedUserTypes: ['MANAGER'],
+              allowedManagerRoles: ['BOOKING_MANAGER'],
+            },
+            {
+              label: 'Tickets',
+              icon: MessageSquare,
+              href: '/managers/tickets',
+              allowedUserTypes: ['MANAGER'],
+              allowedManagerRoles: ['TICKET_MANAGER'],
+            },
+            {
+              label: 'Account Security',
+              icon: KeyRound,
+              href: '/account/security',
+              allowedUserTypes: ['MANAGER'],
+            },
+          ],
+        },
+      ];
+    case 'students':
+      return [
+        {
+          title: 'Student',
+          items: [
+            {
+              label: 'Dashboard',
+              icon: LayoutDashboard,
+              href: '/students',
+              allowedUserTypes: ['STUDENT'],
+            },
+            {
+              label: 'Account Security',
+              icon: KeyRound,
+              href: '/account/security',
+              allowedUserTypes: ['STUDENT'],
+            },
+          ],
+        },
+      ];
+    case 'faculty':
+      return [
+        {
+          title: 'Faculty',
+          items: [
+            {
+              label: 'Dashboard',
+              icon: LayoutDashboard,
+              href: '/faculty',
+              allowedUserTypes: ['FACULTY'],
+            },
+            {
+              label: 'Account Security',
+              icon: KeyRound,
+              href: '/account/security',
+              allowedUserTypes: ['FACULTY'],
+            },
+          ],
+        },
+      ];
+  }
+}
 
 export function ProtectedShell({
   user,
   children,
+  workspace = 'auto',
+  sections,
+  brandSubtitle,
+  userDisplay,
 }: {
   user: UserResponse;
   children: React.ReactNode;
+  workspace?: WorkspaceKind;
+  sections?: NavSection[];
+  brandSubtitle?: string;
+  userDisplay?: { name?: string; role?: string; initials?: string; src?: string };
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
+  const resolvedWorkspace = workspace === 'auto' ? getWorkspaceForUser(user) : workspace;
 
   const handleSignOut = React.useCallback(() => {
     void signOut()
@@ -29,51 +171,9 @@ export function ProtectedShell({
       });
   }, [router, signOut]);
 
-  const sections = React.useMemo<NavSection[]>(() => {
-    const workspaceItems =
-      user.userType === 'STUDENT'
-        ? [
-            {
-              label: 'Account Security',
-              icon: KeyRound,
-              href: '/account/security',
-            },
-          ]
-        : [
-            {
-              label: 'Portal Overview',
-              icon: LayoutDashboard,
-              href: '/portal',
-            },
-            {
-              label: 'Account Security',
-              icon: KeyRound,
-              href: '/account/security',
-            },
-          ];
-
-    const portalSections: NavSection[] = [
-      {
-        title: 'Workspace',
-        items: workspaceItems,
-      },
-    ];
-
-    if (user.userType === 'ADMIN') {
-      portalSections.push({
-        title: 'Administration',
-        items: [
-          {
-            label: 'User Management',
-            icon: ShieldCheck,
-            href: '/admin/users',
-          },
-        ],
-      });
-    }
-
-    return portalSections;
-  }, [user.userType]);
+  const resolvedSections = React.useMemo<NavSection[]>(() => {
+    return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace), user);
+  }, [resolvedWorkspace, sections, user]);
 
   return (
     <div
@@ -84,13 +184,14 @@ export function ProtectedShell({
       }}
     >
       <Sidebar
-        sections={sections}
+        sections={resolvedSections}
         activePath={pathname}
-        brandSubtitle="Identity & Access"
+        brandSubtitle={brandSubtitle ?? getBrandSubtitle(resolvedWorkspace)}
         user={{
-          name: getUserDisplayName(user),
-          initials: getUserInitials(user),
-          role: getUserTypeLabel(user.userType),
+          name: userDisplay?.name ?? getUserDisplayName(user),
+          initials: userDisplay?.initials ?? getUserInitials(user),
+          role: userDisplay?.role ?? getUserTypeLabel(user.userType),
+          src: userDisplay?.src,
         }}
         profileDropdownItems={[
           {
@@ -114,31 +215,6 @@ export function ProtectedShell({
           padding: '32px 24px 40px',
         }}
       >
-        <GlassPill
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-            padding: '12px 16px',
-            marginBottom: 20,
-          }}
-        >
-          <div>
-            <p
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 15,
-                fontWeight: 700,
-                color: 'var(--text-h)',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              Smart Campus
-            </p>
-          </div>
-        </GlassPill>
-
         {children}
       </main>
     </div>

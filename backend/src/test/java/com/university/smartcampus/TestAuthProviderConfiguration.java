@@ -9,7 +9,9 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
-import com.university.smartcampus.AppEnums.AuthDeliveryMethod;
+import com.university.smartcampus.auth.identity.AuthIdentityClient;
+import com.university.smartcampus.auth.provider.AuthProviderClient;
+import com.university.smartcampus.common.enums.AppEnums.AuthDeliveryMethod;
 
 @TestConfiguration
 public class TestAuthProviderConfiguration {

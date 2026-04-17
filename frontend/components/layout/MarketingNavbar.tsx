@@ -55,6 +55,7 @@ export function MarketingNavbar() {
         void signOut().then(() => router.push('/login?reason=signed_out'));
       }}
       onNavigate={(href) => router.push(href)}
+      hideAuthActions={pathname === '/login'}
     />
   );
 }

@@ -5,8 +5,9 @@ import { ArrowRight, KeyRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Button, Card, Chip, GlassPill } from '@/components/ui';
+import { Button, Card, Chip, Table, TableBody, TableCell, TableRow } from '@/components/ui';
 import type { UserResponse } from '@/lib/api-types';
+import { getStudentFacultyLabel, getStudentProgramLabel } from '@/lib/student-catalog';
 import {
   getAccountStatusChipColor,
   getAccountStatusLabel,
@@ -18,7 +19,9 @@ import {
 
 function getProfileSummary(user: UserResponse) {
   if (user.studentProfile) {
-    return user.studentProfile.programName ?? user.studentProfile.facultyName ?? 'Student profile pending';
+    return getStudentProgramLabel(user.studentProfile.programName)
+      || getStudentFacultyLabel(user.studentProfile.facultyName)
+      || 'Student profile pending';
   }
 
   if (user.facultyProfile) {
@@ -26,11 +29,11 @@ function getProfileSummary(user: UserResponse) {
   }
 
   if (user.adminProfile) {
-    return user.adminProfile.jobTitle ?? user.adminProfile.department ?? 'Admin profile';
+    return user.adminProfile.fullName ?? 'Admin profile';
   }
 
   if (user.managerProfile) {
-    return user.managerProfile.jobTitle ?? user.managerProfile.department ?? 'Manager profile';
+    return user.managerRole ? getManagerRoleLabel(user.managerRole) : 'Manager profile';
   }
 
   return 'Provisioned account';
@@ -48,148 +51,113 @@ export function PortalDashboard({ user }: { user?: UserResponse }) {
   const displayName = getUserDisplayName(resolvedUser);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <GlassPill
-        style={{
-          padding: 22,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-        }}
-      >
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          <Chip color={getUserTypeChipColor(resolvedUser.userType)} dot>
-            {getUserTypeLabel(resolvedUser.userType)}
-          </Chip>
-          <Chip color={getAccountStatusChipColor(resolvedUser.accountStatus)} dot>
-            {getAccountStatusLabel(resolvedUser.accountStatus)}
-          </Chip>
-          {resolvedUser.managerRoles.map((role) => (
-            <Chip key={role} color="blue">
-              {getManagerRoleLabel(role)}
-            </Chip>
-          ))}
-        </div>
-
-        <div>
-          <p
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Page header */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+          <h1
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 28,
               fontWeight: 700,
               letterSpacing: '-0.03em',
               color: 'var(--text-h)',
+              margin: 0,
             }}
           >
-            {displayName}
-          </p>
-          <p style={{ marginTop: 8, fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-body)' }}>
-            Your account is active.
-          </p>
-        </div>
-      </GlassPill>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 18,
-        }}
-      >
-        <Card>
-          <p
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 18,
-              fontWeight: 700,
-              color: 'var(--text-h)',
-              marginBottom: 8,
-            }}
-          >
-            Account Summary
-          </p>
-          <p style={{ fontSize: 13.5, lineHeight: 1.7, color: 'var(--text-body)' }}>
-            <strong style={{ color: 'var(--text-h)' }}>Email:</strong> {resolvedUser.email}
-          </p>
-          <p style={{ fontSize: 13.5, lineHeight: 1.7, color: 'var(--text-body)' }}>
-            <strong style={{ color: 'var(--text-h)' }}>Role:</strong> {getUserTypeLabel(resolvedUser.userType)}
-          </p>
-          <p style={{ fontSize: 13.5, lineHeight: 1.7, color: 'var(--text-body)' }}>
-            <strong style={{ color: 'var(--text-h)' }}>Profile:</strong> {getProfileSummary(resolvedUser)}
-          </p>
-        </Card>
-
-        <Card
-          footer={
-            <Button
-              variant="glass"
-              size="sm"
-              iconRight={<ArrowRight size={14} />}
-              onClick={() => router.push('/account/security')}
-            >
-              Open Security
-            </Button>
-          }
-        >
-          <p
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 18,
-              fontWeight: 700,
-              color: 'var(--text-h)',
-              marginBottom: 8,
-            }}
-          >
-            Sign-in Options
-          </p>
-          <p style={{ fontSize: 13.5, lineHeight: 1.7, color: 'var(--text-body)' }}>
-            Use Google any time. If you want email and password sign-in too, set your password in Account Security.
-          </p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            <Chip color="glass">
-              <KeyRound size={12} style={{ display: 'inline-block' }} />
-              Password
+            Welcome, {displayName}
+          </h1>
+          <Chip color={getUserTypeChipColor(resolvedUser.userType)} dot>
+            {getUserTypeLabel(resolvedUser.userType)}
+          </Chip>
+          {resolvedUser.managerRole && (
+            <Chip color="blue">
+              {getManagerRoleLabel(resolvedUser.managerRole)}
             </Chip>
-            <Chip color="blue">Google</Chip>
-          </div>
-        </Card>
-
-        <Card
-          footer={
-            resolvedUser.userType === 'ADMIN' ? (
-              <Button
-                variant="glass"
-                size="sm"
-                iconRight={<ArrowRight size={14} />}
-                onClick={() => router.push('/admin/users')}
-              >
-                Open User Management
-              </Button>
-            ) : undefined
-          }
-        >
-          <p
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 18,
-              fontWeight: 700,
-              color: 'var(--text-h)',
-              marginBottom: 8,
-            }}
-          >
-            Access Scope
-          </p>
-          <p style={{ fontSize: 13.5, lineHeight: 1.7, color: 'var(--text-body)' }}>
-            {resolvedUser.userType === 'ADMIN'
-              ? 'Manage invited users, generate access links, and maintain role assignments.'
-              : resolvedUser.userType === 'MANAGER'
-              ? 'Your access scope depends on the manager roles assigned to your account.'
-              : resolvedUser.userType === 'FACULTY'
-              ? 'Faculty access is active and onboarding is not required for this role.'
-              : 'Student onboarding is complete and your account is ready.'}
-          </p>
-        </Card>
+          )}
+        </div>
+        <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: 0 }}>
+          {getProfileSummary(resolvedUser)}
+        </p>
       </div>
+
+      {/* Info table */}
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <Table>
+          <TableBody>
+            <TableRow hoverable={false}>
+              <TableCell label>Email</TableCell>
+              <TableCell>{resolvedUser.email}</TableCell>
+            </TableRow>
+
+            <TableRow hoverable={false}>
+              <TableCell label>Status</TableCell>
+              <TableCell>
+                <Chip color={getAccountStatusChipColor(resolvedUser.accountStatus)} dot>
+                  {getAccountStatusLabel(resolvedUser.accountStatus)}
+                </Chip>
+              </TableCell>
+            </TableRow>
+
+            <TableRow hoverable={false}>
+              <TableCell label>Role</TableCell>
+              <TableCell>
+                <Chip color={getUserTypeChipColor(resolvedUser.userType)} dot>
+                  {getUserTypeLabel(resolvedUser.userType)}
+                </Chip>
+              </TableCell>
+            </TableRow>
+
+            <TableRow hoverable={false}>
+              <TableCell label>Profile</TableCell>
+              <TableCell>{getProfileSummary(resolvedUser)}</TableCell>
+            </TableRow>
+
+            <TableRow hoverable={false}>
+              <TableCell label>Sign-in</TableCell>
+              <TableCell>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Chip color="glass">
+                    <KeyRound size={12} style={{ display: 'inline-block' }} />
+                    Password
+                  </Chip>
+                  <Chip color="blue">Google</Chip>
+                </div>
+              </TableCell>
+            </TableRow>
+
+            <TableRow hoverable={false}>
+              <TableCell label>Security</TableCell>
+              <TableCell>
+                <Button
+                  variant="glass"
+                  size="sm"
+                  iconRight={<ArrowRight size={14} />}
+                  onClick={() => router.push('/account/security')}
+                >
+                  Account Security
+                </Button>
+              </TableCell>
+            </TableRow>
+
+            {resolvedUser.userType === 'ADMIN' && (
+              <TableRow hoverable={false}>
+                <TableCell label>Admin</TableCell>
+                <TableCell>
+                  <Button
+                    variant="glass"
+                    size="sm"
+                    iconRight={<ArrowRight size={14} />}
+                    onClick={() => router.push('/admin/users')}
+                  >
+                    User Management
+                  </Button>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 }

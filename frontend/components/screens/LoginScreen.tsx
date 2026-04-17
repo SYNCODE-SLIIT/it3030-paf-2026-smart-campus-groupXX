@@ -1,51 +1,47 @@
 'use client';
 
 import React from 'react';
-import { LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Divider, GlassPill, Input } from '@/components/ui';
+import { LoginFormCard } from '@/components/screens/login/LoginFormCard';
+import { LoginSideCards } from '@/components/screens/login/LoginSideCards';
 import { getErrorMessage } from '@/lib/api-client';
-import { getLoginReasonAlert, getUserHomePath, needsStudentOnboarding } from '@/lib/auth-routing';
+import {
+  getLoginReasonAlert,
+  getUserHomePath,
+  needsStudentOnboarding,
+  STUDENT_ONBOARDING_PATH,
+} from '@/lib/auth-routing';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type AlertState =
-  | {
-      variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-      title: string;
-      message: string;
-    }
-  | null;
+type AlertState = {
+  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
+  title: string;
+  message: string;
+} | null;
 
 export function LoginScreen({ reason }: { reason: string | null }) {
   const router = useRouter();
   const { authConfigured, appUser, refreshMe, signInWithGoogle, signInWithPassword } = useAuth();
   const initialAlert = React.useMemo(() => getLoginReasonAlert(reason), [reason]);
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
   const [alert, setAlert] = React.useState<AlertState>(initialAlert);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = React.useState(false);
 
   React.useEffect(() => {
-    if (!appUser) {
-      return;
-    }
-
+    if (!appUser) return;
     if (needsStudentOnboarding(appUser)) {
-      router.replace('/student/onboarding');
+      router.replace(STUDENT_ONBOARDING_PATH);
       return;
     }
-
     router.replace(getUserHomePath(appUser));
   }, [appUser, router]);
 
   async function handleGoogleSignIn() {
     setAlert(null);
     setIsGoogleLoading(true);
-
     try {
       await signInWithGoogle();
     } catch (error) {
@@ -58,9 +54,7 @@ export function LoginScreen({ reason }: { reason: string | null }) {
     }
   }
 
-  async function handlePasswordLogin(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function handlePasswordSubmit(email: string, password: string) {
     if (!authConfigured) {
       setAlert({
         variant: 'warning',
@@ -97,7 +91,7 @@ export function LoginScreen({ reason }: { reason: string | null }) {
 
       if (currentUser) {
         if (needsStudentOnboarding(currentUser)) {
-          router.replace('/student/onboarding');
+          router.replace(STUDENT_ONBOARDING_PATH);
         } else {
           router.replace(getUserHomePath(currentUser));
         }
@@ -112,7 +106,7 @@ export function LoginScreen({ reason }: { reason: string | null }) {
     } catch (error) {
       setAlert({
         variant: 'error',
-        title: 'Password sign-in failed',
+        title: 'Unable to sign in',
         message: getErrorMessage(error, 'We could not sign you in with email and password.'),
       });
     } finally {
@@ -121,111 +115,53 @@ export function LoginScreen({ reason }: { reason: string | null }) {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-        background:
-          'radial-gradient(circle at top left, rgba(238,202,68,.18), transparent 28%), linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%)',
-      }}
-    >
-      <Card
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+      <main
         style={{
-          width: '100%',
-          maxWidth: 420,
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '112px 24px 80px',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div>
-            <h1
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 28,
-                fontWeight: 700,
-                letterSpacing: '-0.03em',
-                color: 'var(--text-h)',
+        <section
+          aria-label="Sign in"
+          className="grid w-full grid-cols-1 md:grid-cols-12 gap-6 items-stretch"
+          style={{ maxWidth: 1100 }}
+        >
+          <div className="col-span-1 md:col-span-7">
+            <LoginFormCard
+              alert={alert}
+              isPasswordLoading={isPasswordLoading}
+              isGoogleLoading={isGoogleLoading}
+              authConfigured={authConfigured}
+              onPasswordSubmit={(email, password) => {
+                void handlePasswordSubmit(email, password);
               }}
-            >
-              Sign in
-            </h1>
-            <p
-              style={{
-                marginTop: 8,
-                fontSize: 13.5,
-                lineHeight: 1.55,
-                color: 'var(--text-body)',
+              onGoogleSignIn={() => {
+                void handleGoogleSignIn();
               }}
-            >
-              Use your invited email. Password and Google sign-in are supported.
-            </p>
+            />
           </div>
+          <aside className="col-span-1 md:col-span-5 flex flex-col">
+            <LoginSideCards />
+          </aside>
+        </section>
+      </main>
 
-          {alert && (
-            <Alert variant={alert.variant} title={alert.title}>
-              {alert.message}
-            </Alert>
-          )}
-
-          <form onSubmit={handlePasswordLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Input
-              id="login-email"
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Email"
-              iconLeft={<Mail size={16} />}
-            />
-            <Input
-              id="login-password"
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Password"
-              iconLeft={<LockKeyhole size={16} />}
-            />
-            <Button
-              type="submit"
-              variant="glass"
-              size="lg"
-              fullWidth
-              disabled={!authConfigured}
-              loading={isPasswordLoading}
-              iconLeft={<LockKeyhole size={16} />}
-            >
-              Sign in
-            </Button>
-          </form>
-
-          <Divider label="or" />
-
-          <Button
-            variant="subtle"
-            size="lg"
-            fullWidth
-            disabled={!authConfigured}
-            onClick={() => {
-              void handleGoogleSignIn();
-            }}
-            loading={isGoogleLoading}
-            iconLeft={<ShieldCheck size={16} />}
-          >
-            Sign in with Google
-          </Button>
-
-          {!authConfigured && (
-            <GlassPill style={{ padding: '10px 12px' }}>
-              <p style={{ fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-body)' }}>
-                Auth is unavailable until the Supabase public keys are configured.
-              </p>
-            </GlassPill>
-          )}
-        </div>
-      </Card>
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          height: 6,
+          background: 'var(--yellow-400)',
+          zIndex: 10,
+        }}
+      />
     </div>
   );
 }

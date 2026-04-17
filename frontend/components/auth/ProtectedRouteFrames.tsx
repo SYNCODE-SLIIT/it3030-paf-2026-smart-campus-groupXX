@@ -6,7 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ProtectedShell } from '@/components/layout/ProtectedShell';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Card, GlassPill, Skeleton } from '@/components/ui';
-import { getUserHomePath, needsStudentOnboarding } from '@/lib/auth-routing';
+import type { ManagerRole, UserType } from '@/lib/api-types';
+import { getUserHomePath, needsStudentOnboarding, STUDENT_ONBOARDING_PATH } from '@/lib/auth-routing';
+import type { WorkspaceKind } from '@/lib/workspace';
 
 function LoadingState({ title, message }: { title: string; message: string }) {
   return (
@@ -68,9 +70,15 @@ function LoadingState({ title, message }: { title: string; message: string }) {
 export function ProtectedAppFrame({
   children,
   requireAdmin = false,
+  allowedUserTypes,
+  allowedManagerRoles,
+  workspace = 'auto',
 }: {
   children: React.ReactNode;
   requireAdmin?: boolean;
+  allowedUserTypes?: UserType[];
+  allowedManagerRoles?: ManagerRole[];
+  workspace?: WorkspaceKind;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -108,7 +116,7 @@ export function ProtectedAppFrame({
     }
 
     if (!session) {
-      return '/login?reason=auth_required';
+      return '/login';
     }
 
     if (!appUser) {
@@ -116,15 +124,26 @@ export function ProtectedAppFrame({
     }
 
     if (needsStudentOnboarding(appUser)) {
-      return '/student/onboarding';
+      return STUDENT_ONBOARDING_PATH;
     }
 
     if (requireAdmin && appUser.userType !== 'ADMIN') {
       return getUserHomePath(appUser);
     }
 
+    if (allowedUserTypes?.length && !allowedUserTypes.includes(appUser.userType)) {
+      return getUserHomePath(appUser);
+    }
+
+    if (
+      allowedManagerRoles?.length &&
+      (appUser.userType !== 'MANAGER' || !appUser.managerRole || !allowedManagerRoles.includes(appUser.managerRole))
+    ) {
+      return getUserHomePath(appUser);
+    }
+
     return null;
-  }, [appUser, isHydratingUser, loading, requireAdmin, session]);
+  }, [allowedManagerRoles, allowedUserTypes, appUser, isHydratingUser, loading, requireAdmin, session]);
 
   React.useEffect(() => {
     if (redirectTarget && redirectTarget !== pathname) {
@@ -141,7 +160,11 @@ export function ProtectedAppFrame({
     );
   }
 
-  return <ProtectedShell user={appUser}>{children}</ProtectedShell>;
+  return (
+    <ProtectedShell user={appUser} workspace={workspace}>
+      {children}
+    </ProtectedShell>
+  );
 }
 
 export function StudentOnboardingFrame({ children }: { children: React.ReactNode }) {
@@ -181,7 +204,7 @@ export function StudentOnboardingFrame({ children }: { children: React.ReactNode
     }
 
     if (!session) {
-      return '/login?reason=auth_required';
+      return '/login';
     }
 
     if (!appUser) {

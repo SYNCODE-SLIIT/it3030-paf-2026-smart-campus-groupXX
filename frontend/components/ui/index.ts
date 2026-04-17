@@ -14,6 +14,7 @@ export { Progress } from './Progress';
 export { Radio } from './Radio';
 export { Select } from './Select';
 export { Skeleton } from './Skeleton';
+export { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from './Table';
 export { Tabs } from './Tabs';
 export { Textarea } from './Textarea';
 export { Toggle } from './Toggle';

@@ -1,13 +1,7 @@
-import { StudentOnboardingFrame } from '@/components/auth/ProtectedRouteFrames';
-import { StudentOnboardingScreen } from '@/components/screens/StudentOnboardingScreen';
-import { requireStudentOnboardingUser } from '@/lib/server-auth';
+import { redirect } from 'next/navigation';
+
+import { STUDENT_ONBOARDING_PATH } from '@/lib/auth-routing';
 
 export default async function StudentOnboardingPage() {
-  const appUser = await requireStudentOnboardingUser();
-
-  return (
-    <StudentOnboardingFrame>
-      <StudentOnboardingScreen user={appUser} />
-    </StudentOnboardingFrame>
-  );
+  redirect(STUDENT_ONBOARDING_PATH);
 }

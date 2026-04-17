@@ -3,7 +3,6 @@ package com.university.smartcampus;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
-import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -11,9 +10,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.university.smartcampus.AppEnums.AccountStatus;
-import com.university.smartcampus.AppEnums.ManagerRole;
-import com.university.smartcampus.AppEnums.UserType;
+import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
+import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
+import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.user.entity.ManagerEntity;
+import com.university.smartcampus.user.entity.UserEntity;
+import com.university.smartcampus.user.repository.UserRepository;
 
 @SpringBootTest
 @Transactional
@@ -23,7 +25,7 @@ class UserManagementRepositoryTest extends AbstractPostgresIntegrationTest {
     private UserRepository userRepository;
 
     @Test
-    void persistsManagerWithMultipleRoleAssignments() {
+    void persistsManagerWithSingleRoleAssignment() {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
         user.setEmail("repo-manager@campus.test");
@@ -37,15 +39,12 @@ class UserManagementRepositoryTest extends AbstractPostgresIntegrationTest {
         manager.setFirstName("Ria");
         manager.setLastName("Repo");
         manager.setEmployeeNumber("EMP-REP-1");
-        manager.setDepartment("Admin");
-        manager.setJobTitle("Operations Manager");
-        manager.setManagerRoles(Set.of(ManagerRole.CATALOG_MANAGER, ManagerRole.BOOKING_MANAGER));
+        manager.setManagerRole(ManagerRole.CATALOG_MANAGER);
         user.setManagerProfile(manager);
 
         userRepository.saveAndFlush(user);
 
         UserEntity stored = userRepository.findByEmailIgnoreCase("repo-manager@campus.test").orElseThrow();
-        assertThat(stored.getManagerProfile().getManagerRoles())
-            .containsExactlyInAnyOrder(ManagerRole.CATALOG_MANAGER, ManagerRole.BOOKING_MANAGER);
+        assertThat(stored.getManagerProfile().getManagerRole()).isEqualTo(ManagerRole.CATALOG_MANAGER);
     }
 }
