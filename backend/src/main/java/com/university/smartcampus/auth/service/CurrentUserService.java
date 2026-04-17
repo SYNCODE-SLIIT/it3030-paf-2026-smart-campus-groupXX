@@ -80,6 +80,22 @@ public class CurrentUserService {
         throw new ForbiddenException("Booking management access is required.");
     }
 
+        public UserEntity requireAdminOrCatalogManager(Authentication authentication) {
+        UserEntity user = requireCurrentUser(authentication);
+        if (user.getUserType() == UserType.ADMIN) {
+            return user;
+        }
+
+        if (user.getUserType() == UserType.MANAGER
+            && user.getManagerProfile() != null
+            && user.getManagerProfile().hasManagerRole(ManagerRole.CATALOG_MANAGER)) {
+            return user;
+        }
+
+        throw new ForbiddenException("Resource catalogue management access is required.");
+    }
+
+
     public UserEntity requireStudent(Authentication authentication) {
         UserEntity user = requireCurrentUser(authentication);
         if (user.getUserType() != UserType.STUDENT) {

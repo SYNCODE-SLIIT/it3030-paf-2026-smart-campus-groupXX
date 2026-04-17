@@ -8,9 +8,16 @@ export type ManagerRole = 'CATALOG_MANAGER' | 'BOOKING_MANAGER' | 'TICKET_MANAGE
 
 export type BookingStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
-export type ResourceCategory = 'ROOM' | 'LAB' | 'VEHICLE' | 'EQUIPMENT' | 'OTHER';
+export type ResourceCategory =
+  | 'SPACES'
+  | 'TECHNICAL_EQUIPMENT'
+  | 'MAINTENANCE_AND_CLEANING'
+  | 'SPORTS'
+  | 'EVENT_AND_DECORATION'
+  | 'GENERAL_UTILITY'
+  | 'TRANSPORT_AND_LOGISTICS';
 
-export type ResourceStatus = 'ACTIVE' | 'INACTIVE';
+export type ResourceStatus = 'ACTIVE' | 'OUT_OF_SERVICE' | 'MAINTENANCE' | 'INACTIVE';
 
 export type StudentFaculty =
   | 'FACULTY_OF_COMPUTING'
@@ -84,9 +91,49 @@ export interface ResourceResponse {
   name: string;
   category: ResourceCategory;
   subcategory: string | null;
+  description: string | null;
   location: string | null;
   capacity: number | null;
+  quantity: number | null;
   status: ResourceStatus;
+  bookable: boolean;
+  movable: boolean;
+  availableFrom: string | null;
+  availableTo: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateResourceRequest {
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  subcategory?: string | null;
+  description?: string | null;
+  location?: string | null;
+  capacity?: number | null;
+  quantity?: number | null;
+  status: ResourceStatus;
+  bookable: boolean;
+  movable: boolean;
+  availableFrom?: string | null;
+  availableTo?: string | null;
+}
+
+export interface UpdateResourceRequest {
+  code?: string;
+  name?: string;
+  category?: ResourceCategory;
+  subcategory?: string | null;
+  description?: string | null;
+  location?: string | null;
+  capacity?: number | null;
+  quantity?: number | null;
+  status?: ResourceStatus;
+  bookable?: boolean;
+  movable?: boolean;
+  availableFrom?: string | null;
+  availableTo?: string | null;
 }
 
 export interface ResourceSummary {

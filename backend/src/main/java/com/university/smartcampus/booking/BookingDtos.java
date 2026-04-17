@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.university.smartcampus.AppEnums.BookingStatus;
+import com.university.smartcampus.resource.ResourceDtos;
 
 public final class BookingDtos {
 

@@ -13,6 +13,8 @@ import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.resource.ResourceEntity;
+import com.university.smartcampus.resource.ResourceService;
 import com.university.smartcampus.user.entity.UserEntity;
 
 @Service

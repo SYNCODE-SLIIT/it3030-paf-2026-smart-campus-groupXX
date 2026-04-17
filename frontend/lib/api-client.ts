@@ -4,6 +4,7 @@ import {
   type BookingResponse,
   type CancelBookingRequest,
   type CreateBookingRequest,
+  type CreateResourceRequest,
   type CreateUserRequest,
   type ErrorResponse,
   type ManagerRole,
@@ -13,6 +14,7 @@ import {
   type SessionSyncResponse,
   type StudentOnboardingRequest,
   type StudentOnboardingStateResponse,
+  type UpdateResourceRequest,
   type UpdateUserRequest,
   type UserResponse,
   type UserType,
@@ -312,6 +314,29 @@ export async function completeStudentOnboarding(accessToken: string, payload: St
 
 export async function listResources(accessToken: string) {
   return request<ResourceResponse[]>('/api/resources', {
+    accessToken,
+  });
+}
+
+export async function createResource(accessToken: string, payload: CreateResourceRequest) {
+  return request<ResourceResponse>('/api/resources', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function updateResource(accessToken: string, resourceId: string, payload: UpdateResourceRequest) {
+  return request<ResourceResponse>(`/api/resources/${resourceId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function deleteResource(accessToken: string, resourceId: string) {
+  return request<MessageResponse>(`/api/resources/${resourceId}`, {
+    method: 'DELETE',
     accessToken,
   });
 }

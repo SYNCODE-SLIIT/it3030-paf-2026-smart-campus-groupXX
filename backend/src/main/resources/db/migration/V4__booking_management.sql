@@ -1,4 +1,23 @@
 
+create table if not exists resources (
+    id uuid primary key,
+    code varchar(100) not null unique,
+    name varchar(150) not null,
+    category varchar(50) not null,
+    subcategory varchar(100),
+    location varchar(150),
+    capacity integer,
+    status varchar(20) not null,
+    created_at timestamptz not null,
+    updated_at timestamptz not null,
+    constraint chk_resources_category check (
+        category in ('ROOM', 'LAB', 'VEHICLE', 'EQUIPMENT', 'OTHER')
+    ),
+    constraint chk_resources_status check (
+        status in ('ACTIVE', 'INACTIVE')
+    )
+);
+
 create table if not exists bookings (
     id uuid primary key,
     resource_id uuid not null references resources(id),
@@ -25,5 +44,8 @@ create index if not exists idx_bookings_requester_start_time
 
 create index if not exists idx_bookings_resource_status_time
     on bookings (resource_id, status, start_time, end_time);
+
+create index if not exists idx_resources_status
+    on resources (status);
 
 
