@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
+import { Navbar, type NavItem } from '@/components/layout/Navbar';
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
 import { useAuth } from '@/components/providers/AuthProvider';
 import type { UserResponse } from '@/lib/api-types';
@@ -263,6 +264,39 @@ export function ProtectedShell({
   const resolvedSections = React.useMemo<NavSection[]>(() => {
     return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace), user);
   }, [resolvedWorkspace, sections, user]);
+
+  if (resolvedWorkspace === 'students') {
+    const navItems: NavItem[] = resolvedSections.flatMap((s) =>
+      s.items.map((item) => ({
+        label: item.label,
+        href: item.href ?? '',
+        allowedUserTypes: item.allowedUserTypes,
+      })),
+    );
+
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background:
+            'radial-gradient(circle at top left, rgba(238,202,68,.18), transparent 30%), linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%)',
+        }}
+      >
+        <Navbar
+          items={navItems}
+          currentPath={pathname}
+          user={{
+            name: userDisplay?.name ?? getUserDisplayName(user),
+            initials: userDisplay?.initials ?? getUserInitials(user),
+            src: userDisplay?.src,
+          }}
+          onLogout={handleSignOut}
+          onNavigate={(href) => router.push(href)}
+        />
+        <main style={{ padding: '96px 24px 40px' }}>{children}</main>
+      </div>
+    );
+  }
 
   return (
     <div
