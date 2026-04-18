@@ -1,4 +1,5 @@
 export { Alert } from './Alert';
+export { Dialog } from './Dialog';
 export { Avatar, AvatarStack } from './Avatar';
 export { DropdownMenu } from './DropdownMenu';
 export type { DropdownMenuItem } from './DropdownMenu';
