@@ -157,6 +157,7 @@ public class TicketService {
         }
 
         TicketEntity ticket = getTicketEntity(id);
+        requireTicketManagementAccess(manager, ticket);
 
         if (ticket.getStatus() == TicketStatus.CLOSED) {
             throw new BadRequestException("Closed tickets cannot be updated.");
@@ -202,8 +203,8 @@ public class TicketService {
 
     @Transactional
     public TicketResponse assignTicket(UserEntity actor, UUID ticketId, UUID assignedToUserId) {
-        if (!isTicketManagerOrAdmin(actor)) {
-            throw new ForbiddenException("Ticket manager or admin access is required.");
+        if (!isAdmin(actor)) {
+            throw new ForbiddenException("Admin access is required to assign tickets.");
         }
         TicketEntity ticket = getTicketEntity(ticketId);
         UserEntity assignee = userRepository.findById(assignedToUserId)
@@ -318,15 +319,39 @@ public class TicketService {
 
     private TicketEntity requireAccessibleTicket(UserEntity user, UUID id) {
         TicketEntity ticket = getTicketEntity(id);
-        if (!isTicketManagerOrAdmin(user) && !ticket.getReportedBy().getId().equals(user.getId())) {
+        if (isAdmin(user)) {
+            return ticket;
+        }
+        if (isTicketManager(user)) {
+            if (isAssignedTo(ticket, user)) {
+                return ticket;
+            }
             throw new ForbiddenException("You do not have access to this ticket.");
         }
-        return ticket;
+        if (ticket.getReportedBy().getId().equals(user.getId())) {
+            return ticket;
+        }
+        throw new ForbiddenException("You do not have access to this ticket.");
+    }
+
+    private void requireTicketManagementAccess(UserEntity user, TicketEntity ticket) {
+        if (isAdmin(user)) {
+            return;
+        }
+        if (isTicketManager(user) && isAssignedTo(ticket, user)) {
+            return;
+        }
+        throw new ForbiddenException("You do not have access to this ticket.");
     }
 
     private TicketEntity getTicketEntity(UUID id) {
         return ticketRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Ticket not found."));
+    }
+
+    private boolean isAssignedTo(TicketEntity ticket, UserEntity user) {
+        return ticket.getAssignedTo() != null
+                && ticket.getAssignedTo().getId().equals(user.getId());
     }
 
     private boolean isAdmin(UserEntity user) {
