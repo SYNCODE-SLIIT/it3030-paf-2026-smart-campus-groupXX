@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.TicketCategory;
 import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
@@ -176,9 +177,7 @@ public class TicketService {
         ticket.setStatus(request.newStatus());
 
         if (request.assignedTo() != null) {
-            UserEntity assignee = userRepository.findById(request.assignedTo())
-                    .orElseThrow(() -> new NotFoundException("Assigned user not found."));
-            ticket.setAssignedTo(assignee);
+            ticket.setAssignedTo(resolveAssignableAssignee(request.assignedTo()));
         }
 
         if (StringUtils.hasText(request.resolutionNotes())) {
@@ -207,9 +206,7 @@ public class TicketService {
             throw new ForbiddenException("Admin access is required to assign tickets.");
         }
         TicketEntity ticket = getTicketEntity(ticketId);
-        UserEntity assignee = userRepository.findById(assignedToUserId)
-                .orElseThrow(() -> new NotFoundException("Assigned user not found."));
-        ticket.setAssignedTo(assignee);
+        ticket.setAssignedTo(resolveAssignableAssignee(assignedToUserId));
         return toTicketResponse(ticket);
     }
 
@@ -347,6 +344,20 @@ public class TicketService {
     private TicketEntity getTicketEntity(UUID id) {
         return ticketRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Ticket not found."));
+    }
+
+    private UserEntity resolveAssignableAssignee(UUID assignedToUserId) {
+        UserEntity assignee = userRepository.findById(assignedToUserId)
+                .orElseThrow(() -> new NotFoundException("Assigned user not found."));
+        if (!isAssignableAssignee(assignee)) {
+            throw new BadRequestException("Tickets can only be assigned to active admins or ticket managers.");
+        }
+        return assignee;
+    }
+
+    private boolean isAssignableAssignee(UserEntity user) {
+        return user.getAccountStatus() == AccountStatus.ACTIVE
+                && (isAdmin(user) || isTicketManager(user));
     }
 
     private boolean isAssignedTo(TicketEntity ticket, UserEntity user) {

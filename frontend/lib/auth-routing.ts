@@ -1,8 +1,23 @@
-import type { NextStep, UserResponse } from '@/lib/api-types';
+import type { ManagerRole, NextStep, UserResponse } from '@/lib/api-types';
 
 export const STUDENT_ONBOARDING_PATH = '/students/onboarding';
 
-export function getUserHomePath(user: Pick<UserResponse, 'userType'>) {
+type HomePathUser = Pick<UserResponse, 'userType'> & Partial<Pick<UserResponse, 'managerRole'>>;
+
+export function getManagerDashboardPath(managerRole?: ManagerRole | null) {
+  switch (managerRole) {
+    case 'CATALOG_MANAGER':
+      return '/managers/dashboard/catalog';
+    case 'BOOKING_MANAGER':
+      return '/managers/dashboard/bookings';
+    case 'TICKET_MANAGER':
+      return '/managers/dashboard/tickets';
+    default:
+      return '/managers';
+  }
+}
+
+export function getUserHomePath(user: HomePathUser) {
   if (user.userType === 'STUDENT') {
     return '/students';
   }
@@ -12,7 +27,7 @@ export function getUserHomePath(user: Pick<UserResponse, 'userType'>) {
   }
 
   if (user.userType === 'MANAGER') {
-    return '/managers';
+    return getManagerDashboardPath(user.managerRole);
   }
 
   return '/faculty';

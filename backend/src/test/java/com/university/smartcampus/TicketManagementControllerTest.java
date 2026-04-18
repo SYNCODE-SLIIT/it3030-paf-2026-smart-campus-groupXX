@@ -41,6 +41,7 @@ import com.university.smartcampus.ticket.repository.TicketAttachmentRepository;
 import com.university.smartcampus.ticket.repository.TicketRepository;
 import com.university.smartcampus.ticket.repository.TicketStatusHistoryRepository;
 import com.university.smartcampus.user.entity.AdminEntity;
+import com.university.smartcampus.user.entity.FacultyEntity;
 import com.university.smartcampus.user.entity.ManagerEntity;
 import com.university.smartcampus.user.entity.StudentEntity;
 import com.university.smartcampus.user.entity.UserEntity;
@@ -263,6 +264,59 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assignedToEmail").value("ticketmgr@campus.test"));
+    }
+
+    @Test
+    void adminCanAssignTicketToAdmin() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
+        UserEntity admin = userRepository.findByEmailIgnoreCase("admin@campus.test").orElseThrow();
+        AssignTicketRequest request = new AssignTicketRequest(admin.getId());
+
+        mockMvc.perform(put("/api/tickets/{id}/assign", ticket.getId())
+                        .with(jwtFor("admin@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedToEmail").value("admin@campus.test"));
+    }
+
+    @Test
+    void adminCannotAssignTicketToStudentFacultyWrongManagerRoleOrInactiveTicketManager() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
+        UserEntity student = userRepository.findByEmailIgnoreCase("student@campus.test").orElseThrow();
+        UserEntity faculty = seedFaculty("faculty@campus.test");
+        UserEntity catalogManager = seedManager("catalogmgr@campus.test", ManagerRole.CATALOG_MANAGER,
+                AccountStatus.ACTIVE);
+        UserEntity suspendedTicketManager = seedManager("inactive-ticketmgr@campus.test", ManagerRole.TICKET_MANAGER,
+                AccountStatus.SUSPENDED);
+
+        assertInvalidAssignment(ticket, student);
+        assertInvalidAssignment(ticket, faculty);
+        assertInvalidAssignment(ticket, catalogManager);
+        assertInvalidAssignment(ticket, suspendedTicketManager);
+        assertThat(ticketRepository.findById(ticket.getId()).orElseThrow().getAssignedTo()).isNull();
+    }
+
+    @Test
+    void statusUpdateCannotAssignTicketToInvalidUser() throws Exception {
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.OPEN));
+        UserEntity student = userRepository.findByEmailIgnoreCase("student@campus.test").orElseThrow();
+        TicketStatusUpdateRequest request = new TicketStatusUpdateRequest(
+                TicketStatus.IN_PROGRESS, "Started working on it.", student.getId(), null, null);
+
+        mockMvc.perform(put("/api/tickets/{id}/status", ticket.getId())
+                        .with(jwtFor("ticketmgr@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        "Tickets can only be assigned to active admins or ticket managers."));
+
+        TicketEntity persisted = ticketRepository.findById(ticket.getId()).orElseThrow();
+        UserEntity manager = userRepository.findByEmailIgnoreCase("ticketmgr@campus.test").orElseThrow();
+        assertThat(persisted.getAssignedTo().getId()).isEqualTo(manager.getId());
+        assertThat(persisted.getStatus()).isEqualTo(TicketStatus.OPEN);
     }
 
     @Test
@@ -594,6 +648,18 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    private void assertInvalidAssignment(TicketEntity ticket, UserEntity assignee) throws Exception {
+        AssignTicketRequest request = new AssignTicketRequest(assignee.getId());
+
+        mockMvc.perform(put("/api/tickets/{id}/assign", ticket.getId())
+                        .with(jwtFor("admin@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        "Tickets can only be assigned to active admins or ticket managers."));
+    }
+
     private void seedAdmin(String email) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
@@ -610,6 +676,25 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
         user.setAdminProfile(admin);
 
         userRepository.save(user);
+    }
+
+    private UserEntity seedFaculty(String email) {
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setEmail(email);
+        user.setUserType(UserType.FACULTY);
+        user.setAccountStatus(AccountStatus.ACTIVE);
+        user.setInvitedAt(Instant.now());
+        user.setActivatedAt(Instant.now());
+
+        FacultyEntity faculty = new FacultyEntity();
+        faculty.setUser(user);
+        faculty.setFirstName("Faculty");
+        faculty.setLastName("User");
+        faculty.setEmployeeNumber("FAC-" + UUID.randomUUID().toString().substring(0, 8));
+        user.setFacultyProfile(faculty);
+
+        return userRepository.save(user);
     }
 
     private UserEntity seedStudent(String email) {
@@ -630,20 +715,26 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     private UserEntity seedTicketManager(String email) {
+        return seedManager(email, ManagerRole.TICKET_MANAGER, AccountStatus.ACTIVE);
+    }
+
+    private UserEntity seedManager(String email, ManagerRole role, AccountStatus status) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
         user.setEmail(email);
         user.setUserType(UserType.MANAGER);
-        user.setAccountStatus(AccountStatus.ACTIVE);
+        user.setAccountStatus(status);
         user.setInvitedAt(Instant.now());
-        user.setActivatedAt(Instant.now());
+        if (status == AccountStatus.ACTIVE || status == AccountStatus.SUSPENDED) {
+            user.setActivatedAt(Instant.now());
+        }
 
         ManagerEntity manager = new ManagerEntity();
         manager.setUser(user);
         manager.setFirstName("Ticket");
         manager.setLastName("Manager");
-        manager.setEmployeeNumber("MGR-TKT-001");
-        manager.setManagerRole(ManagerRole.TICKET_MANAGER);
+        manager.setEmployeeNumber("MGR-" + UUID.randomUUID().toString().substring(0, 8));
+        manager.setManagerRole(role);
         user.setManagerProfile(manager);
 
         return userRepository.save(user);

@@ -22,6 +22,7 @@ import { Navbar, type NavItem } from '@/components/layout/Navbar';
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
 import { useAuth } from '@/components/providers/AuthProvider';
 import type { UserResponse } from '@/lib/api-types';
+import { getManagerDashboardPath } from '@/lib/auth-routing';
 import { filterSectionsByRole } from '@/lib/nav-rbac';
 import { getUserDisplayName, getUserInitials, getUserTypeLabel } from '@/lib/user-display';
 import type { WorkspaceKind } from '@/lib/workspace';
@@ -52,7 +53,7 @@ function getBrandSubtitle(workspace: Exclude<WorkspaceKind, 'auto'>) {
   }
 }
 
-function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSection[] {
+function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: UserResponse): NavSection[] {
   switch (workspace) {
     case 'admin':
       return [
@@ -146,7 +147,7 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSecti
             {
               label: 'Dashboard',
               icon: LayoutDashboard,
-              href: '/managers',
+              href: getManagerDashboardPath(user?.managerRole),
               allowedUserTypes: ['MANAGER'],
             },
             {
@@ -269,7 +270,7 @@ export function ProtectedShell({
   }, [router, signOut]);
 
   const resolvedSections = React.useMemo<NavSection[]>(() => {
-    return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace), user);
+    return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace, user), user);
   }, [resolvedWorkspace, sections, user]);
 
   if (resolvedWorkspace === 'students') {
