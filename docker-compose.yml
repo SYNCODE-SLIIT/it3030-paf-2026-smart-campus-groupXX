@@ -2,7 +2,7 @@ services:
   backend:
     image: maven:3.9.6-eclipse-temurin-21
     working_dir: /app
-    command: sh -c "chmod +x /app/scripts/dev-autoreload.sh && /app/scripts/dev-autoreload.sh"
+    command: sh -c "sed -i 's/\r$//' /app/scripts/dev-autoreload.sh && chmod +x /app/scripts/dev-autoreload.sh && /app/scripts/dev-autoreload.sh"
     ports:
       - "8080:8080"
     environment:
@@ -21,7 +21,6 @@ services:
       APP_BOOTSTRAP_ADMIN_EMAIL: ${APP_BOOTSTRAP_ADMIN_EMAIL:-}
       APP_BOOTSTRAP_ADMIN_PASSWORD: ${APP_BOOTSTRAP_ADMIN_PASSWORD:-}
       APP_BOOTSTRAP_ADMIN_FULL_NAME: ${APP_BOOTSTRAP_ADMIN_FULL_NAME:-System Admin}
-      APP_BOOTSTRAP_ADMIN_EMPLOYEE_NUMBER: ${APP_BOOTSTRAP_ADMIN_EMPLOYEE_NUMBER:-ADM-001}
     volumes:
       - ./backend:/app
       - ~/.m2:/root/.m2

@@ -72,7 +72,7 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         );
 
         assertThat(filtered).hasSize(1);
-        assertThat(filtered.getFirst().code()).isEqualTo("BUS-01");
+        assertThat(filtered.get(0).code()).isEqualTo("BUS-01");
     }
 
     @Test

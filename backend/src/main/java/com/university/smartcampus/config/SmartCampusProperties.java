@@ -199,7 +199,6 @@ public class SmartCampusProperties {
     public static class Admin {
         private String email;
         private String fullName;
-        private String employeeNumber;
         private String password;
 
         public String getEmail() {
@@ -216,14 +215,6 @@ public class SmartCampusProperties {
 
         public void setFullName(String fullName) {
             this.fullName = fullName;
-        }
-
-        public String getEmployeeNumber() {
-            return employeeNumber;
-        }
-
-        public void setEmployeeNumber(String employeeNumber) {
-            this.employeeNumber = employeeNumber;
         }
 
         public String getPassword() {

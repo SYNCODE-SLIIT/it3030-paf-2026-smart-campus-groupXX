@@ -34,7 +34,6 @@ interface OnboardingFormState {
   lastName: string;
   preferredName: string;
   phoneNumber: string;
-  registrationNumber: string;
   facultyName: StudentFaculty | '';
   programName: StudentProgram | '';
   academicYear: AcademicYear | '';
@@ -50,7 +49,6 @@ function toFormState(profile: UserResponse['studentProfile']): OnboardingFormSta
     lastName: profile?.lastName ?? '',
     preferredName: profile?.preferredName ?? '',
     phoneNumber: profile?.phoneNumber ?? '',
-    registrationNumber: profile?.registrationNumber ?? '',
     facultyName: profile?.facultyName ?? '',
     programName: profile?.programName ?? '',
     academicYear: profile?.academicYear ?? '',
@@ -217,7 +215,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       return;
     }
 
-    if (!formState.firstName || !formState.lastName || !formState.phoneNumber || !formState.registrationNumber) {
+    if (!formState.firstName || !formState.lastName || !formState.phoneNumber) {
       setAlert({
         variant: 'error',
         title: 'Missing required fields',
@@ -276,7 +274,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           lastName: formState.lastName.trim(),
           preferredName: formState.preferredName.trim() || undefined,
           phoneNumber: formState.phoneNumber.trim(),
-          registrationNumber: formState.registrationNumber.trim(),
           facultyName,
           programName,
           academicYear,
@@ -437,12 +434,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                   label="Phone Number"
                   value={formState.phoneNumber}
                   onChange={(event) => setField('phoneNumber', event.target.value)}
-                  required
-                />
-                <Input
-                  label="Registration Number"
-                  value={formState.registrationNumber}
-                  onChange={(event) => setField('registrationNumber', event.target.value)}
                   required
                 />
                 <Select

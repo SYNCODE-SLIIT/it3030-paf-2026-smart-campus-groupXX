@@ -15,7 +15,6 @@ export interface SharedPersonFields {
   lastName: string;
   preferredName: string;
   phoneNumber: string;
-  employeeNumber: string;
 }
 
 export interface FacultyFormState extends SharedPersonFields {
@@ -26,7 +25,6 @@ export interface FacultyFormState extends SharedPersonFields {
 export interface AdminFormState {
   fullName: string;
   phoneNumber: string;
-  employeeNumber: string;
 }
 
 export interface StudentFormState {
@@ -34,7 +32,6 @@ export interface StudentFormState {
   lastName: string;
   preferredName: string;
   phoneNumber: string;
-  registrationNumber: string;
   facultyName: StudentFaculty | '';
   programName: StudentProgram | '';
   academicYear: AcademicYear | '';
@@ -52,7 +49,6 @@ export function createEmptyStudentForm(): StudentFormState {
     lastName: '',
     preferredName: '',
     phoneNumber: '',
-    registrationNumber: '',
     facultyName: '',
     programName: '',
     academicYear: '',
@@ -69,7 +65,6 @@ export function createEmptyFacultyForm(): FacultyFormState {
     lastName: '',
     preferredName: '',
     phoneNumber: '',
-    employeeNumber: '',
     department: '',
     designation: '',
   };
@@ -79,7 +74,6 @@ export function createEmptyAdminForm(): AdminFormState {
   return {
     fullName: '',
     phoneNumber: '',
-    employeeNumber: '',
   };
 }
 
@@ -89,7 +83,6 @@ export function createEmptyManagerForm(): ManagerFormState {
     lastName: '',
     preferredName: '',
     phoneNumber: '',
-    employeeNumber: '',
   };
 }
 
@@ -99,7 +92,6 @@ export function facultyFormFromUser(user: UserResponse): FacultyFormState {
     lastName: user.facultyProfile?.lastName ?? '',
     preferredName: user.facultyProfile?.preferredName ?? '',
     phoneNumber: user.facultyProfile?.phoneNumber ?? '',
-    employeeNumber: user.facultyProfile?.employeeNumber ?? '',
     department: user.facultyProfile?.department ?? '',
     designation: user.facultyProfile?.designation ?? '',
   };
@@ -111,7 +103,6 @@ export function studentFormFromUser(user: UserResponse): StudentFormState {
     lastName: user.studentProfile?.lastName ?? '',
     preferredName: user.studentProfile?.preferredName ?? '',
     phoneNumber: user.studentProfile?.phoneNumber ?? '',
-    registrationNumber: user.studentProfile?.registrationNumber ?? '',
     facultyName: user.studentProfile?.facultyName ?? '',
     programName: user.studentProfile?.programName ?? '',
     academicYear: user.studentProfile?.academicYear ?? '',
@@ -126,7 +117,6 @@ export function adminFormFromUser(user: UserResponse): AdminFormState {
   return {
     fullName: user.adminProfile?.fullName ?? '',
     phoneNumber: user.adminProfile?.phoneNumber ?? '',
-    employeeNumber: user.adminProfile?.employeeNumber ?? '',
   };
 }
 
@@ -136,7 +126,6 @@ export function managerFormFromUser(user: UserResponse): ManagerFormState {
     lastName: user.managerProfile?.lastName ?? '',
     preferredName: user.managerProfile?.preferredName ?? '',
     phoneNumber: user.managerProfile?.phoneNumber ?? '',
-    employeeNumber: user.managerProfile?.employeeNumber ?? '',
   };
 }
 
@@ -146,7 +135,6 @@ export function toFacultyProfileInput(form: FacultyFormState): FacultyProfileInp
     lastName: form.lastName.trim(),
     preferredName: form.preferredName.trim() || undefined,
     phoneNumber: form.phoneNumber.trim() || undefined,
-    employeeNumber: form.employeeNumber.trim(),
     department: form.department.trim(),
     designation: form.designation.trim(),
   };
@@ -162,7 +150,6 @@ export function toStudentProfileInput(form: StudentFormState): StudentProfileInp
     lastName: form.lastName.trim(),
     preferredName: form.preferredName.trim() || undefined,
     phoneNumber: form.phoneNumber.trim(),
-    registrationNumber: form.registrationNumber.trim(),
     facultyName: form.facultyName,
     programName: form.programName,
     academicYear: form.academicYear,
@@ -177,7 +164,6 @@ export function toAdminProfileInput(form: AdminFormState): AdminProfileInput {
   return {
     fullName: form.fullName.trim(),
     phoneNumber: form.phoneNumber.trim() || undefined,
-    employeeNumber: form.employeeNumber.trim(),
   };
 }
 
@@ -187,6 +173,5 @@ export function toManagerProfileInput(form: ManagerFormState): ManagerProfileInp
     lastName: form.lastName.trim(),
     preferredName: form.preferredName.trim() || undefined,
     phoneNumber: form.phoneNumber.trim() || undefined,
-    employeeNumber: form.employeeNumber.trim(),
   };
 }

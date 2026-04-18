@@ -15,6 +15,7 @@ import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
 import com.university.smartcampus.user.entity.AdminEntity;
 import com.university.smartcampus.user.entity.UserEntity;
+import com.university.smartcampus.user.identifier.UserIdentifierService;
 import com.university.smartcampus.user.repository.UserRepository;
 
 @Component
@@ -24,17 +25,20 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
     private final CurrentUserService currentUserService;
     private final SmartCampusProperties properties;
     private final AuthIdentityClient authIdentityClient;
+    private final UserIdentifierService userIdentifierService;
 
     public BootstrapAdminInitializer(
         UserRepository userRepository,
         CurrentUserService currentUserService,
         SmartCampusProperties properties,
-        AuthIdentityClient authIdentityClient
+        AuthIdentityClient authIdentityClient,
+        UserIdentifierService userIdentifierService
     ) {
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
         this.properties = properties;
         this.authIdentityClient = authIdentityClient;
+        this.userIdentifierService = userIdentifierService;
     }
 
     @Override
@@ -60,8 +64,14 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
             AdminEntity admin = new AdminEntity();
             admin.setUser(user);
             admin.setFullName(bootstrapAdmin.fullNameOrDefault(email));
-            admin.setEmployeeNumber(bootstrapAdmin.getEmployeeNumber());
             user.setAdminProfile(admin);
+            userRepository.save(user);
+        }
+
+        if (user.getUserType() == UserType.ADMIN && user.getAdminProfile() != null
+                && !StringUtils.hasText(user.getAdminProfile().getEmployeeNumber())) {
+            user.getAdminProfile().setEmployeeNumber(
+                userIdentifierService.generateAdminEmployeeNumber(user.getInvitedAt()));
             userRepository.save(user);
         }
 

@@ -8,6 +8,7 @@ import com.university.smartcampus.common.enums.AppEnums.StudentProgram;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
 
 public final class StudentDtos {
 
@@ -19,7 +20,7 @@ public final class StudentDtos {
         @NotBlank String lastName,
         String preferredName,
         @NotBlank String phoneNumber,
-        @NotBlank String registrationNumber,
+        @Null(message = "Registration number is auto-generated and cannot be provided.") String registrationNumber,
         @NotNull StudentFaculty facultyName,
         @NotNull StudentProgram programName,
         @NotNull AcademicYear academicYear,

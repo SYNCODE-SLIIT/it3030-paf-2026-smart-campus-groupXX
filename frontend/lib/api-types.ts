@@ -255,7 +255,6 @@ export interface FacultyProfileInput {
   lastName: string;
   preferredName?: string;
   phoneNumber?: string;
-  employeeNumber: string;
   department: string;
   designation: string;
 }
@@ -263,7 +262,6 @@ export interface FacultyProfileInput {
 export interface AdminProfileInput {
   fullName: string;
   phoneNumber?: string;
-  employeeNumber: string;
 }
 
 export interface ManagerProfileInput {
@@ -271,7 +269,6 @@ export interface ManagerProfileInput {
   lastName: string;
   preferredName?: string;
   phoneNumber?: string;
-  employeeNumber: string;
 }
 
 export interface StudentProfileInput {
@@ -279,7 +276,6 @@ export interface StudentProfileInput {
   lastName: string;
   preferredName?: string;
   phoneNumber: string;
-  registrationNumber: string;
   facultyName: StudentFaculty;
   programName: StudentProgram;
   academicYear: AcademicYear;
@@ -317,7 +313,6 @@ export interface StudentOnboardingRequest {
   lastName: string;
   preferredName?: string;
   phoneNumber: string;
-  registrationNumber: string;
   facultyName: StudentFaculty;
   programName: StudentProgram;
   academicYear: AcademicYear;

@@ -45,6 +45,7 @@ import com.university.smartcampus.user.entity.FacultyEntity;
 import com.university.smartcampus.user.entity.ManagerEntity;
 import com.university.smartcampus.user.entity.StudentEntity;
 import com.university.smartcampus.user.entity.UserEntity;
+import com.university.smartcampus.user.identifier.UserIdentifierService;
 import com.university.smartcampus.user.mapper.UserMapper;
 import com.university.smartcampus.user.repository.ManagerRepository;
 import com.university.smartcampus.user.repository.StudentRepository;
@@ -67,6 +68,7 @@ public class UserManagementService {
     private final CurrentUserService currentUserService;
     private final ProfileImageStorageClient profileImageStorageClient;
     private final SmartCampusProperties properties;
+    private final UserIdentifierService userIdentifierService;
 
     public UserManagementService(
             UserRepository userRepository,
@@ -77,7 +79,8 @@ public class UserManagementService {
             UserMapper userMapper,
             CurrentUserService currentUserService,
             ProfileImageStorageClient profileImageStorageClient,
-            SmartCampusProperties properties) {
+            SmartCampusProperties properties,
+            UserIdentifierService userIdentifierService) {
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
         this.managerRepository = managerRepository;
@@ -87,6 +90,7 @@ public class UserManagementService {
         this.currentUserService = currentUserService;
         this.profileImageStorageClient = profileImageStorageClient;
         this.properties = properties;
+        this.userIdentifierService = userIdentifierService;
     }
 
     @Transactional
@@ -290,11 +294,11 @@ public class UserManagementService {
         student.setLastName(request.lastName());
         student.setPreferredName(request.preferredName());
         student.setPhoneNumber(request.phoneNumber());
-        student.setRegistrationNumber(request.registrationNumber());
         student.setFacultyName(request.facultyName());
         student.setProgramName(request.programName());
         student.setAcademicYear(request.academicYear());
         student.setSemester(request.semester());
+        assignStudentRegistrationNumberIfMissing(student);
         if (StringUtils.hasText(request.profileImageUrl())) {
             student.setProfileImageUrl(request.profileImageUrl().trim());
         }
@@ -391,6 +395,7 @@ public class UserManagementService {
         if (input != null) {
             applyFacultyProfile(faculty, input);
         }
+        faculty.setEmployeeNumber(userIdentifierService.generateFacultyEmployeeNumber(resolveJoinInstant(user)));
         user.setFacultyProfile(faculty);
         return faculty;
     }
@@ -401,6 +406,7 @@ public class UserManagementService {
         if (input != null) {
             applyAdminProfile(admin, input);
         }
+        admin.setEmployeeNumber(userIdentifierService.generateAdminEmployeeNumber(resolveJoinInstant(user)));
         user.setAdminProfile(admin);
         return admin;
     }
@@ -411,6 +417,7 @@ public class UserManagementService {
         if (input != null) {
             applyManagerProfile(manager, input);
         }
+        manager.setEmployeeNumber(userIdentifierService.generateManagerEmployeeNumber(resolveJoinInstant(user)));
         manager.setManagerRole(managerRole);
         user.setManagerProfile(manager);
         return manager;
@@ -442,7 +449,6 @@ public class UserManagementService {
         requireText(input.firstName(), "First name is required.");
         requireText(input.lastName(), "Last name is required.");
         requireText(input.phoneNumber(), "Phone number is required.");
-        requireText(input.registrationNumber(), "Registration number is required.");
         requireStudentAcademicFields(input.facultyName(), input.programName(), input.academicYear(), input.semester());
 
         if (input.programName().faculty() != input.facultyName()) {
@@ -453,11 +459,11 @@ public class UserManagementService {
         student.setLastName(input.lastName().trim());
         student.setPreferredName(trimToNull(input.preferredName()));
         student.setPhoneNumber(input.phoneNumber().trim());
-        student.setRegistrationNumber(input.registrationNumber().trim());
         student.setFacultyName(input.facultyName());
         student.setProgramName(input.programName());
         student.setAcademicYear(input.academicYear());
         student.setSemester(input.semester());
+        assignStudentRegistrationNumberIfMissing(student);
         student.setEmailNotificationsEnabled(defaultBoolean(input.emailNotificationsEnabled(), Boolean.TRUE));
         student.setSmsNotificationsEnabled(defaultBoolean(input.smsNotificationsEnabled(), Boolean.FALSE));
 
@@ -471,7 +477,6 @@ public class UserManagementService {
         faculty.setLastName(input.lastName());
         faculty.setPreferredName(input.preferredName());
         faculty.setPhoneNumber(input.phoneNumber());
-        faculty.setEmployeeNumber(input.employeeNumber());
         faculty.setDepartment(input.department());
         faculty.setDesignation(input.designation());
     }
@@ -479,7 +484,6 @@ public class UserManagementService {
     private void applyAdminProfile(AdminEntity admin, AdminProfileInput input) {
         admin.setFullName(input.fullName());
         admin.setPhoneNumber(input.phoneNumber());
-        admin.setEmployeeNumber(input.employeeNumber());
     }
 
     private void applyManagerProfile(ManagerEntity manager, ManagerProfileInput input) {
@@ -487,7 +491,24 @@ public class UserManagementService {
         manager.setLastName(input.lastName());
         manager.setPreferredName(input.preferredName());
         manager.setPhoneNumber(input.phoneNumber());
-        manager.setEmployeeNumber(input.employeeNumber());
+    }
+
+    private void assignStudentRegistrationNumberIfMissing(StudentEntity student) {
+        if (StringUtils.hasText(student.getRegistrationNumber())) {
+            return;
+        }
+
+        student.setRegistrationNumber(userIdentifierService.generateStudentRegistrationNumber(student));
+    }
+
+    private Instant resolveJoinInstant(UserEntity user) {
+        if (user.getInvitedAt() != null) {
+            return user.getInvitedAt();
+        }
+        if (user.getCreatedAt() != null) {
+            return user.getCreatedAt();
+        }
+        return Instant.now();
     }
 
     private UserEntity getUserEntity(UUID id) {

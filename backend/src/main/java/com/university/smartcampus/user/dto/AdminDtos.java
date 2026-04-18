@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
 
 public final class AdminDtos {
 
@@ -23,7 +24,7 @@ public final class AdminDtos {
         String lastName,
         String preferredName,
         String phoneNumber,
-        String registrationNumber,
+        @Null(message = "Registration number is auto-generated and cannot be provided.") String registrationNumber,
         StudentFaculty facultyName,
         StudentProgram programName,
         AcademicYear academicYear,
@@ -39,7 +40,7 @@ public final class AdminDtos {
         @NotBlank String lastName,
         String preferredName,
         String phoneNumber,
-        @NotBlank String employeeNumber,
+        @Null(message = "Employee number is auto-generated and cannot be provided.") String employeeNumber,
         @NotBlank String department,
         @NotBlank String designation
     ) {
@@ -48,7 +49,7 @@ public final class AdminDtos {
     public record AdminProfileInput(
         @NotBlank String fullName,
         String phoneNumber,
-        @NotBlank String employeeNumber
+        @Null(message = "Employee number is auto-generated and cannot be provided.") String employeeNumber
     ) {
     }
 
@@ -57,7 +58,7 @@ public final class AdminDtos {
         @NotBlank String lastName,
         String preferredName,
         String phoneNumber,
-        @NotBlank String employeeNumber
+        @Null(message = "Employee number is auto-generated and cannot be provided.") String employeeNumber
     ) {
     }
 

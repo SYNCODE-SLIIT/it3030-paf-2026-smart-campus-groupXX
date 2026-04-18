@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.Year;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -248,7 +250,6 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                         "lastName": "Student",
                         "preferredName": "US",
                         "phoneNumber": "0711111111",
-                        "registrationNumber": "ST-EDIT-001",
                         "facultyName": "FACULTY_OF_COMPUTING",
                         "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
                         "academicYear": "YEAR_2",
@@ -260,7 +261,8 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.studentProfile.firstName").value("Updated"))
-            .andExpect(jsonPath("$.studentProfile.registrationNumber").value("ST-EDIT-001"))
+            .andExpect(jsonPath("$.studentProfile.registrationNumber").value(org.hamcrest.Matchers.matchesPattern(
+                "IT" + String.format("%02d", Math.floorMod(Year.now(ZoneOffset.UTC).getValue() - 1, 100)) + "\\d{6}")))
             .andExpect(jsonPath("$.studentProfile.programName").value("BSC_HONS_INFORMATION_TECHNOLOGY"));
     }
 
@@ -277,7 +279,6 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                         "firstName": "Invalid",
                         "lastName": "Student",
                         "phoneNumber": "0711111111",
-                        "registrationNumber": "ST-INVALID-001",
                         "facultyName": "FACULTY_OF_ENGINEERING",
                         "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
                         "academicYear": "YEAR_2",
@@ -373,7 +374,6 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                       "lastName": "Board",
                       "preferredName": "OB",
                       "phoneNumber": "0777777777",
-                      "registrationNumber": "ST-001",
                       "facultyName": "FACULTY_OF_COMPUTING",
                       "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
                       "academicYear": "YEAR_3",
@@ -386,7 +386,60 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
             .andExpect(jsonPath("$.studentProfile.onboardingCompleted").value(true))
-            .andExpect(jsonPath("$.studentProfile.registrationNumber").value("ST-001"));
+            .andExpect(jsonPath("$.studentProfile.registrationNumber").value(org.hamcrest.Matchers.matchesPattern(
+                "IT" + String.format("%02d", Math.floorMod(Year.now(ZoneOffset.UTC).getValue() - 2, 100)) + "\\d{6}")));
+    }
+
+    @Test
+    void onboardingRejectsClientProvidedRegistrationNumber() throws Exception {
+        seedStudent("onboarding-reject@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(put("/api/students/me/onboarding")
+                .with(jwtFor("onboarding-reject@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "firstName": "On",
+                      "lastName": "Board",
+                      "phoneNumber": "0777777777",
+                      "registrationNumber": "IT26000001",
+                      "facultyName": "FACULTY_OF_COMPUTING",
+                      "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                      "academicYear": "YEAR_3",
+                      "semester": "SEMESTER_2"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("auto-generated")));
+    }
+
+    @Test
+    void adminCreateRejectsClientProvidedEmployeeNumber() throws Exception {
+        CreateUserRequest request = new CreateUserRequest(
+            "faculty-with-employee@campus.test",
+            UserType.FACULTY,
+            true,
+            null,
+            new AdminDtos.FacultyProfileInput(
+                "Fac",
+                "Member",
+                null,
+                "0711111111",
+                "FAC26000001",
+                "Computing",
+                "Lecturer"
+            ),
+            null,
+            null,
+            null
+        );
+
+        mockMvc.perform(post("/api/admin/users")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("auto-generated")));
     }
 
     @Test
@@ -472,7 +525,6 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                       "firstName": "On",
                       "lastName": "Board",
                       "phoneNumber": "0777777777",
-                      "registrationNumber": "ST-002",
                       "facultyName": "FACULTY_OF_COMPUTING",
                       "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
                       "academicYear": "YEAR_1"
