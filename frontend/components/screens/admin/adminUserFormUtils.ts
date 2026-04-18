@@ -1,7 +1,12 @@
 import type {
+  AcademicYear,
   AdminProfileInput,
   FacultyProfileInput,
   ManagerProfileInput,
+  Semester,
+  StudentFaculty,
+  StudentProfileInput,
+  StudentProgram,
   UserResponse,
 } from '@/lib/api-types';
 
@@ -10,24 +15,48 @@ export interface SharedPersonFields {
   lastName: string;
   preferredName: string;
   phoneNumber: string;
-  employeeNumber: string;
-  department: string;
 }
 
 export interface FacultyFormState extends SharedPersonFields {
+  department: string;
   designation: string;
-  officeLocation: string;
-  officePhone: string;
 }
 
-export interface AdminFormState extends SharedPersonFields {
-  jobTitle: string;
-  officePhone: string;
+export interface AdminFormState {
+  fullName: string;
+  phoneNumber: string;
 }
 
-export interface ManagerFormState extends SharedPersonFields {
-  jobTitle: string;
-  officeLocation: string;
+export interface StudentFormState {
+  firstName: string;
+  lastName: string;
+  preferredName: string;
+  phoneNumber: string;
+  facultyName: StudentFaculty | '';
+  programName: StudentProgram | '';
+  academicYear: AcademicYear | '';
+  semester: Semester | '';
+  profileImageUrl: string;
+  emailNotificationsEnabled: boolean;
+  smsNotificationsEnabled: boolean;
+}
+
+export type ManagerFormState = SharedPersonFields;
+
+export function createEmptyStudentForm(): StudentFormState {
+  return {
+    firstName: '',
+    lastName: '',
+    preferredName: '',
+    phoneNumber: '',
+    facultyName: '',
+    programName: '',
+    academicYear: '',
+    semester: '',
+    profileImageUrl: '',
+    emailNotificationsEnabled: true,
+    smsNotificationsEnabled: false,
+  };
 }
 
 export function createEmptyFacultyForm(): FacultyFormState {
@@ -36,24 +65,15 @@ export function createEmptyFacultyForm(): FacultyFormState {
     lastName: '',
     preferredName: '',
     phoneNumber: '',
-    employeeNumber: '',
     department: '',
     designation: '',
-    officeLocation: '',
-    officePhone: '',
   };
 }
 
 export function createEmptyAdminForm(): AdminFormState {
   return {
-    firstName: '',
-    lastName: '',
-    preferredName: '',
+    fullName: '',
     phoneNumber: '',
-    employeeNumber: '',
-    department: '',
-    jobTitle: '',
-    officePhone: '',
   };
 }
 
@@ -63,10 +83,6 @@ export function createEmptyManagerForm(): ManagerFormState {
     lastName: '',
     preferredName: '',
     phoneNumber: '',
-    employeeNumber: '',
-    department: '',
-    jobTitle: '',
-    officeLocation: '',
   };
 }
 
@@ -76,24 +92,31 @@ export function facultyFormFromUser(user: UserResponse): FacultyFormState {
     lastName: user.facultyProfile?.lastName ?? '',
     preferredName: user.facultyProfile?.preferredName ?? '',
     phoneNumber: user.facultyProfile?.phoneNumber ?? '',
-    employeeNumber: user.facultyProfile?.employeeNumber ?? '',
     department: user.facultyProfile?.department ?? '',
     designation: user.facultyProfile?.designation ?? '',
-    officeLocation: user.facultyProfile?.officeLocation ?? '',
-    officePhone: user.facultyProfile?.officePhone ?? '',
+  };
+}
+
+export function studentFormFromUser(user: UserResponse): StudentFormState {
+  return {
+    firstName: user.studentProfile?.firstName ?? '',
+    lastName: user.studentProfile?.lastName ?? '',
+    preferredName: user.studentProfile?.preferredName ?? '',
+    phoneNumber: user.studentProfile?.phoneNumber ?? '',
+    facultyName: user.studentProfile?.facultyName ?? '',
+    programName: user.studentProfile?.programName ?? '',
+    academicYear: user.studentProfile?.academicYear ?? '',
+    semester: user.studentProfile?.semester ?? '',
+    profileImageUrl: user.studentProfile?.profileImageUrl ?? '',
+    emailNotificationsEnabled: user.studentProfile?.emailNotificationsEnabled ?? true,
+    smsNotificationsEnabled: user.studentProfile?.smsNotificationsEnabled ?? false,
   };
 }
 
 export function adminFormFromUser(user: UserResponse): AdminFormState {
   return {
-    firstName: user.adminProfile?.firstName ?? '',
-    lastName: user.adminProfile?.lastName ?? '',
-    preferredName: user.adminProfile?.preferredName ?? '',
+    fullName: user.adminProfile?.fullName ?? '',
     phoneNumber: user.adminProfile?.phoneNumber ?? '',
-    employeeNumber: user.adminProfile?.employeeNumber ?? '',
-    department: user.adminProfile?.department ?? '',
-    jobTitle: user.adminProfile?.jobTitle ?? '',
-    officePhone: user.adminProfile?.officePhone ?? '',
   };
 }
 
@@ -103,10 +126,6 @@ export function managerFormFromUser(user: UserResponse): ManagerFormState {
     lastName: user.managerProfile?.lastName ?? '',
     preferredName: user.managerProfile?.preferredName ?? '',
     phoneNumber: user.managerProfile?.phoneNumber ?? '',
-    employeeNumber: user.managerProfile?.employeeNumber ?? '',
-    department: user.managerProfile?.department ?? '',
-    jobTitle: user.managerProfile?.jobTitle ?? '',
-    officeLocation: user.managerProfile?.officeLocation ?? '',
   };
 }
 
@@ -116,24 +135,35 @@ export function toFacultyProfileInput(form: FacultyFormState): FacultyProfileInp
     lastName: form.lastName.trim(),
     preferredName: form.preferredName.trim() || undefined,
     phoneNumber: form.phoneNumber.trim() || undefined,
-    employeeNumber: form.employeeNumber.trim(),
     department: form.department.trim(),
     designation: form.designation.trim(),
-    officeLocation: form.officeLocation.trim() || undefined,
-    officePhone: form.officePhone.trim() || undefined,
+  };
+}
+
+export function toStudentProfileInput(form: StudentFormState): StudentProfileInput {
+  if (!form.facultyName || !form.programName || !form.academicYear || !form.semester) {
+    throw new Error('Student academic fields are required.');
+  }
+
+  return {
+    firstName: form.firstName.trim(),
+    lastName: form.lastName.trim(),
+    preferredName: form.preferredName.trim() || undefined,
+    phoneNumber: form.phoneNumber.trim(),
+    facultyName: form.facultyName,
+    programName: form.programName,
+    academicYear: form.academicYear,
+    semester: form.semester,
+    profileImageUrl: form.profileImageUrl.trim() || undefined,
+    emailNotificationsEnabled: form.emailNotificationsEnabled,
+    smsNotificationsEnabled: form.smsNotificationsEnabled,
   };
 }
 
 export function toAdminProfileInput(form: AdminFormState): AdminProfileInput {
   return {
-    firstName: form.firstName.trim(),
-    lastName: form.lastName.trim(),
-    preferredName: form.preferredName.trim() || undefined,
+    fullName: form.fullName.trim(),
     phoneNumber: form.phoneNumber.trim() || undefined,
-    employeeNumber: form.employeeNumber.trim(),
-    department: form.department.trim(),
-    jobTitle: form.jobTitle.trim(),
-    officePhone: form.officePhone.trim() || undefined,
   };
 }
 
@@ -143,9 +173,5 @@ export function toManagerProfileInput(form: ManagerFormState): ManagerProfileInp
     lastName: form.lastName.trim(),
     preferredName: form.preferredName.trim() || undefined,
     phoneNumber: form.phoneNumber.trim() || undefined,
-    employeeNumber: form.employeeNumber.trim(),
-    department: form.department.trim(),
-    jobTitle: form.jobTitle.trim(),
-    officeLocation: form.officeLocation.trim() || undefined,
   };
 }

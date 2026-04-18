@@ -1,4 +1,4 @@
-import type { ResourceCategory, ResourceResponse, ResourceStatus, UserResponse } from '@/lib/api-types';
+import type { ResourceCategory, ResourceResponse, ResourceStatus } from '@/lib/api-types';
 
 export const resourceCategoryOptions: Array<{ value: ResourceCategory; label: string }> = [
   { value: 'SPACES', label: 'Spaces' },
@@ -81,26 +81,10 @@ export function getResourceStatusChipColor(status: ResourceStatus) {
   }
 }
 
-export function canManageResourceCatalogue(user: Pick<UserResponse, 'userType' | 'managerRoles'> | null | undefined) {
-  if (!user) {
-    return false;
+export function resourceAvailabilityLabel(resource: Pick<ResourceResponse, 'availableFrom' | 'availableTo'>) {
+  if (!resource.availableFrom && !resource.availableTo) {
+    return 'Any time';
   }
 
-  return user.userType === 'ADMIN' || (user.userType === 'MANAGER' && user.managerRoles.includes('CATALOG_MANAGER'));
-}
-
-export function formatResourceCapacity(resource: Pick<ResourceResponse, 'capacity' | 'quantity'>) {
-  if (resource.capacity !== null && resource.capacity !== undefined && resource.quantity !== null && resource.quantity !== undefined) {
-    return `${resource.capacity} / ${resource.quantity}`;
-  }
-
-  if (resource.capacity !== null && resource.capacity !== undefined) {
-    return String(resource.capacity);
-  }
-
-  if (resource.quantity !== null && resource.quantity !== undefined) {
-    return `${resource.quantity} units`;
-  }
-
-  return '-';
+  return `${resource.availableFrom ?? '—'} to ${resource.availableTo ?? '—'}`;
 }

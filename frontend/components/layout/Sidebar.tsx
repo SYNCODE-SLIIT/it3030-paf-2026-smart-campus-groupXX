@@ -6,7 +6,7 @@ import {
   FolderOpen, MessageSquare, BarChart2,
   Bell, ChevronUp, LogOut, Building2, User, Settings, ShieldCheck,
 } from 'lucide-react';
-import type { UserType } from '@/lib/api-types';
+import type { ManagerRole, UserType } from '@/lib/api-types';
 import { Avatar } from '@/components/ui';
 import { GlassPill } from '@/components/ui/GlassPill';
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu';
@@ -17,7 +17,9 @@ export interface NavItem {
   badge?: number;
   href?: string;
   /** Roles that can see this item. Omit to show to everyone. */
-  allowedRoles?: UserType[];
+  allowedUserTypes?: UserType[];
+  /** Manager sub-roles that can see this item. Omit to show to every manager. */
+  allowedManagerRoles?: ManagerRole[];
 }
 
 export interface NavSection {
@@ -45,7 +47,7 @@ export const defaultSidebarSections: NavSection[] = [
     items: [
       { label: 'Courses',   icon: BookOpen,   badge: 3 },
       { label: 'Schedule',  icon: Calendar             },
-      { label: 'Grades',    icon: TrendingUp,  allowedRoles: ['STUDENT', 'FACULTY'] },
+      { label: 'Grades',    icon: TrendingUp,  allowedUserTypes: ['STUDENT', 'FACULTY'] },
       { label: 'Resources', icon: FolderOpen           },
     ],
   },
@@ -53,14 +55,15 @@ export const defaultSidebarSections: NavSection[] = [
     title: 'Communicate',
     items: [
       { label: 'Messages',  icon: MessageSquare, badge: 12 },
-      { label: 'Analytics', icon: BarChart2, allowedRoles: ['FACULTY', 'ADMIN'] },
+      { label: 'Analytics', icon: BarChart2, allowedUserTypes: ['FACULTY', 'ADMIN'] },
     ],
   },
   {
     title: 'Administration',
     items: [
-      { label: 'User Management', icon: ShieldCheck, allowedRoles: ['ADMIN'] },
-      { label: 'Settings',        icon: Settings,    allowedRoles: ['ADMIN'] },
+      { label: 'Resources', icon: FolderOpen, allowedUserTypes: ['ADMIN'] },
+      { label: 'User Management', icon: ShieldCheck, allowedUserTypes: ['ADMIN'] },
+      { label: 'Settings',        icon: Settings,    allowedUserTypes: ['ADMIN'] },
     ],
   },
 ];
@@ -250,7 +253,10 @@ export function Sidebar({
                 <SidebarNavItem
                   key={item.label}
                   item={item}
-                  active={active === item.label || (!!item.href && item.href === activePath)}
+                  active={
+                    active === item.label
+                    || (!!item.href && (item.href === activePath || (item.href !== '/admin' && activePath.startsWith(`${item.href}/`))))
+                  }
                   onClick={() => handleNav(item)}
                 />
               ))}

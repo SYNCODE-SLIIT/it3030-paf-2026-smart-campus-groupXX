@@ -5,7 +5,11 @@ function joinNameParts(...parts: Array<string | null | undefined>) {
 }
 
 export function getUserDisplayName(user: UserResponse) {
-  const profile = user.studentProfile ?? user.facultyProfile ?? user.adminProfile ?? user.managerProfile;
+  if (user.adminProfile) {
+    return user.adminProfile.fullName || user.email;
+  }
+
+  const profile = user.studentProfile ?? user.facultyProfile ?? user.managerProfile;
   const preferredName = profile?.preferredName;
   const firstName = profile?.firstName;
   const lastName = profile?.lastName;
@@ -46,6 +50,28 @@ export function getManagerRoleLabel(role: ManagerRole) {
     case 'TICKET_MANAGER':
       return 'Ticket Manager';
   }
+}
+
+export function getManagerRoleInitials(role: ManagerRole | null | undefined) {
+  if (!role) {
+    return 'MG';
+  }
+
+  return getManagerRoleLabel(role)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+export function getUserAvatarInitials(user: UserResponse) {
+  if (user.userType === 'MANAGER') {
+    return getManagerRoleInitials(user.managerRole);
+  }
+
+  return getUserInitials(user);
 }
 
 export function getAccountStatusLabel(status: AccountStatus) {

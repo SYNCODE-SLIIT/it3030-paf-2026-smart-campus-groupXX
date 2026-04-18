@@ -22,7 +22,7 @@ public final class AppEnums {
         TICKET_MANAGER
     }
 
-    public enum ResourceCategory {
+     public enum ResourceCategory {
         SPACES,
         TECHNICAL_EQUIPMENT,
         MAINTENANCE_AND_CLEANING,
@@ -38,11 +38,20 @@ public final class AppEnums {
         MAINTENANCE,
         INACTIVE
     }
-
+    
     public enum UserType {
         STUDENT,
         FACULTY,
         ADMIN,
         MANAGER
     }
+
+    public enum BookingStatus {
+        PENDING,
+        APPROVED,
+        REJECTED,
+        CANCELLED
+    }
+
+   
 }

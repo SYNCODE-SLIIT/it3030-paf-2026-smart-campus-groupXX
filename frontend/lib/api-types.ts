@@ -6,7 +6,7 @@ export type AuthDeliveryMethod = 'INVITE_EMAIL' | 'LOGIN_LINK_EMAIL';
 
 export type ManagerRole = 'CATALOG_MANAGER' | 'BOOKING_MANAGER' | 'TICKET_MANAGER';
 
-export type NextStep = 'ONBOARDING' | 'DASHBOARD';
+export type BookingStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
 export type ResourceCategory =
   | 'SPACES'
@@ -19,97 +19,70 @@ export type ResourceCategory =
 
 export type ResourceStatus = 'ACTIVE' | 'OUT_OF_SERVICE' | 'MAINTENANCE' | 'INACTIVE';
 
+export type StudentFaculty =
+  | 'FACULTY_OF_COMPUTING'
+  | 'FACULTY_OF_ENGINEERING'
+  | 'SLIIT_BUSINESS_SCHOOL'
+  | 'FACULTY_OF_HUMANITIES_AND_SCIENCES'
+  | 'SCHOOL_OF_ARCHITECTURE'
+  | 'WILLIAM_ANGLISS_AT_SLIIT'
+  | 'FACULTY_OF_GRADUATE_STUDIES_AND_RESEARCH';
+
+export type StudentProgram =
+  | 'BSC_HONS_INFORMATION_TECHNOLOGY'
+  | 'BSC_HONS_COMPUTER_SCIENCE'
+  | 'BSC_HONS_COMPUTER_SYSTEMS_ENGINEERING'
+  | 'BSC_HONS_IT_ARTIFICIAL_INTELLIGENCE'
+  | 'BSC_HONS_IT_SOFTWARE_ENGINEERING'
+  | 'BSC_HONS_IT_COMPUTER_SYSTEMS_NETWORK_ENGINEERING'
+  | 'BSC_HONS_IT_INFORMATION_SYSTEMS_ENGINEERING'
+  | 'BSC_HONS_IT_CYBER_SECURITY'
+  | 'BSC_HONS_IT_INTERACTIVE_MEDIA'
+  | 'BSC_HONS_IT_DATA_SCIENCE'
+  | 'BSC_ENG_HONS_CIVIL_ENGINEERING'
+  | 'BSC_ENG_HONS_ELECTRICAL_ELECTRONIC_ENGINEERING'
+  | 'BSC_ENG_HONS_MECHANICAL_ENGINEERING'
+  | 'BSC_ENG_HONS_MECHANICAL_ENGINEERING_MECHATRONICS'
+  | 'BSC_ENG_HONS_MATERIALS_ENGINEERING'
+  | 'BBA_HONS_ACCOUNTING_FINANCE'
+  | 'BBA_HONS_BUSINESS_ANALYTICS'
+  | 'BBA_HONS_HUMAN_CAPITAL_MANAGEMENT'
+  | 'BBA_HONS_MARKETING_MANAGEMENT'
+  | 'BBA_HONS_LOGISTICS_SUPPLY_CHAIN_MANAGEMENT'
+  | 'BBA_HONS_BUSINESS_MANAGEMENT'
+  | 'BBA_HONS_MANAGEMENT_INFORMATION_SYSTEMS'
+  | 'BBA_HONS_QUALITY_MANAGEMENT'
+  | 'BSC_HONS_FINANCIAL_MATHS_APPLIED_STATISTICS'
+  | 'BSC_HONS_BIOTECHNOLOGY'
+  | 'BSC_HONS_PSYCHOLOGY'
+  | 'BSC_HONS_NURSING'
+  | 'BA_HONS_ENGLISH_STUDIES'
+  | 'BED_HONS_SCIENCES_ENGLISH_SOCIAL_SCIENCES_IT'
+  | 'BSC_HONS_ARCHITECTURE'
+  | 'BA_HONS_INTERIOR_DESIGN'
+  | 'MSC_ARCHITECTURE'
+  | 'ADVANCED_DIPLOMA_HOSPITALITY_MANAGEMENT'
+  | 'ADVANCED_DIPLOMA_TRAVEL_TOURISM_MANAGEMENT'
+  | 'DIPLOMA_EVENT_MANAGEMENT'
+  | 'CERTIFICATE_IV_PATISSERIE'
+  | 'COMMERCIAL_COOKERY'
+  | 'POSTGRADUATE_DIPLOMA_EDUCATION'
+  | 'MASTER_OF_EDUCATION'
+  | 'MASTER_BUSINESS_ADMINISTRATION'
+  | 'MSC_INFORMATION_TECHNOLOGY'
+  | 'MSC_INFORMATION_MANAGEMENT'
+  | 'MSC_INFORMATION_SYSTEMS'
+  | 'MSC_NETWORK_ENGINEERING'
+  | 'MSC_ARTIFICIAL_INTELLIGENCE';
+
+export type AcademicYear = 'YEAR_1' | 'YEAR_2' | 'YEAR_3' | 'YEAR_4';
+
+export type Semester = 'SEMESTER_1' | 'SEMESTER_2';
+
+export type NextStep = 'ONBOARDING' | 'DASHBOARD';
+
 export interface MessageResponse {
   message: string;
-}
-
-export interface ErrorResponse {
-  timestamp: string;
-  status: number;
-  error: string;
-  message: string;
-  path: string;
-}
-
-export interface StudentProfileResponse {
-  onboardingCompleted: boolean;
-  firstName: string | null;
-  lastName: string | null;
-  preferredName: string | null;
-  phoneNumber: string | null;
-  registrationNumber: string | null;
-  facultyName: string | null;
-  programName: string | null;
-  academicYear: number | null;
-  semester: string | null;
-  profileImageUrl: string | null;
-  emailNotificationsEnabled: boolean | null;
-  smsNotificationsEnabled: boolean | null;
-}
-
-export interface FacultyProfileResponse {
-  firstName: string | null;
-  lastName: string | null;
-  preferredName: string | null;
-  phoneNumber: string | null;
-  employeeNumber: string | null;
-  department: string | null;
-  designation: string | null;
-  officeLocation: string | null;
-  officePhone: string | null;
-}
-
-export interface AdminProfileResponse {
-  firstName: string | null;
-  lastName: string | null;
-  preferredName: string | null;
-  phoneNumber: string | null;
-  employeeNumber: string | null;
-  department: string | null;
-  jobTitle: string | null;
-  officePhone: string | null;
-}
-
-export interface ManagerProfileResponse {
-  firstName: string | null;
-  lastName: string | null;
-  preferredName: string | null;
-  phoneNumber: string | null;
-  employeeNumber: string | null;
-  department: string | null;
-  jobTitle: string | null;
-  officeLocation: string | null;
-}
-
-export interface UserResponse {
-  id: string;
-  authUserId: string | null;
-  email: string;
-  userType: UserType;
-  accountStatus: AccountStatus;
-  lastLoginAt: string | null;
-  invitedAt: string;
-  activatedAt: string | null;
-  lastInviteSentAt: string | null;
-  inviteSendCount: number;
-  lastInviteMethod: AuthDeliveryMethod | null;
-  lastInviteReference: string | null;
-  lastInviteRedirectUri: string | null;
-  managerRoles: ManagerRole[];
-  studentProfile: StudentProfileResponse | null;
-  facultyProfile: FacultyProfileResponse | null;
-  adminProfile: AdminProfileResponse | null;
-  managerProfile: ManagerProfileResponse | null;
-}
-
-export interface SessionSyncResponse {
-  user: UserResponse;
-  nextStep: NextStep;
-}
-
-export interface StudentOnboardingStateResponse {
-  onboardingCompleted: boolean;
-  profile: StudentProfileResponse | null;
 }
 
 export interface ResourceResponse {
@@ -127,6 +100,8 @@ export interface ResourceResponse {
   movable: boolean;
   availableFrom: string | null;
   availableTo: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateResourceRequest {
@@ -161,27 +136,132 @@ export interface UpdateResourceRequest {
   availableTo?: string | null;
 }
 
+export interface ResourceSummary {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface CreateBookingRequest {
+  resourceId: string;
+  startTime: string;
+  endTime: string;
+  purpose?: string;
+}
+
+export interface BookingDecisionRequest {
+  reason: string;
+}
+
+export interface CancelBookingRequest {
+  reason?: string;
+}
+
+export interface BookingResponse {
+  id: string;
+  resource: ResourceSummary;
+  requesterId: string;
+  status: BookingStatus;
+  startTime: string;
+  endTime: string;
+  purpose: string | null;
+  rejectionReason: string | null;
+  cancellationReason: string | null;
+  decidedAt: string | null;
+  cancelledAt: string | null;
+}
+
+export interface ErrorResponse {
+  timestamp: string;
+  status: number;
+  error: string;
+  message: string;
+  path: string;
+}
+
+export interface StudentProfileResponse {
+  onboardingCompleted: boolean;
+  firstName: string | null;
+  lastName: string | null;
+  preferredName: string | null;
+  phoneNumber: string | null;
+  registrationNumber: string | null;
+  facultyName: StudentFaculty | null;
+  programName: StudentProgram | null;
+  academicYear: AcademicYear | null;
+  semester: Semester | null;
+  profileImageUrl: string | null;
+  emailNotificationsEnabled: boolean | null;
+  smsNotificationsEnabled: boolean | null;
+}
+
+export interface FacultyProfileResponse {
+  firstName: string | null;
+  lastName: string | null;
+  preferredName: string | null;
+  phoneNumber: string | null;
+  employeeNumber: string | null;
+  department: string | null;
+  designation: string | null;
+}
+
+export interface AdminProfileResponse {
+  fullName: string | null;
+  phoneNumber: string | null;
+  employeeNumber: string | null;
+}
+
+export interface ManagerProfileResponse {
+  firstName: string | null;
+  lastName: string | null;
+  preferredName: string | null;
+  phoneNumber: string | null;
+  employeeNumber: string | null;
+}
+
+export interface UserResponse {
+  id: string;
+  authUserId: string | null;
+  email: string;
+  userType: UserType;
+  accountStatus: AccountStatus;
+  lastLoginAt: string | null;
+  invitedAt: string;
+  activatedAt: string | null;
+  lastInviteSentAt: string | null;
+  inviteSendCount: number;
+  lastInviteMethod: AuthDeliveryMethod | null;
+  lastInviteReference: string | null;
+  lastInviteRedirectUri: string | null;
+  managerRole: ManagerRole | null;
+  studentProfile: StudentProfileResponse | null;
+  facultyProfile: FacultyProfileResponse | null;
+  adminProfile: AdminProfileResponse | null;
+  managerProfile: ManagerProfileResponse | null;
+}
+
+export interface SessionSyncResponse {
+  user: UserResponse;
+  nextStep: NextStep;
+}
+
+export interface StudentOnboardingStateResponse {
+  onboardingCompleted: boolean;
+  profile: StudentProfileResponse | null;
+}
+
 export interface FacultyProfileInput {
   firstName: string;
   lastName: string;
   preferredName?: string;
   phoneNumber?: string;
-  employeeNumber: string;
   department: string;
   designation: string;
-  officeLocation?: string;
-  officePhone?: string;
 }
 
 export interface AdminProfileInput {
-  firstName: string;
-  lastName: string;
-  preferredName?: string;
+  fullName: string;
   phoneNumber?: string;
-  employeeNumber: string;
-  department: string;
-  jobTitle: string;
-  officePhone?: string;
 }
 
 export interface ManagerProfileInput {
@@ -189,32 +269,43 @@ export interface ManagerProfileInput {
   lastName: string;
   preferredName?: string;
   phoneNumber?: string;
-  employeeNumber: string;
-  department: string;
-  jobTitle: string;
-  officeLocation?: string;
+}
+
+export interface StudentProfileInput {
+  firstName: string;
+  lastName: string;
+  preferredName?: string;
+  phoneNumber: string;
+  facultyName: StudentFaculty;
+  programName: StudentProgram;
+  academicYear: AcademicYear;
+  semester: Semester;
+  profileImageUrl?: string;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
 }
 
 export interface CreateUserRequest {
   email: string;
   userType: UserType;
   sendInvite: boolean;
-  studentProfile?: Record<string, never>;
+  studentProfile?: Partial<StudentProfileInput>;
   facultyProfile?: FacultyProfileInput | null;
   adminProfile?: AdminProfileInput | null;
   managerProfile?: ManagerProfileInput | null;
-  managerRoles?: ManagerRole[] | null;
+  managerRole?: ManagerRole | null;
 }
 
 export interface UpdateUserRequest {
   accountStatus?: AccountStatus;
+  studentProfile?: StudentProfileInput | null;
   facultyProfile?: FacultyProfileInput | null;
   adminProfile?: AdminProfileInput | null;
   managerProfile?: ManagerProfileInput | null;
 }
 
-export interface ManagerRolesUpdateRequest {
-  managerRoles: ManagerRole[];
+export interface ManagerRoleUpdateRequest {
+  managerRole: ManagerRole;
 }
 
 export interface StudentOnboardingRequest {
@@ -222,12 +313,85 @@ export interface StudentOnboardingRequest {
   lastName: string;
   preferredName?: string;
   phoneNumber: string;
-  registrationNumber: string;
-  facultyName: string;
-  programName: string;
-  academicYear: number;
-  semester?: string;
+  facultyName: StudentFaculty;
+  programName: StudentProgram;
+  academicYear: AcademicYear;
+  semester: Semester;
   profileImageUrl?: string;
   emailNotificationsEnabled?: boolean;
   smsNotificationsEnabled?: boolean;
+}
+
+// Ticket management
+export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
+export type TicketCategory = 'ELECTRICAL' | 'NETWORK' | 'EQUIPMENT' | 'FURNITURE' | 'CLEANLINESS' | 'FACILITY_DAMAGE' | 'ACCESS_SECURITY' | 'OTHER';
+export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface TicketSummaryResponse {
+  id: string;
+  ticketCode: string;
+  title: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  reportedByEmail: string;
+  createdAt: string;
+}
+
+export interface TicketResponse extends TicketSummaryResponse {
+  description: string;
+  assignedToEmail: string | null;
+  resolutionNotes: string | null;
+  rejectionReason: string | null;
+  contactNote: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  updatedAt: string;
+}
+
+export interface CreateTicketRequest {
+  title: string;
+  description: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  contactNote?: string;
+}
+
+export interface UpdateTicketRequest {
+  priority?: TicketPriority;
+  contactNote?: string;
+}
+
+export interface TicketCommentResponse {
+  id: string;
+  ticketId: string;
+  userId: string;
+  userEmail: string;
+  commentText: string;
+  isEdited: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AddCommentRequest {
+  commentText: string;
+}
+
+export interface TicketAttachmentResponse {
+  id: string;
+  ticketId: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  uploadedAt: string;
+}
+
+export interface TicketStatusHistoryResponse {
+  id: string;
+  ticketId: string;
+  oldStatus: TicketStatus | null;
+  newStatus: TicketStatus;
+  changedByEmail: string;
+  note: string | null;
+  changedAt: string;
 }

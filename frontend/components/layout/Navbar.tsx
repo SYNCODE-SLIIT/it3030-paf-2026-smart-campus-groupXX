@@ -10,7 +10,7 @@ export interface NavItem {
   label: string;
   href: string;
   /** Roles that can see this item. Omit to show to everyone. */
-  allowedRoles?: UserType[];
+  allowedUserTypes?: UserType[];
 }
 
 export interface NavUser {
@@ -26,10 +26,11 @@ interface NavbarProps {
   onLogin?: () => void;
   onLogout?: () => void;
   onNavigate?: (href: string) => void;
+  hideAuthActions?: boolean;
 }
 
 
-export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate }: NavbarProps) {
+export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate, hideAuthActions }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -106,47 +107,49 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
         </GlassPill>
 
         {/* Right pill: Auth */}
-        <GlassPill
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: user ? '0 8px 0 10px' : '0 8px',
-            height: 52,
-            pointerEvents: 'auto',
-          }}
-        >
-          {user ? (
-            <>
-              <Avatar
-                initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
-                src={user.src}
-                size="sm"
-              />
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 600,
-                  fontSize: 12,
-                  color: 'var(--text-h)',
-                  maxWidth: 120,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {user.name}
-              </span>
-              <Button variant="ghost" size="sm" onClick={onLogout} style={{ borderRadius: 100 }}>
-                Sign out
+        {!hideAuthActions && (
+          <GlassPill
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: user ? '0 8px 0 10px' : '0 8px',
+              height: 52,
+              pointerEvents: 'auto',
+            }}
+          >
+            {user ? (
+              <>
+                <Avatar
+                  initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
+                  src={user.src}
+                  size="sm"
+                />
+                <span
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 600,
+                    fontSize: 12,
+                    color: 'var(--text-h)',
+                    maxWidth: 120,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {user.name}
+                </span>
+                <Button variant="ghost" size="sm" onClick={onLogout} style={{ borderRadius: 100 }}>
+                  Sign out
+                </Button>
+              </>
+            ) : (
+              <Button variant="glass" size="sm" onClick={onLogin} style={{ borderRadius: 100 }}>
+                Sign in
               </Button>
-            </>
-          ) : (
-            <Button variant="glass" size="sm" onClick={onLogin} style={{ borderRadius: 100 }}>
-              Sign in
-            </Button>
-          )}
-        </GlassPill>
+            )}
+          </GlassPill>
+        )}
       </header>
 
       {/* Mobile overlay */}
@@ -210,39 +213,41 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
             })}
           </nav>
 
-          <div style={{ marginTop: 'auto' }}>
-            {user ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Avatar
-                  initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
-                  src={user.src}
-                  size="md"
-                />
-                <span
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    color: 'var(--text-h)',
-                    flex: 1,
-                  }}
-                >
-                  {user.name}
-                </span>
-                <Button
-                  variant="ghost-danger"
-                  size="sm"
-                  onClick={() => { onLogout?.(); setMobileOpen(false); }}
-                >
-                  Sign out
+          {!hideAuthActions && (
+            <div style={{ marginTop: 'auto' }}>
+              {user ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Avatar
+                    initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
+                    src={user.src}
+                    size="md"
+                  />
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 700,
+                      fontSize: 15,
+                      color: 'var(--text-h)',
+                      flex: 1,
+                    }}
+                  >
+                    {user.name}
+                  </span>
+                  <Button
+                    variant="ghost-danger"
+                    size="sm"
+                    onClick={() => { onLogout?.(); setMobileOpen(false); }}
+                  >
+                    Sign out
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="glass" size="lg" fullWidth onClick={() => { onLogin?.(); setMobileOpen(false); }}>
+                  Sign in
                 </Button>
-              </div>
-            ) : (
-              <Button variant="glass" size="lg" fullWidth onClick={() => { onLogin?.(); setMobileOpen(false); }}>
-                Sign in
-              </Button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </>

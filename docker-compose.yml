@@ -2,10 +2,11 @@ services:
   backend:
     image: maven:3.9.6-eclipse-temurin-21
     working_dir: /app
-    command: mvn -Dspring-boot.run.excludeDevtools=true spring-boot:run
+    command: sh -c "sed -i 's/\r$//' /app/scripts/dev-autoreload.sh && chmod +x /app/scripts/dev-autoreload.sh && /app/scripts/dev-autoreload.sh"
     ports:
       - "8080:8080"
     environment:
+      RELOAD_POLL_INTERVAL_SECONDS: "2"
       SPRING_PROFILES_ACTIVE: local
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
@@ -14,13 +15,12 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      APP_TICKET_ATTACHMENTS_BUCKET: ${APP_TICKET_ATTACHMENTS_BUCKET:-ticket-attachments}
+      APP_TICKET_ATTACHMENTS_PUBLIC: ${APP_TICKET_ATTACHMENTS_PUBLIC:-true}
+      APP_TICKET_ATTACHMENTS_FILE_SIZE_LIMIT_BYTES: ${APP_TICKET_ATTACHMENTS_FILE_SIZE_LIMIT_BYTES:-10485760}
       APP_BOOTSTRAP_ADMIN_EMAIL: ${APP_BOOTSTRAP_ADMIN_EMAIL:-}
       APP_BOOTSTRAP_ADMIN_PASSWORD: ${APP_BOOTSTRAP_ADMIN_PASSWORD:-}
-      APP_BOOTSTRAP_ADMIN_FIRST_NAME: ${APP_BOOTSTRAP_ADMIN_FIRST_NAME:-System}
-      APP_BOOTSTRAP_ADMIN_LAST_NAME: ${APP_BOOTSTRAP_ADMIN_LAST_NAME:-Admin}
-      APP_BOOTSTRAP_ADMIN_EMPLOYEE_NUMBER: ${APP_BOOTSTRAP_ADMIN_EMPLOYEE_NUMBER:-ADM-001}
-      APP_BOOTSTRAP_ADMIN_DEPARTMENT: ${APP_BOOTSTRAP_ADMIN_DEPARTMENT:-Platform Operations}
-      APP_BOOTSTRAP_ADMIN_JOB_TITLE: ${APP_BOOTSTRAP_ADMIN_JOB_TITLE:-Platform Administrator}
+      APP_BOOTSTRAP_ADMIN_FULL_NAME: ${APP_BOOTSTRAP_ADMIN_FULL_NAME:-System Admin}
     volumes:
       - ./backend:/app
       - ~/.m2:/root/.m2
@@ -28,12 +28,12 @@ services:
       test:
         [
           "CMD-SHELL",
-          "status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/me || true); [ \"$$status\" != \"000\" ]"
+          "status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/health || true); [ \"$$status\" = \"200\" ]"
         ]
       interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 40s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
 
   frontend:
     build: ./frontend

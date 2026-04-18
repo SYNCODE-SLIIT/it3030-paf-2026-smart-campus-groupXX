@@ -15,9 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.university.smartcampus.AppEnums.ResourceCategory;
 import com.university.smartcampus.AppEnums.ResourceStatus;
-import com.university.smartcampus.ResourceDtos.CreateResourceRequest;
-import com.university.smartcampus.ResourceDtos.ResourceResponse;
-import com.university.smartcampus.ResourceDtos.UpdateResourceRequest;
+import com.university.smartcampus.common.exception.ConflictException;
+import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
+import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
+import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
+import com.university.smartcampus.resource.ResourceEntity;
+import com.university.smartcampus.resource.ResourceRepository;
+import com.university.smartcampus.resource.ResourceService;
 
 @SpringBootTest
 @Import(TestAuthProviderConfiguration.class)
@@ -68,7 +72,7 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         );
 
         assertThat(filtered).hasSize(1);
-        assertThat(filtered.getFirst().code()).isEqualTo("BUS-01");
+        assertThat(filtered.get(0).code()).isEqualTo("BUS-01");
     }
 
     @Test
@@ -108,13 +112,7 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         assertThat(persisted.getStatus()).isEqualTo(ResourceStatus.INACTIVE);
     }
 
-    private ResourceEntity seedResource(
-        String code,
-        String name,
-        ResourceCategory category,
-        ResourceStatus status,
-        String location
-    ) {
+    private ResourceEntity seedResource(String code, String name, ResourceCategory category, ResourceStatus status, String location) {
         ResourceEntity resource = new ResourceEntity();
         resource.setId(UUID.randomUUID());
         resource.setCode(code);

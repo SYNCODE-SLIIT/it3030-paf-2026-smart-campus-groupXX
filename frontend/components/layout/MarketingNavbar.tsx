@@ -25,6 +25,10 @@ export function MarketingNavbar() {
       return baseItems;
     }
 
+    if (appUser.userType === 'STUDENT') {
+      return baseItems;
+    }
+
     return [
       ...baseItems,
       {
@@ -51,6 +55,7 @@ export function MarketingNavbar() {
         void signOut().then(() => router.push('/login?reason=signed_out'));
       }}
       onNavigate={(href) => router.push(href)}
+      hideAuthActions={pathname === '/login'}
     />
   );
 }

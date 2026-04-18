@@ -1,10 +1,7 @@
-import { StudentOnboardingFrame } from '@/components/auth/ProtectedRouteFrames';
-import { StudentOnboardingScreen } from '@/components/screens/StudentOnboardingScreen';
+import { redirect } from 'next/navigation';
 
-export default function StudentOnboardingPage() {
-  return (
-    <StudentOnboardingFrame>
-      <StudentOnboardingScreen />
-    </StudentOnboardingFrame>
-  );
+import { STUDENT_ONBOARDING_PATH } from '@/lib/auth-routing';
+
+export default async function StudentOnboardingPage() {
+  redirect(STUDENT_ONBOARDING_PATH);
 }

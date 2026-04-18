@@ -59,7 +59,11 @@ async function forward(request: NextRequest) {
   };
 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    init.body = await request.arrayBuffer();
+    const body = await request.arrayBuffer();
+
+    if (body.byteLength > 0) {
+      init.body = body;
+    }
   }
 
   try {

@@ -1,10 +1,5 @@
-import { ProtectedAppFrame } from '@/components/auth/ProtectedRouteFrames';
-import { AdminResourcesScreen } from '@/components/screens/AdminResourcesScreen';
+import { redirect } from 'next/navigation';
 
 export default function AdminResourcesPage() {
-  return (
-    <ProtectedAppFrame>
-      <AdminResourcesScreen />
-    </ProtectedAppFrame>
-  );
+  redirect('/managers/catalog');
 }

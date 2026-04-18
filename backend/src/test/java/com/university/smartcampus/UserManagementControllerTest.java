@@ -4,13 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
-import java.util.Set;
+import java.time.Year;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -19,14 +22,29 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
-import com.university.smartcampus.AdminDtos.CreateUserRequest;
-import com.university.smartcampus.AdminDtos.ManagerRolesUpdateRequest;
-import com.university.smartcampus.AppEnums.AccountStatus;
-import com.university.smartcampus.AppEnums.ManagerRole;
-import com.university.smartcampus.AppEnums.UserType;
+import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
+import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
+import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.AppEnums.BookingStatus;
+import com.university.smartcampus.AppEnums.ResourceCategory;
+import com.university.smartcampus.AppEnums.ResourceStatus;
+import com.university.smartcampus.booking.BookingEntity;
+import com.university.smartcampus.booking.BookingRepository;
+import com.university.smartcampus.resource.ResourceEntity;
+import com.university.smartcampus.resource.ResourceRepository;
+import com.university.smartcampus.user.dto.AdminDtos;
+import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
+import com.university.smartcampus.user.dto.AdminDtos.ManagerRoleUpdateRequest;
+import com.university.smartcampus.user.entity.AdminEntity;
+import com.university.smartcampus.user.entity.FacultyEntity;
+import com.university.smartcampus.user.entity.ManagerEntity;
+import com.university.smartcampus.user.entity.StudentEntity;
+import com.university.smartcampus.user.entity.UserEntity;
+import com.university.smartcampus.user.repository.UserRepository;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -45,10 +63,19 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private ResourceRepository resourceRepository;
+
+    @Autowired
     private TestAuthProviderConfiguration.RecordingAuthProviderClient recordingAuthProviderClient;
 
     @Autowired
     private TestAuthProviderConfiguration.RecordingAuthIdentityClient recordingAuthIdentityClient;
+
+    @Autowired
+    private TestAuthProviderConfiguration.RecordingProfileImageStorageClient recordingProfileImageStorageClient;
 
     @Autowired
     private WebApplicationContext context;
@@ -58,6 +85,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         mockMvc = webAppContextSetup(context).apply(springSecurity()).build();
         recordingAuthProviderClient.reset();
         recordingAuthIdentityClient.reset();
+        recordingProfileImageStorageClient.reset();
         userRepository.deleteAll();
         seedAdmin("admin@campus.test");
     }
@@ -68,7 +96,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             "student@campus.test",
             UserType.STUDENT,
             true,
-            new AdminDtos.StudentProfileInput(),
+            null,
             null,
             null,
             null,
@@ -89,7 +117,44 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void rejectsManagerCreationWithoutManagerRoles() throws Exception {
+    void unauthenticatedUserCannotAccessAdminUsersEndpoint() throws Exception {
+        mockMvc.perform(get("/api/admin/users"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void currentAdminResponseUsesFullNameProfileShape() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.adminProfile.fullName").value("Admin User"))
+            .andExpect(jsonPath("$.adminProfile.firstName").doesNotExist());
+    }
+
+    @Test
+    void studentCannotAccessAdminUsersEndpoint() throws Exception {
+        seedStudent("student.no.admin@campus.test", AccountStatus.ACTIVE, true);
+
+        mockMvc.perform(get("/api/admin/users")
+                .with(jwtFor("student.no.admin@campus.test")))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unauthenticatedUserCannotAccessStudentOnboardingEndpoint() throws Exception {
+        mockMvc.perform(get("/api/students/me/onboarding"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminCannotAccessStudentOnboardingEndpoint() throws Exception {
+        mockMvc.perform(get("/api/students/me/onboarding")
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rejectsManagerCreationWithoutManagerRole() throws Exception {
         CreateUserRequest request = new CreateUserRequest(
             "manager-no-roles@campus.test",
             UserType.MANAGER,
@@ -98,7 +163,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             null,
             null,
             null,
-            Set.of()
+            null
         );
 
         mockMvc.perform(post("/api/admin/users")
@@ -160,18 +225,69 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void adminCanReplaceManagerRoles() throws Exception {
-        UserEntity manager = seedManager("manager@campus.test", Set.of(ManagerRole.CATALOG_MANAGER));
+    void adminCanReplaceManagerRole() throws Exception {
+        UserEntity manager = seedManager("manager@campus.test", ManagerRole.CATALOG_MANAGER);
 
-        mockMvc.perform(put("/api/admin/users/{id}/manager-roles", manager.getId())
+        mockMvc.perform(put("/api/admin/users/{id}/manager-role", manager.getId())
                 .with(jwtFor("admin@campus.test"))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new ManagerRolesUpdateRequest(Set.of(
-                    ManagerRole.BOOKING_MANAGER,
-                    ManagerRole.TICKET_MANAGER
-                )))))
+                .content(objectMapper.writeValueAsString(new ManagerRoleUpdateRequest(ManagerRole.TICKET_MANAGER))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.managerRoles[0]").exists());
+            .andExpect(jsonPath("$.managerRole").value("TICKET_MANAGER"));
+    }
+
+    @Test
+    void adminCanUpdateStudentProfile() throws Exception {
+        UserEntity student = seedStudent("student.edit@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(patch("/api/admin/users/{id}", student.getId())
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "studentProfile": {
+                        "firstName": "Updated",
+                        "lastName": "Student",
+                        "preferredName": "US",
+                        "phoneNumber": "0711111111",
+                        "facultyName": "FACULTY_OF_COMPUTING",
+                        "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                        "academicYear": "YEAR_2",
+                        "semester": "SEMESTER_1",
+                        "emailNotificationsEnabled": true,
+                        "smsNotificationsEnabled": false
+                      }
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.studentProfile.firstName").value("Updated"))
+            .andExpect(jsonPath("$.studentProfile.registrationNumber").value(org.hamcrest.Matchers.matchesPattern(
+                "IT" + String.format("%02d", Math.floorMod(Year.now(ZoneOffset.UTC).getValue() - 1, 100)) + "\\d{6}")))
+            .andExpect(jsonPath("$.studentProfile.programName").value("BSC_HONS_INFORMATION_TECHNOLOGY"));
+    }
+
+    @Test
+    void adminStudentProfileUpdateRejectsProgramFromAnotherFaculty() throws Exception {
+        UserEntity student = seedStudent("student.invalid@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(patch("/api/admin/users/{id}", student.getId())
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "studentProfile": {
+                        "firstName": "Invalid",
+                        "lastName": "Student",
+                        "phoneNumber": "0711111111",
+                        "facultyName": "FACULTY_OF_ENGINEERING",
+                        "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                        "academicYear": "YEAR_2",
+                        "semester": "SEMESTER_1"
+                      }
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Program does not belong to the selected faculty."));
     }
 
     @Test
@@ -207,6 +323,35 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void adminCanDeleteUserWithRequesterBookings() throws Exception {
+        UserEntity student = seedStudent("delete.with.bookings@campus.test", AccountStatus.ACTIVE, true);
+        UUID authUserId = UUID.randomUUID();
+        student.setAuthUserId(authUserId);
+        userRepository.saveAndFlush(student);
+
+        ResourceEntity resource = seedResource("DEL-" + UUID.randomUUID());
+        Instant startTime = Instant.now().plusSeconds(3600);
+
+        BookingEntity booking = new BookingEntity();
+        booking.setId(UUID.randomUUID());
+        booking.setRequester(student);
+        booking.setResource(resource);
+        booking.setStartTime(startTime);
+        booking.setEndTime(startTime.plusSeconds(3600));
+        booking.setStatus(BookingStatus.PENDING);
+        bookingRepository.saveAndFlush(booking);
+
+        mockMvc.perform(delete("/api/admin/users/{id}", student.getId())
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("User deleted."));
+
+        assertThat(userRepository.findById(student.getId())).isEmpty();
+        assertThat(bookingRepository.findById(booking.getId())).isEmpty();
+        assertThat(recordingAuthIdentityClient.deletedIdentityIds()).contains(authUserId);
+    }
+
+    @Test
     void adminCannotDeleteOwnAccount() throws Exception {
         UserEntity admin = userRepository.findByEmailIgnoreCase("admin@campus.test").orElseThrow();
 
@@ -229,11 +374,10 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                       "lastName": "Board",
                       "preferredName": "OB",
                       "phoneNumber": "0777777777",
-                      "registrationNumber": "ST-001",
-                      "facultyName": "Computing",
-                      "programName": "IT",
-                      "academicYear": 3,
-                      "semester": "Semester 2",
+                      "facultyName": "FACULTY_OF_COMPUTING",
+                      "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                      "academicYear": "YEAR_3",
+                      "semester": "SEMESTER_2",
                       "profileImageUrl": null,
                       "emailNotificationsEnabled": true,
                       "smsNotificationsEnabled": false
@@ -242,7 +386,151 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
             .andExpect(jsonPath("$.studentProfile.onboardingCompleted").value(true))
-            .andExpect(jsonPath("$.studentProfile.registrationNumber").value("ST-001"));
+            .andExpect(jsonPath("$.studentProfile.registrationNumber").value(org.hamcrest.Matchers.matchesPattern(
+                "IT" + String.format("%02d", Math.floorMod(Year.now(ZoneOffset.UTC).getValue() - 2, 100)) + "\\d{6}")));
+    }
+
+    @Test
+    void onboardingRejectsClientProvidedRegistrationNumber() throws Exception {
+        seedStudent("onboarding-reject@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(put("/api/students/me/onboarding")
+                .with(jwtFor("onboarding-reject@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "firstName": "On",
+                      "lastName": "Board",
+                      "phoneNumber": "0777777777",
+                      "registrationNumber": "IT26000001",
+                      "facultyName": "FACULTY_OF_COMPUTING",
+                      "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                      "academicYear": "YEAR_3",
+                      "semester": "SEMESTER_2"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("auto-generated")));
+    }
+
+    @Test
+    void adminCreateRejectsClientProvidedEmployeeNumber() throws Exception {
+        CreateUserRequest request = new CreateUserRequest(
+            "faculty-with-employee@campus.test",
+            UserType.FACULTY,
+            true,
+            null,
+            new AdminDtos.FacultyProfileInput(
+                "Fac",
+                "Member",
+                null,
+                "0711111111",
+                "FAC26000001",
+                "Computing",
+                "Lecturer"
+            ),
+            null,
+            null,
+            null
+        );
+
+        mockMvc.perform(post("/api/admin/users")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("auto-generated")));
+    }
+
+    @Test
+    void studentCanUploadProfileImage() throws Exception {
+        seedStudent("image.student@campus.test", AccountStatus.INVITED, false);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            "image/png",
+            new byte[] { 1, 2, 3, 4 }
+        );
+
+        mockMvc.perform(multipart("/api/students/me/profile-image")
+                .file(file)
+                .with(jwtFor("image.student@campus.test")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.studentProfile.profileImageUrl").value(org.hamcrest.Matchers.startsWith("https://storage.test/")));
+
+        assertThat(recordingProfileImageStorageClient.storedImages()).hasSize(1);
+    }
+
+    @Test
+    void profileImageUploadRejectsInvalidMimeType() throws Exception {
+        seedStudent("bad-image.student@campus.test", AccountStatus.INVITED, false);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.txt",
+            "text/plain",
+            new byte[] { 1, 2, 3, 4 }
+        );
+
+        mockMvc.perform(multipart("/api/students/me/profile-image")
+                .file(file)
+                .with(jwtFor("bad-image.student@campus.test")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Profile image must be a JPEG, PNG, or WebP file."));
+    }
+
+    @Test
+    void profileImageUploadRejectsOversizedFile() throws Exception {
+        seedStudent("large-image.student@campus.test", AccountStatus.INVITED, false);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            "image/png",
+            new byte[(2 * 1024 * 1024) + 1]
+        );
+
+        mockMvc.perform(multipart("/api/students/me/profile-image")
+                .file(file)
+                .with(jwtFor("large-image.student@campus.test")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Profile image must be 2 MB or smaller."));
+    }
+
+    @Test
+    void profileImageUploadRejectsNonStudentAndUnauthenticatedUsers() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            "image/png",
+            new byte[] { 1, 2, 3, 4 }
+        );
+
+        mockMvc.perform(multipart("/api/students/me/profile-image")
+                .file(file)
+                .with(jwtFor("admin@campus.test")))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(multipart("/api/students/me/profile-image").file(file))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void studentOnboardingRequiresSemester() throws Exception {
+        seedStudent("missing-semester@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(put("/api/students/me/onboarding")
+                .with(jwtFor("missing-semester@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "firstName": "On",
+                      "lastName": "Board",
+                      "phoneNumber": "0777777777",
+                      "facultyName": "FACULTY_OF_COMPUTING",
+                      "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
+                      "academicYear": "YEAR_1"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
     }
 
     private void seedAdmin(String email) {
@@ -256,11 +544,8 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
 
         AdminEntity admin = new AdminEntity();
         admin.setUser(user);
-        admin.setFirstName("Admin");
-        admin.setLastName("User");
+        admin.setFullName("Admin User");
         admin.setEmployeeNumber("ADM-001");
-        admin.setDepartment("Operations");
-        admin.setJobTitle("Administrator");
         user.setAdminProfile(admin);
 
         userRepository.save(user);
@@ -302,7 +587,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         userRepository.save(user);
     }
 
-    private UserEntity seedManager(String email, Set<ManagerRole> roles) {
+    private UserEntity seedManager(String email, ManagerRole role) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
         user.setEmail(email);
@@ -316,11 +601,26 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         manager.setFirstName("Manager");
         manager.setLastName("User");
         manager.setEmployeeNumber("MGR-001");
-        manager.setDepartment("Facilities");
-        manager.setJobTitle("Manager");
-        manager.setManagerRoles(roles);
+        manager.setManagerRole(role);
 
         user.setManagerProfile(manager);
         return userRepository.save(user);
+    }
+
+    private ResourceEntity seedResource(String code) {
+        ResourceEntity resource = new ResourceEntity();
+        resource.setId(UUID.randomUUID());
+        resource.setCode(code);
+        resource.setName("Delete Test Resource");
+        resource.setCategory(ResourceCategory.SPACES);
+        resource.setSubcategory("Seeded");
+        resource.setDescription("Resource used by delete-user tests");
+        resource.setLocation("Test Wing");
+        resource.setCapacity(10);
+        resource.setQuantity(1);
+        resource.setStatus(ResourceStatus.ACTIVE);
+        resource.setBookable(true);
+        resource.setMovable(false);
+        return resourceRepository.save(resource);
     }
 }

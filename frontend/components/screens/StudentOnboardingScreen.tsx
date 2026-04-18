@@ -1,33 +1,43 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, GraduationCap } from 'lucide-react';
+import { ArrowRight, GraduationCap, ImageUp, X } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Chip, GlassPill, Input, Select, Skeleton, Toggle } from '@/components/ui';
+import { Alert, Avatar, Button, Card, Chip, GlassPill, Input, Select, Skeleton, Toggle } from '@/components/ui';
 import {
   completeStudentOnboarding,
   getErrorMessage,
   getStudentOnboarding,
+  uploadStudentProfileImage,
 } from '@/lib/api-client';
-import type { StudentOnboardingRequest, UserResponse } from '@/lib/api-types';
+import { getUserHomePath } from '@/lib/auth-routing';
+import type {
+  AcademicYear,
+  Semester,
+  StudentFaculty,
+  StudentOnboardingRequest,
+  StudentProgram,
+  UserResponse,
+} from '@/lib/api-types';
+import {
+  academicYearOptions,
+  facultyOptions,
+  programBelongsToFaculty,
+  programOptionsByFaculty,
+  semesterOptions,
+} from '@/lib/student-catalog';
 import { getUserTypeLabel } from '@/lib/user-display';
-
-const academicYearOptions = Array.from({ length: 12 }, (_, index) => ({
-  value: String(index + 1),
-  label: `Year ${index + 1}`,
-}));
 
 interface OnboardingFormState {
   firstName: string;
   lastName: string;
   preferredName: string;
   phoneNumber: string;
-  registrationNumber: string;
-  facultyName: string;
-  programName: string;
-  academicYear: string;
-  semester: string;
+  facultyName: StudentFaculty | '';
+  programName: StudentProgram | '';
+  academicYear: AcademicYear | '';
+  semester: Semester | '';
   profileImageUrl: string;
   emailNotificationsEnabled: boolean;
   smsNotificationsEnabled: boolean;
@@ -39,10 +49,9 @@ function toFormState(profile: UserResponse['studentProfile']): OnboardingFormSta
     lastName: profile?.lastName ?? '',
     preferredName: profile?.preferredName ?? '',
     phoneNumber: profile?.phoneNumber ?? '',
-    registrationNumber: profile?.registrationNumber ?? '',
     facultyName: profile?.facultyName ?? '',
     programName: profile?.programName ?? '',
-    academicYear: profile?.academicYear ? String(profile.academicYear) : '',
+    academicYear: profile?.academicYear ?? '',
     semester: profile?.semester ?? '',
     profileImageUrl: profile?.profileImageUrl ?? '',
     emailNotificationsEnabled: profile?.emailNotificationsEnabled ?? true,
@@ -63,6 +72,18 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     message: string;
   } | null>(null);
   const [isSubmitting, startSubmitTransition] = React.useTransition();
+  const [selectedImageFile, setSelectedImageFile] = React.useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(null);
+  const [submitStage, setSubmitStage] = React.useState<string | null>(null);
+  const imageInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
 
   React.useEffect(() => {
     if (resolvedUser) {
@@ -86,7 +107,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
         }
 
         if (onboardingState.onboardingCompleted) {
-          window.location.assign('/');
+          window.location.assign(getUserHomePath(resolvedUser));
           return;
         }
 
@@ -124,6 +145,64 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }));
   }
 
+  function handleFacultyChange(facultyName: StudentFaculty | '') {
+    setFormState((current) => ({
+      ...current,
+      facultyName,
+      programName:
+        facultyName && current.programName && programBelongsToFaculty(current.programName, facultyName)
+          ? current.programName
+          : '',
+    }));
+  }
+
+  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+
+    if (!file) {
+      return;
+    }
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      event.currentTarget.value = '';
+      setAlert({
+        variant: 'error',
+        title: 'Unsupported image',
+        message: 'Please choose a JPEG, PNG, or WebP image.',
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      event.currentTarget.value = '';
+      setAlert({
+        variant: 'error',
+        title: 'Image too large',
+        message: 'Profile images must be 2 MB or smaller.',
+      });
+      return;
+    }
+
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setSelectedImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setAlert(null);
+  }
+
+  function handleRemoveImage() {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setSelectedImageFile(null);
+    setImagePreviewUrl(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -136,7 +215,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       return;
     }
 
-    if (!formState.firstName || !formState.lastName || !formState.phoneNumber || !formState.registrationNumber) {
+    if (!formState.firstName || !formState.lastName || !formState.phoneNumber) {
       setAlert({
         variant: 'error',
         title: 'Missing required fields',
@@ -145,46 +224,91 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       return;
     }
 
-    if (!formState.facultyName || !formState.programName || !formState.academicYear) {
+    const facultyName = formState.facultyName;
+    const programName = formState.programName;
+    const academicYear = formState.academicYear;
+    const semester = formState.semester;
+
+    if (!facultyName || !programName || !academicYear || !semester) {
       setAlert({
         variant: 'error',
         title: 'Academic details required',
-        message: 'Faculty, program, and academic year are required for student onboarding.',
+        message: 'Faculty, program, academic year, and semester are required for student onboarding.',
       });
       return;
     }
 
     startSubmitTransition(async () => {
+      let submitStep: 'image' | 'onboarding' = 'onboarding';
+
       try {
+        let profileImageUrl = formState.profileImageUrl.trim() || undefined;
+
+        if (selectedImageFile) {
+          submitStep = 'image';
+          setSubmitStage('Uploading profile image...');
+
+          const imageUser = await uploadStudentProfileImage(session.access_token, selectedImageFile);
+          const uploadedProfileImageUrl = imageUser.studentProfile?.profileImageUrl?.trim();
+
+          if (!uploadedProfileImageUrl) {
+            throw new Error('The profile image uploaded, but the server did not return an image URL.');
+          }
+
+          profileImageUrl = uploadedProfileImageUrl;
+          setFormState((current) => ({
+            ...current,
+            profileImageUrl: uploadedProfileImageUrl,
+          }));
+          setSelectedImageFile(null);
+          setImagePreviewUrl(null);
+          if (imageInputRef.current) {
+            imageInputRef.current.value = '';
+          }
+        }
+
+        submitStep = 'onboarding';
+        setSubmitStage('Completing onboarding...');
         const payload: StudentOnboardingRequest = {
           firstName: formState.firstName.trim(),
           lastName: formState.lastName.trim(),
           preferredName: formState.preferredName.trim() || undefined,
           phoneNumber: formState.phoneNumber.trim(),
-          registrationNumber: formState.registrationNumber.trim(),
-          facultyName: formState.facultyName.trim(),
-          programName: formState.programName.trim(),
-          academicYear: Number(formState.academicYear),
-          semester: formState.semester.trim() || undefined,
-          profileImageUrl: formState.profileImageUrl.trim() || undefined,
+          facultyName,
+          programName,
+          academicYear,
+          semester,
+          profileImageUrl,
           emailNotificationsEnabled: formState.emailNotificationsEnabled,
           smsNotificationsEnabled: formState.smsNotificationsEnabled,
         };
 
         await completeStudentOnboarding(session.access_token, payload);
-        await refreshMe();
+        const refreshedUser = await refreshMe();
+        const redirectUser = refreshedUser ?? resolvedUser;
 
         // Use a full navigation so role/onboarding guards rehydrate from the latest backend state.
-        window.location.assign('/');
+        if (redirectUser) {
+          window.location.assign(getUserHomePath(redirectUser));
+        }
       } catch (error) {
         setAlert({
           variant: 'error',
-          title: 'Onboarding failed',
-          message: getErrorMessage(error, 'We could not complete onboarding.'),
+          title: submitStep === 'image' ? 'Image upload failed' : 'Onboarding failed',
+          message: getErrorMessage(
+            error,
+            submitStep === 'image'
+              ? 'We could not upload your profile image right now.'
+              : 'We could not complete onboarding.',
+          ),
         });
+      } finally {
+        setSubmitStage(null);
       }
     });
   }
+
+  const programOptions = formState.facultyName ? programOptionsByFaculty[formState.facultyName] : [];
 
   return (
     <div
@@ -312,43 +436,104 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                   onChange={(event) => setField('phoneNumber', event.target.value)}
                   required
                 />
-                <Input
-                  label="Registration Number"
-                  value={formState.registrationNumber}
-                  onChange={(event) => setField('registrationNumber', event.target.value)}
-                  required
-                />
-                <Input
+                <Select
                   label="Faculty / School"
                   value={formState.facultyName}
-                  onChange={(event) => setField('facultyName', event.target.value)}
+                  onChange={(event) => handleFacultyChange(event.target.value as StudentFaculty | '')}
+                  options={facultyOptions}
+                  placeholder="Choose faculty"
                   required
                 />
-                <Input
+                <Select
                   label="Program"
                   value={formState.programName}
-                  onChange={(event) => setField('programName', event.target.value)}
+                  onChange={(event) => setField('programName', event.target.value as StudentProgram | '')}
+                  options={programOptions}
+                  placeholder="Choose program"
+                  disabled={!formState.facultyName}
                   required
                 />
                 <Select
                   label="Academic Year"
                   value={formState.academicYear}
-                  onChange={(event) => setField('academicYear', event.target.value)}
+                  onChange={(event) => setField('academicYear', event.target.value as AcademicYear | '')}
                   options={academicYearOptions}
                   placeholder="Choose year"
                   required
                 />
-                <Input
+                <Select
                   label="Semester"
                   value={formState.semester}
-                  onChange={(event) => setField('semester', event.target.value)}
+                  onChange={(event) => setField('semester', event.target.value as Semester | '')}
+                  options={semesterOptions}
+                  placeholder="Choose semester"
+                  required
                 />
-                <Input
-                  label="Profile Image URL"
-                  value={formState.profileImageUrl}
-                  onChange={(event) => setField('profileImageUrl', event.target.value)}
-                  hint="Optional URL because the current backend contract accepts profileImageUrl."
-                />
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <p
+                    style={{
+                      margin: '0 0 8px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 8.5,
+                      letterSpacing: '.18em',
+                      textTransform: 'uppercase',
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Profile Image
+                  </p>
+                  <GlassPill
+                    style={{
+                      padding: '16px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <Avatar
+                        size="lg"
+                        src={(imagePreviewUrl ?? formState.profileImageUrl) || undefined}
+                        initials={`${formState.firstName?.[0] ?? resolvedUser.email[0] ?? 'S'}${formState.lastName?.[0] ?? ''}`.toUpperCase()}
+                      />
+                      <div>
+                        <p style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--text-h)' }}>
+                          {selectedImageFile ? selectedImageFile.name : 'Upload a profile photo'}
+                        </p>
+                        <p style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                          JPEG, PNG, or WebP. Maximum 2 MB.
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                        aria-label="Choose profile image"
+                        onChange={handleImageChange}
+                        style={{ display: 'none' }}
+                      />
+                      <Button
+                        type="button"
+                        variant="subtle"
+                        size="sm"
+                        iconLeft={<ImageUp size={14} />}
+                        disabled={isSubmitting}
+                        onClick={() => imageInputRef.current?.click()}
+                      >
+                        Choose Image
+                      </Button>
+                      {(selectedImageFile || imagePreviewUrl) && (
+                        <Button type="button" variant="ghost" size="sm" iconLeft={<X size={14} />} onClick={handleRemoveImage}>
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </GlassPill>
+                </div>
               </div>
 
               <GlassPill
@@ -385,6 +570,11 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
               </GlassPill>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                {submitStage && (
+                  <p style={{ alignSelf: 'center', marginRight: 12, fontSize: 12.5, color: 'var(--text-muted)' }}>
+                    {submitStage}
+                  </p>
+                )}
                 <Button
                   type="submit"
                   variant="glass"

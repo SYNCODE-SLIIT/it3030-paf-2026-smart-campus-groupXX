@@ -1,4 +1,5 @@
 export { Alert } from './Alert';
+export { Dialog } from './Dialog';
 export { Avatar, AvatarStack } from './Avatar';
 export { DropdownMenu } from './DropdownMenu';
 export type { DropdownMenuItem } from './DropdownMenu';
@@ -14,7 +15,9 @@ export { Progress } from './Progress';
 export { Radio } from './Radio';
 export { Select } from './Select';
 export { Skeleton } from './Skeleton';
+export { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from './Table';
 export { Tabs } from './Tabs';
 export { Textarea } from './Textarea';
 export { Toggle } from './Toggle';
 export { Tooltip } from './Tooltip';
+export { Toast, ToastStack } from './Toast';

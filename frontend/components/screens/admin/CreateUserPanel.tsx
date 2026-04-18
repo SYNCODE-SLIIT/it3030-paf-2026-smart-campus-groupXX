@@ -3,10 +3,19 @@
 import React from 'react';
 import { UserPlus } from 'lucide-react';
 
-import { RoleCheckboxGroup } from '@/components/screens/admin/RoleCheckboxGroup';
+import { ProfileFields } from '@/components/screens/admin/ProfileFields';
+import { RoleRadioGroup } from '@/components/screens/admin/RoleRadioGroup';
 import { Alert, Button, Card, Input, Select } from '@/components/ui';
 import { createUser, getErrorMessage } from '@/lib/api-client';
 import type { CreateUserRequest, ManagerRole, UserResponse, UserType } from '@/lib/api-types';
+import {
+  createEmptyAdminForm,
+  createEmptyFacultyForm,
+  createEmptyManagerForm,
+  toAdminProfileInput,
+  toFacultyProfileInput,
+  toManagerProfileInput,
+} from '@/components/screens/admin/adminUserFormUtils';
 
 const userTypeOptions: Array<{ value: UserType; label: string }> = [
   { value: 'STUDENT', label: 'Student' },
@@ -29,18 +38,31 @@ export function CreateUserPanel({
   onNotice,
   embedded = false,
   onCancel,
+  defaultUserType = 'STUDENT',
+  fixedUserType,
 }: {
   accessToken: string | null;
   onCreated: (user: UserResponse) => Promise<void>;
   onNotice: (notice: NoticeState) => void;
   embedded?: boolean;
   onCancel?: () => void;
+  defaultUserType?: UserType;
+  fixedUserType?: UserType;
 }) {
   const [email, setEmail] = React.useState('');
-  const [userType, setUserType] = React.useState<UserType>('STUDENT');
-  const [managerRoles, setManagerRoles] = React.useState<ManagerRole[]>([]);
+  const [userType, setUserType] = React.useState<UserType>(fixedUserType ?? defaultUserType);
+  const [managerRole, setManagerRole] = React.useState<ManagerRole | ''>('');
+  const [facultyForm, setFacultyForm] = React.useState(createEmptyFacultyForm);
+  const [adminForm, setAdminForm] = React.useState(createEmptyAdminForm);
+  const [managerForm, setManagerForm] = React.useState(createEmptyManagerForm);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [isCreating, startCreateTransition] = React.useTransition();
+
+  React.useEffect(() => {
+    if (fixedUserType) {
+      setUserType(fixedUserType);
+    }
+  }, [fixedUserType]);
 
   async function handleCreate() {
     if (!accessToken) {
@@ -53,8 +75,10 @@ export function CreateUserPanel({
       return;
     }
 
-    if (userType === 'MANAGER' && managerRoles.length === 0) {
-      setFormError('Select at least one manager role.');
+    const selectedManagerRole = userType === 'MANAGER' ? managerRole : '';
+
+    if (userType === 'MANAGER' && !selectedManagerRole) {
+      setFormError('Select one manager role.');
       return;
     }
 
@@ -66,7 +90,10 @@ export function CreateUserPanel({
           email: email.trim(),
           userType,
           sendInvite: true,
-          ...(userType === 'MANAGER' ? { managerRoles } : {}),
+          ...(userType === 'FACULTY' ? { facultyProfile: toFacultyProfileInput(facultyForm) } : {}),
+          ...(userType === 'ADMIN' ? { adminProfile: toAdminProfileInput(adminForm) } : {}),
+          ...(userType === 'MANAGER' ? { managerProfile: toManagerProfileInput(managerForm) } : {}),
+          ...(selectedManagerRole ? { managerRole: selectedManagerRole } : {}),
         };
 
         const createdUser = await createUser(accessToken, payload);
@@ -80,8 +107,11 @@ export function CreateUserPanel({
         });
 
         setEmail('');
-        setUserType('STUDENT');
-        setManagerRoles([]);
+        setUserType(fixedUserType ?? defaultUserType);
+        setManagerRole('');
+        setFacultyForm(createEmptyFacultyForm());
+        setAdminForm(createEmptyAdminForm());
+        setManagerForm(createEmptyManagerForm());
 
         await onCreated(createdUser);
       } catch (error) {
@@ -98,6 +128,13 @@ export function CreateUserPanel({
 
   const content = (
     <>
+      <style>{`
+        .admin-editor-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 14px;
+        }
+      `}</style>
       {!embedded && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <span style={{ display: 'flex', color: 'var(--yellow-500)' }}>
@@ -124,19 +161,39 @@ export function CreateUserPanel({
 
       <div style={{ display: 'grid', gap: 16 }}>
         <Input
+          id="admin-create-user-email"
+          name="admin-create-user-email"
           label="Email"
+          type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="user@example.com"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           autoFocus={embedded}
           required
         />
 
-        <Select
-          label="Role"
-          value={userType}
-          onChange={(event) => setUserType(event.target.value as UserType)}
-          options={userTypeOptions}
+        {fixedUserType ? (
+          <Input label="Role" value={userTypeOptions.find((option) => option.value === fixedUserType)?.label ?? fixedUserType} disabled />
+        ) : (
+          <Select
+            label="Role"
+            value={userType}
+            onChange={(event) => setUserType(event.target.value as UserType)}
+            options={userTypeOptions}
+          />
+        )}
+
+        <ProfileFields
+          userType={userType}
+          facultyForm={facultyForm}
+          setFacultyForm={setFacultyForm}
+          adminForm={adminForm}
+          setAdminForm={setAdminForm}
+          managerForm={managerForm}
+          setManagerForm={setManagerForm}
         />
 
         {userType === 'MANAGER' && (
@@ -152,7 +209,7 @@ export function CreateUserPanel({
             >
               Manager Roles
             </p>
-            <RoleCheckboxGroup value={managerRoles} onChange={setManagerRoles} />
+            <RoleRadioGroup value={managerRole} onChange={setManagerRole} />
           </div>
         )}
 

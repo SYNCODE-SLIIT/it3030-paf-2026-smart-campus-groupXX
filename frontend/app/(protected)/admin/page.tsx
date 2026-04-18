@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { AdminDashboardScreen } from '@/components/screens/admin/AdminDashboardScreen';
 
-export default function AdminHomePage() {
-  redirect('/admin/users');
+export default async function AdminHomePage() {
+  return <AdminDashboardScreen />;
 }

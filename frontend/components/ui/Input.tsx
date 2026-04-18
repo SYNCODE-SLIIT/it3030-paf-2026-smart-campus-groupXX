@@ -40,6 +40,7 @@ export function Input({
 }: InputProps) {
   const [focused, setFocused] = React.useState(false);
   const resolvedStatus = error ? 'error' : status;
+  const resolvedClassName = `ui-input-control ${className}`.trim();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -102,7 +103,7 @@ export function Input({
             cursor: disabled ? 'not-allowed' : 'text',
             ...style,
           }}
-          className={className}
+          className={resolvedClassName}
           {...props}
         />
         {iconRight && (
@@ -114,7 +115,7 @@ export function Input({
               transform: 'translateY(-50%)',
               color: 'var(--text-muted)',
               fontSize: 15,
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
               display: 'flex',
             }}
           >

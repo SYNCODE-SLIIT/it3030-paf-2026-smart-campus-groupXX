@@ -31,7 +31,11 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  try {
+    await supabase.auth.getUser();
+  } catch {
+    // Keep routing responsive even when session refresh fails; server guards handle auth redirects.
+  }
 
   return response;
 }

@@ -3,21 +3,11 @@
 import React from 'react';
 import { Copy, Mail, ShieldCheck } from 'lucide-react';
 
-import { RoleCheckboxGroup } from '@/components/screens/admin/RoleCheckboxGroup';
+import { RoleRadioGroup } from '@/components/screens/admin/RoleRadioGroup';
 import { Alert, Button, Card, Chip, Input, Select } from '@/components/ui';
-import { getErrorMessage, replaceManagerRoles, resendInvite, updateUser } from '@/lib/api-client';
+import { getErrorMessage, replaceManagerRole, resendInvite, updateUser } from '@/lib/api-client';
 import type { AccountStatus, ManagerRole, UpdateUserRequest, UserResponse } from '@/lib/api-types';
 import { getAccountStatusChipColor, getAccountStatusLabel, getManagerRoleLabel, getUserTypeChipColor, getUserTypeLabel } from '@/lib/user-display';
-
-function rolesEqual(a: ManagerRole[], b: ManagerRole[]) {
-  if (a.length !== b.length) {
-    return false;
-  }
-
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
-  return sortedA.every((value, index) => value === sortedB[index]);
-}
 
 const accountStatusOptions: Array<{ value: AccountStatus; label: string }> = [
   { value: 'INVITED', label: 'Invited' },
@@ -45,7 +35,7 @@ export function UserDetailsPanel({
   onNotice: (notice: NoticeState) => void;
 }) {
   const [accountStatus, setAccountStatus] = React.useState<AccountStatus>('INVITED');
-  const [managerRoles, setManagerRoles] = React.useState<ManagerRole[]>([]);
+  const [managerRole, setManagerRole] = React.useState<ManagerRole | ''>('');
   const [panelError, setPanelError] = React.useState<string | null>(null);
   const [isSaving, startSaveTransition] = React.useTransition();
   const [isResending, startResendTransition] = React.useTransition();
@@ -57,7 +47,7 @@ export function UserDetailsPanel({
     }
 
     setAccountStatus(user.accountStatus);
-    setManagerRoles(user.managerRoles);
+    setManagerRole(user.managerRole ?? '');
     setPanelError(null);
   }, [user]);
 
@@ -102,9 +92,9 @@ export function UserDetailsPanel({
 
         await updateUser(accessToken, currentUser.id, payload);
 
-        if (currentUser.userType === 'MANAGER' && !rolesEqual(managerRoles, currentUser.managerRoles)) {
-          await replaceManagerRoles(accessToken, currentUser.id, {
-            managerRoles,
+        if (currentUser.userType === 'MANAGER' && managerRole && managerRole !== currentUser.managerRole) {
+          await replaceManagerRole(accessToken, currentUser.id, {
+            managerRole,
           });
         }
 
@@ -203,11 +193,11 @@ export function UserDetailsPanel({
           <Chip color={getAccountStatusChipColor(currentUser.accountStatus)} dot>
             {getAccountStatusLabel(currentUser.accountStatus)}
           </Chip>
-          {currentUser.managerRoles.map((role) => (
-            <Chip key={role} color="blue">
-              {getManagerRoleLabel(role)}
+          {currentUser.managerRole && (
+            <Chip color="blue">
+              {getManagerRoleLabel(currentUser.managerRole)}
             </Chip>
-          ))}
+          )}
         </div>
 
         {panelError && (
@@ -236,9 +226,9 @@ export function UserDetailsPanel({
                 color: 'var(--text-muted)',
               }}
             >
-              Manager Roles
+              Manager Role
             </p>
-            <RoleCheckboxGroup value={managerRoles} onChange={setManagerRoles} />
+            <RoleRadioGroup value={managerRole} onChange={setManagerRole} />
           </div>
         )}
 

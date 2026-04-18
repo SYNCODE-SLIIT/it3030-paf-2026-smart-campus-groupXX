@@ -211,6 +211,19 @@ svg {
   display: block;
 }
 
+/* Hide native browser reveal controls on password inputs.
+   We use a custom visibility toggle inside Input.tsx. */
+input.ui-input-control[type='password']::-ms-reveal,
+input.ui-input-control[type='password']::-ms-clear {
+  display: none;
+}
+
+input.ui-input-control[type='password']::-webkit-credentials-auto-fill-button,
+input.ui-input-control[type='password']::-webkit-strong-password-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ════════════════════════════════════════════════════
    KEYFRAME ANIMATIONS
 ════════════════════════════════════════════════════ */
@@ -240,4 +253,14 @@ svg {
   35%  { scale: 1.12; }
   65%  { scale: 0.97; }
   100% { scale: 1; }
+}
+
+@keyframes dialog-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes dialog-slide-in {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }

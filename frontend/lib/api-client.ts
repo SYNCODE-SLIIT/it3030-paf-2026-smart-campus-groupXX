@@ -1,18 +1,31 @@
 import {
-  AccountStatus,
+  type AccountStatus,
+  type AddCommentRequest,
+  type BookingDecisionRequest,
+  type BookingResponse,
+  type CancelBookingRequest,
+  type CreateBookingRequest,
   type CreateResourceRequest,
+  type CreateTicketRequest,
   type CreateUserRequest,
   type ErrorResponse,
   type ManagerRole,
-  type ManagerRolesUpdateRequest,
+  type ManagerRoleUpdateRequest,
   type MessageResponse,
-  type ResourceCategory,
   type ResourceResponse,
-  type ResourceStatus,
   type SessionSyncResponse,
   type StudentOnboardingRequest,
   type StudentOnboardingStateResponse,
+  type TicketAttachmentResponse,
+  type TicketCategory,
+  type TicketCommentResponse,
+  type TicketPriority,
+  type TicketResponse,
+  type TicketStatus,
+  type TicketStatusHistoryResponse,
+  type TicketSummaryResponse,
   type UpdateResourceRequest,
+  type UpdateTicketRequest,
   type UpdateUserRequest,
   type UserResponse,
   type UserType,
@@ -50,18 +63,61 @@ interface RequestOptions {
   accessToken?: string | null;
   body?: unknown;
   cache?: RequestCache;
+  retryOnUpstreamFailure?: boolean;
 }
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
 
+const STATUS_MESSAGES: Partial<Record<number, string>> = {
+  0: 'Cannot reach the backend service. Please check that the backend is running and try again.',
+  400: 'Some information is missing or invalid. Please review the form and try again.',
+  401: 'Your session has expired. Please sign in again.',
+  403: 'You do not have permission to perform this action.',
+  404: 'The requested item could not be found.',
+  409: 'This record conflicts with an existing item.',
+  500: 'The server hit an unexpected problem. Please try again.',
+  502: 'The frontend cannot reach the backend service. Please make sure the backend is running.',
+  503: 'The service is temporarily unavailable. Please try again shortly.',
+  504: 'The backend took too long to respond. Please try again.',
+};
+
+function normalizeErrorMessage(message: string) {
+  const trimmed = message.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (lower.includes('invalid login credentials')) {
+    return 'The email or password is incorrect.';
+  }
+
+  if (lower.includes('email not confirmed')) {
+    return 'Confirm your email before signing in.';
+  }
+
+  if (lower.includes('networkerror') || lower.includes('failed to fetch') || lower.includes('load failed')) {
+    return 'The request could not reach the service. Check your connection and try again.';
+  }
+
+  if (lower.includes('jwt expired') || lower.includes('invalid jwt') || lower.includes('unauthorized')) {
+    return 'Your session has expired. Please sign in again.';
+  }
+
+  return trimmed;
+}
+
 function shouldRetryRequest(response: Response, options: RequestOptions, attempt: number) {
   const method = options.method ?? 'GET';
-  return method === 'GET' && attempt < 1 && RETRYABLE_UPSTREAM_STATUSES.has(response.status);
+  const allowRetry = method === 'GET' || options.retryOnUpstreamFailure === true;
+  return allowRetry && attempt < 1 && RETRYABLE_UPSTREAM_STATUSES.has(response.status);
 }
 
 function shouldRetryNetworkError(options: RequestOptions, attempt: number) {
   const method = options.method ?? 'GET';
-  return method === 'GET' && attempt < 1;
+  const allowRetry = method === 'GET' || options.retryOnUpstreamFailure === true;
+  return allowRetry && attempt < 1;
 }
 
 async function waitBeforeRetry() {
@@ -149,11 +205,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
-    return error.message;
+    return normalizeErrorMessage(error.details?.message ?? error.message)
+      ?? STATUS_MESSAGES[error.status]
+      ?? fallback;
   }
 
   if (error instanceof Error && error.message) {
-    return error.message;
+    return normalizeErrorMessage(error.message) ?? fallback;
   }
 
   return fallback;
@@ -170,6 +228,7 @@ export async function syncSession(accessToken: string) {
   return request<SessionSyncResponse>('/api/auth/session/sync', {
     method: 'POST',
     accessToken,
+    retryOnUpstreamFailure: true,
   });
 }
 
@@ -184,13 +243,6 @@ export interface UserFilters {
   userType?: UserType | '';
   accountStatus?: AccountStatus | '';
   managerRole?: ManagerRole | '';
-}
-
-export interface ResourceFilters {
-  search?: string;
-  category?: ResourceCategory | '';
-  status?: ResourceStatus | '';
-  location?: string;
 }
 
 export async function listUsers(accessToken: string, filters: UserFilters = {}) {
@@ -215,6 +267,12 @@ export async function listUsers(accessToken: string, filters: UserFilters = {}) 
   });
 }
 
+export async function getUser(accessToken: string, userId: string) {
+  return request<UserResponse>(`/api/admin/users/${userId}`, {
+    accessToken,
+  });
+}
+
 export async function createUser(accessToken: string, payload: CreateUserRequest) {
   return request<UserResponse>('/api/admin/users', {
     method: 'POST',
@@ -231,12 +289,12 @@ export async function updateUser(accessToken: string, userId: string, payload: U
   });
 }
 
-export async function replaceManagerRoles(
+export async function replaceManagerRole(
   accessToken: string,
   userId: string,
-  payload: ManagerRolesUpdateRequest,
+  payload: ManagerRoleUpdateRequest,
 ) {
-  return request<UserResponse>(`/api/admin/users/${userId}/manager-roles`, {
+  return request<UserResponse>(`/api/admin/users/${userId}/manager-role`, {
     method: 'PUT',
     accessToken,
     body: payload,
@@ -257,24 +315,22 @@ export async function deleteUser(accessToken: string, userId: string) {
   });
 }
 
-export async function listResources(accessToken: string, filters: ResourceFilters = {}) {
-  const params = new URLSearchParams();
+export async function getStudentOnboarding(accessToken: string) {
+  return request<StudentOnboardingStateResponse>('/api/students/me/onboarding', {
+    accessToken,
+  });
+}
 
-  if (filters.search) {
-    params.set('search', filters.search);
-  }
-  if (filters.category) {
-    params.set('category', filters.category);
-  }
-  if (filters.status) {
-    params.set('status', filters.status);
-  }
-  if (filters.location) {
-    params.set('location', filters.location);
-  }
+export async function completeStudentOnboarding(accessToken: string, payload: StudentOnboardingRequest) {
+  return request<UserResponse>('/api/students/me/onboarding', {
+    method: 'PUT',
+    accessToken,
+    body: payload,
+  });
+}
 
-  const query = params.toString();
-  return request<ResourceResponse[]>(`/api/resources${query ? `?${query}` : ''}`, {
+export async function listResources(accessToken: string) {
+  return request<ResourceResponse[]>('/api/resources', {
     accessToken,
   });
 }
@@ -302,16 +358,211 @@ export async function deleteResource(accessToken: string, resourceId: string) {
   });
 }
 
-export async function getStudentOnboarding(accessToken: string) {
-  return request<StudentOnboardingStateResponse>('/api/students/me/onboarding', {
+export async function createBooking(accessToken: string, payload: CreateBookingRequest) {
+  return request<BookingResponse>('/api/bookings', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function listMyBookings(accessToken: string) {
+  return request<BookingResponse[]>('/api/bookings', {
     accessToken,
   });
 }
 
-export async function completeStudentOnboarding(accessToken: string, payload: StudentOnboardingRequest) {
-  return request<UserResponse>('/api/students/me/onboarding', {
-    method: 'PUT',
+export async function getMyBooking(accessToken: string, bookingId: string) {
+  return request<BookingResponse>(`/api/bookings/${bookingId}`, {
+    accessToken,
+  });
+}
+
+export async function cancelMyBooking(accessToken: string, bookingId: string, payload?: CancelBookingRequest) {
+  return request<BookingResponse>(`/api/bookings/${bookingId}/cancel`, {
+    method: 'POST',
     accessToken,
     body: payload,
   });
+}
+
+export async function listAllBookings(accessToken: string) {
+  return request<BookingResponse[]>('/api/admin/bookings', {
+    accessToken,
+  });
+}
+
+export async function approveBooking(accessToken: string, bookingId: string) {
+  return request<BookingResponse>(`/api/admin/bookings/${bookingId}/approve`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function rejectBooking(accessToken: string, bookingId: string, payload: BookingDecisionRequest) {
+  return request<BookingResponse>(`/api/admin/bookings/${bookingId}/reject`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function cancelApprovedBookingAsManager(
+  accessToken: string,
+  bookingId: string,
+  payload?: CancelBookingRequest,
+) {
+  return request<BookingResponse>(`/api/admin/bookings/${bookingId}/cancel`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function uploadStudentProfileImage(accessToken: string, file: File) {
+  const path = '/api/students/me/profile-image';
+  const formData = new FormData();
+  formData.set('file', file);
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: formData,
+      cache: 'no-store',
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError(
+        0,
+        'Cannot reach the backend API. Make sure the backend service is running and reachable at NEXT_PUBLIC_API_URL.',
+      );
+    }
+
+    throw error;
+  }
+
+  if (!response.ok) {
+    let details: ErrorResponse | null = null;
+
+    try {
+      details = await response.json();
+    } catch {
+      details = null;
+    }
+
+    throw new ApiError(
+      response.status,
+      details?.message ?? `Request failed with status ${response.status}.`,
+      details,
+    );
+  }
+
+  return parseResponse<UserResponse>(response);
+}
+
+// Ticket Management
+
+export async function listMyTickets(
+  accessToken: string,
+  params?: { status?: TicketStatus; category?: TicketCategory; priority?: TicketPriority },
+): Promise<TicketSummaryResponse[]> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set('status', params.status);
+  if (params?.category) qs.set('category', params.category);
+  if (params?.priority) qs.set('priority', params.priority);
+  const query = qs.toString();
+  return request<TicketSummaryResponse[]>(`/api/tickets${query ? `?${query}` : ''}`, { accessToken });
+}
+
+export async function createTicket(accessToken: string, payload: CreateTicketRequest): Promise<TicketResponse> {
+  return request<TicketResponse>('/api/tickets', { method: 'POST', accessToken, body: payload });
+}
+
+export async function getTicket(accessToken: string, ticketId: string): Promise<TicketResponse> {
+  return request<TicketResponse>(`/api/tickets/${ticketId}`, { accessToken });
+}
+
+export async function updateTicket(
+  accessToken: string,
+  ticketId: string,
+  payload: UpdateTicketRequest,
+): Promise<TicketResponse> {
+  return request<TicketResponse>(`/api/tickets/${ticketId}`, { method: 'PATCH', accessToken, body: payload });
+}
+
+export async function listTicketComments(
+  accessToken: string,
+  ticketId: string,
+): Promise<TicketCommentResponse[]> {
+  return request<TicketCommentResponse[]>(`/api/tickets/${ticketId}/comments`, { accessToken });
+}
+
+export async function addTicketComment(
+  accessToken: string,
+  ticketId: string,
+  payload: AddCommentRequest,
+): Promise<TicketCommentResponse> {
+  return request<TicketCommentResponse>(`/api/tickets/${ticketId}/comments`, { method: 'POST', accessToken, body: payload });
+}
+
+export async function listTicketAttachments(
+  accessToken: string,
+  ticketId: string,
+): Promise<TicketAttachmentResponse[]> {
+  return request<TicketAttachmentResponse[]>(`/api/tickets/${ticketId}/attachments`, { accessToken });
+}
+
+export async function uploadTicketAttachment(
+  accessToken: string,
+  ticketId: string,
+  file: File,
+): Promise<TicketAttachmentResponse> {
+  const path = `/api/tickets/${ticketId}/attachments`;
+  const formData = new FormData();
+  formData.set('file', file);
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: formData,
+      cache: 'no-store',
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError(0, 'Cannot reach the backend API. Make sure the backend service is running and reachable at NEXT_PUBLIC_API_URL.');
+    }
+    throw error;
+  }
+
+  if (!response.ok) {
+    let details: ErrorResponse | null = null;
+    try { details = await response.json(); } catch { details = null; }
+    throw new ApiError(response.status, details?.message ?? `Upload failed with status ${response.status}.`, details);
+  }
+
+  return response.json() as Promise<TicketAttachmentResponse>;
+}
+
+export async function deleteTicketAttachment(
+  accessToken: string,
+  ticketId: string,
+  attachmentId: string,
+): Promise<void> {
+  return request<void>(`/api/tickets/${ticketId}/attachments/${attachmentId}`, { method: 'DELETE', accessToken });
+}
+
+export async function getTicketHistory(
+  accessToken: string,
+  ticketId: string,
+): Promise<TicketStatusHistoryResponse[]> {
+  return request<TicketStatusHistoryResponse[]>(`/api/tickets/${ticketId}/history`, { accessToken });
 }
