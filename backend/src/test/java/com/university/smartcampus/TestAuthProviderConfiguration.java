@@ -15,6 +15,7 @@ import com.university.smartcampus.auth.provider.AuthProviderClient;
 import com.university.smartcampus.common.enums.AppEnums.AuthDeliveryMethod;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.ticket.storage.TicketAttachmentStorageClient;
+import com.university.smartcampus.user.storage.ProfileImageStorageClient;
 
 @TestConfiguration
 public class TestAuthProviderConfiguration {
@@ -35,6 +36,12 @@ public class TestAuthProviderConfiguration {
     @Primary
     RecordingTicketAttachmentStorageClient recordingTicketAttachmentStorageClient() {
         return new RecordingTicketAttachmentStorageClient();
+    }
+
+    @Bean
+    @Primary
+    RecordingProfileImageStorageClient recordingProfileImageStorageClient() {
+        return new RecordingProfileImageStorageClient();
     }
 
     static class RecordingAuthProviderClient implements AuthProviderClient {
@@ -145,6 +152,35 @@ public class TestAuthProviderConfiguration {
         void reset() {
             uploads.clear();
             deletedUrls.clear();
+        }
+    }
+
+    static class RecordingProfileImageStorageClient implements ProfileImageStorageClient {
+
+        private final List<StoredProfileImage> storedImages = new ArrayList<>();
+
+        @Override
+        public StoredProfileImage storeStudentProfileImage(UUID userId, MultipartFile file) {
+            if (file == null || file.isEmpty()) {
+                throw new BadRequestException("Profile image file is required.");
+            }
+
+            String fileName = file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()
+                    ? "profile-image"
+                    : file.getOriginalFilename();
+            StoredProfileImage result = new StoredProfileImage(
+                    "https://storage.test/profile-images/students/" + userId + "/" + fileName,
+                    "students/" + userId + "/" + fileName);
+            storedImages.add(result);
+            return result;
+        }
+
+        List<StoredProfileImage> storedImages() {
+            return Collections.unmodifiableList(storedImages);
+        }
+
+        void reset() {
+            storedImages.clear();
         }
     }
 }

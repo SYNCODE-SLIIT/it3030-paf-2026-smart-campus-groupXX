@@ -155,9 +155,14 @@ public class SmartCampusProperties {
 
     public static class Storage {
         private final TicketAttachments ticketAttachments = new TicketAttachments();
+        private final ProfileImages profileImages = new ProfileImages();
 
         public TicketAttachments getTicketAttachments() {
             return ticketAttachments;
+        }
+
+        public ProfileImages getProfileImages() {
+            return profileImages;
         }
     }
 
@@ -235,14 +240,6 @@ public class SmartCampusProperties {
 
         private boolean hasText(String value) {
             return value != null && !value.isBlank();
-        }
-    }
-
-    public static class Storage {
-        private final ProfileImages profileImages = new ProfileImages();
-
-        public ProfileImages getProfileImages() {
-            return profileImages;
         }
     }
 

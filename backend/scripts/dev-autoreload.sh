@@ -48,17 +48,21 @@ start_app
 
 while true; do
   sleep "${POLL_INTERVAL_SECONDS}"
+  CURRENT_HASH="$(snapshot_hash)"
 
   if [ -n "${APP_PID}" ] && ! kill -0 "${APP_PID}" 2>/dev/null; then
-    echo "[autoreload] Backend process exited. Restarting..."
-    start_app
-    LAST_HASH="$(snapshot_hash)"
-    continue
+    EXIT_STATUS=0
+    wait "${APP_PID}" || EXIT_STATUS=$?
+    APP_PID=""
+
+    if [ "${CURRENT_HASH}" = "${LAST_HASH}" ]; then
+      echo "[autoreload] Backend process exited with status ${EXIT_STATUS}. Waiting for source changes before restarting..."
+      continue
+    fi
   fi
 
-  CURRENT_HASH="$(snapshot_hash)"
   if [ "${CURRENT_HASH}" != "${LAST_HASH}" ]; then
-    echo "[autoreload] Source change detected. Restarting backend..."
+    echo "[autoreload] Source change detected. Starting backend..."
     LAST_HASH="${CURRENT_HASH}"
     stop_app
     start_app
