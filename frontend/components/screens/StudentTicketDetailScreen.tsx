@@ -420,24 +420,30 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
                 </div>
               ))}
 
-              <form onSubmit={handleAddComment} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                <Textarea
-                  id="comment-text"
-                  name="comment-text"
-                  label="Add a comment"
-                  placeholder="Write your comment here…"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  rows={3}
-                  resize="none"
-                  required
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Button type="submit" loading={commentSubmitting} size="sm">
-                    Add Comment
-                  </Button>
-                </div>
-              </form>
+              {ticket.status !== 'CLOSED' && ticket.status !== 'REJECTED' ? (
+                <form onSubmit={handleAddComment} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                  <Textarea
+                    id="comment-text"
+                    name="comment-text"
+                    label="Add a comment"
+                    placeholder="Write your comment here…"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    rows={3}
+                    resize="none"
+                    required
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button type="submit" loading={commentSubmitting} size="sm">
+                      Add Comment
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  Comments are disabled for {ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.
+                </p>
+              )}
             </div>
           )}
 

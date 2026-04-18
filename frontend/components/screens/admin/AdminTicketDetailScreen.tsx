@@ -252,7 +252,7 @@ export function AdminTicketDetailScreen({ ticketId }: { ticketId: string }) {
   }
 
   const isClosed = ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
-  const canComment = ticket.status !== 'OPEN';
+  const canComment = ticket.status !== 'OPEN' && !isClosed;
 
   const managerOptions = managers.map((m) => ({ value: m.id, label: getManagerDisplayName(m) }));
 
@@ -448,7 +448,9 @@ export function AdminTicketDetailScreen({ ticketId }: { ticketId: string }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {!canComment && (
                 <Alert variant="info" title="Comments locked">
-                  Comments are available after the ticket is accepted (In Progress).
+                  {isClosed
+                    ? `Comments are disabled for ${ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.`
+                    : 'Comments are available after the ticket is accepted (In Progress).'}
                 </Alert>
               )}
               {comments.length === 0 && canComment && (

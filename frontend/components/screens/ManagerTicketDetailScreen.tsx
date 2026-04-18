@@ -204,7 +204,7 @@ export function ManagerTicketDetailScreen({ ticketId }: { ticketId: string }) {
   }
 
   const isFinal = ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
-  const canComment = ticket.status !== 'OPEN';
+  const canComment = ticket.status !== 'OPEN' && !isFinal;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -384,7 +384,9 @@ export function ManagerTicketDetailScreen({ ticketId }: { ticketId: string }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {!canComment && (
                 <Alert variant="info" title="Comments locked">
-                  Accept the ticket first to enable comments.
+                  {isFinal
+                    ? `Comments are disabled for ${ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.`
+                    : 'Accept the ticket first to enable comments.'}
                 </Alert>
               )}
               {comments.length === 0 && canComment && (

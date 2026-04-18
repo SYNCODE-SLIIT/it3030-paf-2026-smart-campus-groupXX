@@ -216,6 +216,9 @@ public class TicketService {
     public TicketCommentResponse addComment(UserEntity user, UUID id, AddCommentRequest request) {
         TicketEntity ticket = requireAccessibleTicket(user, id);
 
+        if (ticket.getStatus() == TicketStatus.CLOSED || ticket.getStatus() == TicketStatus.REJECTED) {
+            throw new BadRequestException("Cannot add comments to a closed or rejected ticket.");
+        }
         if (isTicketManagerOrAdmin(user) && ticket.getStatus() == TicketStatus.OPEN) {
             throw new BadRequestException("Cannot comment on an open ticket before accepting it.");
         }
