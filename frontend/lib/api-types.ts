@@ -335,19 +335,34 @@ export interface TicketSummaryResponse {
   category: TicketCategory;
   priority: TicketPriority;
   status: TicketStatus;
+  reportedById: string | null;
   reportedByEmail: string;
+  assignedToId: string | null;
+  assignedToName: string | null;
   createdAt: string;
 }
 
 export interface TicketResponse extends TicketSummaryResponse {
-  description: string;
   assignedToEmail: string | null;
+  assignedToName: string | null;
   resolutionNotes: string | null;
   rejectionReason: string | null;
   contactNote: string | null;
   resolvedAt: string | null;
   closedAt: string | null;
   updatedAt: string;
+}
+
+export interface TicketStatusUpdateRequest {
+  newStatus: TicketStatus;
+  note?: string;
+  assignedTo?: string;
+  resolutionNotes?: string;
+  rejectionReason?: string;
+}
+
+export interface AssignTicketRequest {
+  assignedTo: string;
 }
 
 export interface CreateTicketRequest {

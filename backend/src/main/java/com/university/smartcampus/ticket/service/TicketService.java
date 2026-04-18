@@ -97,7 +97,12 @@ public class TicketService {
             TicketPriority priority) {
         Specification<TicketEntity> spec = (root, query, cb) -> cb.conjunction();
 
-        if (!isTicketManager(user)) {
+        if (isAdmin(user)) {
+            // admin sees all tickets
+        } else if (isTicketManager(user)) {
+            UUID userId = user.getId();
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("assignedTo").get("id"), userId));
+        } else {
             UUID userId = user.getId();
             spec = spec.and((root, query, cb) -> cb.equal(root.get("reportedBy").get("id"), userId));
         }
@@ -147,8 +152,8 @@ public class TicketService {
 
     @Transactional
     public TicketResponse updateStatus(UserEntity manager, UUID id, TicketStatusUpdateRequest request) {
-        if (!isTicketManager(manager)) {
-            throw new ForbiddenException("Ticket manager access is required.");
+        if (!isTicketManagerOrAdmin(manager)) {
+            throw new ForbiddenException("Ticket manager or admin access is required.");
         }
 
         TicketEntity ticket = getTicketEntity(id);
@@ -196,8 +201,24 @@ public class TicketService {
     }
 
     @Transactional
+    public TicketResponse assignTicket(UserEntity actor, UUID ticketId, UUID assignedToUserId) {
+        if (!isTicketManagerOrAdmin(actor)) {
+            throw new ForbiddenException("Ticket manager or admin access is required.");
+        }
+        TicketEntity ticket = getTicketEntity(ticketId);
+        UserEntity assignee = userRepository.findById(assignedToUserId)
+                .orElseThrow(() -> new NotFoundException("Assigned user not found."));
+        ticket.setAssignedTo(assignee);
+        return toTicketResponse(ticket);
+    }
+
+    @Transactional
     public TicketCommentResponse addComment(UserEntity user, UUID id, AddCommentRequest request) {
         TicketEntity ticket = requireAccessibleTicket(user, id);
+
+        if (isTicketManagerOrAdmin(user) && ticket.getStatus() == TicketStatus.OPEN) {
+            throw new BadRequestException("Cannot comment on an open ticket before accepting it.");
+        }
 
         TicketCommentEntity comment = new TicketCommentEntity();
         comment.setId(UUID.randomUUID());
@@ -294,7 +315,7 @@ public class TicketService {
 
     private TicketEntity requireAccessibleTicket(UserEntity user, UUID id) {
         TicketEntity ticket = getTicketEntity(id);
-        if (!isTicketManager(user) && !ticket.getReportedBy().getId().equals(user.getId())) {
+        if (!isTicketManagerOrAdmin(user) && !ticket.getReportedBy().getId().equals(user.getId())) {
             throw new ForbiddenException("You do not have access to this ticket.");
         }
         return ticket;
@@ -305,10 +326,36 @@ public class TicketService {
                 .orElseThrow(() -> new NotFoundException("Ticket not found."));
     }
 
+    private boolean isAdmin(UserEntity user) {
+        return user.getUserType() == UserType.ADMIN;
+    }
+
     private boolean isTicketManager(UserEntity user) {
         return user.getUserType() == UserType.MANAGER
                 && user.getManagerProfile() != null
                 && user.getManagerProfile().getManagerRole() == ManagerRole.TICKET_MANAGER;
+    }
+
+    private boolean isTicketManagerOrAdmin(UserEntity user) {
+        return isAdmin(user) || isTicketManager(user);
+    }
+
+    private String resolveAssignedToName(UserEntity user) {
+        if (user == null) return null;
+        if (isAdmin(user) && user.getAdminProfile() != null) {
+            return user.getAdminProfile().getFullName();
+        }
+        if (isTicketManager(user) && user.getManagerProfile() != null) {
+            if (user.getManagerProfile().getPreferredName() != null
+                    && !user.getManagerProfile().getPreferredName().isBlank()) {
+                return user.getManagerProfile().getPreferredName();
+            }
+            String first = user.getManagerProfile().getFirstName() != null ? user.getManagerProfile().getFirstName() : "";
+            String last = user.getManagerProfile().getLastName() != null ? user.getManagerProfile().getLastName() : "";
+            String full = (first + " " + last).trim();
+            return full.isBlank() ? user.getEmail() : full;
+        }
+        return user.getEmail();
     }
 
     private TicketSummaryResponse toTicketSummaryResponse(TicketEntity ticket) {
@@ -323,6 +370,7 @@ public class TicketService {
                 ticket.getReportedBy().getId(),
                 ticket.getReportedBy().getEmail(),
                 ticket.getAssignedTo() != null ? ticket.getAssignedTo().getId() : null,
+                resolveAssignedToName(ticket.getAssignedTo()),
                 ticket.getCreatedAt());
     }
 
@@ -339,6 +387,7 @@ public class TicketService {
                 ticket.getReportedBy().getEmail(),
                 ticket.getAssignedTo() != null ? ticket.getAssignedTo().getId() : null,
                 ticket.getAssignedTo() != null ? ticket.getAssignedTo().getEmail() : null,
+                resolveAssignedToName(ticket.getAssignedTo()),
                 ticket.getResolutionNotes(),
                 ticket.getRejectionReason(),
                 ticket.getContactNote(),

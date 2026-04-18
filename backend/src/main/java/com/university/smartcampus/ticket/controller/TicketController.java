@@ -26,6 +26,7 @@ import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
 import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
 import com.university.smartcampus.ticket.dto.TicketDtos.AddCommentRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.AddTicketAttachmentRequest;
+import com.university.smartcampus.ticket.dto.TicketDtos.AssignTicketRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.CreateTicketRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAttachmentResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketCommentResponse;
@@ -90,8 +91,17 @@ public class TicketController {
             @PathVariable UUID id,
             @Valid @RequestBody TicketStatusUpdateRequest request,
             Authentication authentication) {
-        UserEntity manager = currentUserService.requireTicketManager(authentication);
-        return ticketService.updateStatus(manager, id, request);
+        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        return ticketService.updateStatus(user, id, request);
+    }
+
+    @PutMapping("/{id}/assign")
+    public TicketResponse assignTicket(
+            @PathVariable UUID id,
+            @Valid @RequestBody AssignTicketRequest request,
+            Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        return ticketService.assignTicket(user, id, request.assignedTo());
     }
 
     @GetMapping("/{id}/comments")

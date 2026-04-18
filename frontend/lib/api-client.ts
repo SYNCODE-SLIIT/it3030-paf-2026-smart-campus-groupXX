@@ -1,6 +1,7 @@
 import {
   type AccountStatus,
   type AddCommentRequest,
+  type AssignTicketRequest,
   type BookingDecisionRequest,
   type BookingResponse,
   type CancelBookingRequest,
@@ -23,6 +24,7 @@ import {
   type TicketResponse,
   type TicketStatus,
   type TicketStatusHistoryResponse,
+  type TicketStatusUpdateRequest,
   type TicketSummaryResponse,
   type UpdateResourceRequest,
   type UpdateTicketRequest,
@@ -565,4 +567,20 @@ export async function getTicketHistory(
   ticketId: string,
 ): Promise<TicketStatusHistoryResponse[]> {
   return request<TicketStatusHistoryResponse[]>(`/api/tickets/${ticketId}/history`, { accessToken });
+}
+
+export async function updateTicketStatus(
+  accessToken: string,
+  ticketId: string,
+  payload: TicketStatusUpdateRequest,
+): Promise<TicketResponse> {
+  return request<TicketResponse>(`/api/tickets/${ticketId}/status`, { method: 'PUT', accessToken, body: payload });
+}
+
+export async function assignTicket(
+  accessToken: string,
+  ticketId: string,
+  payload: AssignTicketRequest,
+): Promise<TicketResponse> {
+  return request<TicketResponse>(`/api/tickets/${ticketId}/assign`, { method: 'PUT', accessToken, body: payload });
 }

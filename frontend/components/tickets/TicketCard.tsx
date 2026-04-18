@@ -1,10 +1,12 @@
 import React from 'react';
+import { User } from 'lucide-react';
 import { Button, Chip } from '@/components/ui';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
 
 interface TicketCardProps {
   ticket: TicketSummaryResponse;
   onView: () => void;
+  showReporter?: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -71,7 +73,7 @@ function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-LK', { year: 'numeric', month: 'short', day: '2-digit' }).format(d);
 }
 
-export function TicketCard({ ticket, onView }: TicketCardProps) {
+export function TicketCard({ ticket, onView, showReporter = false }: TicketCardProps) {
   const [hovered, setHovered] = React.useState(false);
   const segs = STATUS_SEGS[ticket.status];
 
@@ -198,23 +200,58 @@ export function TicketCard({ ticket, onView }: TicketCardProps) {
         style={{
           padding: '10px 16px',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
+          flexDirection: 'column',
+          gap: 6,
         }}
       >
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
-            color: 'var(--text-muted)',
-          }}
-        >
-          {formatDate(ticket.createdAt)}
-        </span>
-        <Button variant="ghost" size="xs" onClick={onView}>
-          View
-        </Button>
+        {showReporter && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <User size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                color: 'var(--text-muted)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {ticket.reportedByEmail}
+            </span>
+          </div>
+        )}
+        {ticket.assignedToName && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <User size={10} style={{ color: 'var(--blue-400)', flexShrink: 0 }} />
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                color: 'var(--text-muted)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Assigned: {ticket.assignedToName}
+            </span>
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9.5,
+              color: 'var(--text-muted)',
+            }}
+          >
+            {formatDate(ticket.createdAt)}
+          </span>
+          <Button variant="ghost" size="xs" onClick={onView}>
+            View
+          </Button>
+        </div>
       </div>
     </div>
   );

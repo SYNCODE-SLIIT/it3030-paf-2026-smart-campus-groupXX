@@ -13,6 +13,7 @@ import {
   LogOut,
   MessageSquare,
   ShieldCheck,
+  Ticket,
   Users,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -97,6 +98,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSecti
               label: 'Admins',
               icon: ShieldCheck,
               href: '/admin/admins',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
+              label: 'Tickets',
+              icon: Ticket,
+              href: '/admin/tickets',
               allowedUserTypes: ['ADMIN'],
             },
           ],
