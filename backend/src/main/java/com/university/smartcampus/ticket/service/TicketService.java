@@ -316,6 +316,7 @@ public class TicketService {
                 ticket.getId(),
                 ticket.getTicketCode(),
                 ticket.getTitle(),
+                ticket.getDescription(),
                 ticket.getCategory(),
                 ticket.getPriority(),
                 ticket.getStatus(),

@@ -331,6 +331,7 @@ export interface TicketSummaryResponse {
   id: string;
   ticketCode: string;
   title: string;
+  description: string;
   category: TicketCategory;
   priority: TicketPriority;
   status: TicketStatus;

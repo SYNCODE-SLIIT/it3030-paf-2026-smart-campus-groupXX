@@ -56,6 +56,7 @@ public final class TicketDtos {
         UUID id,
         String ticketCode,
         String title,
+        String description,
         TicketCategory category,
         TicketPriority priority,
         TicketStatus status,
