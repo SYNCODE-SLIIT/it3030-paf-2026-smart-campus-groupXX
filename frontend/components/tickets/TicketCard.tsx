@@ -67,6 +67,12 @@ const STATUS_DISPLAY: Record<TicketStatus, string> = {
   REJECTED:    'Rejected',
 };
 
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function formatDate(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -107,7 +113,7 @@ export function TicketCard({ ticket, onView, showReporter = false }: TicketCardP
           gap: 10,
         }}
       >
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, width: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
             <span
               style={{
@@ -136,6 +142,7 @@ export function TicketCard({ ticket, onView, showReporter = false }: TicketCardP
           >
             {ticket.title}
           </p>
+          {/* Always reserves 2-line height so cards align regardless of description length */}
           <p
             style={{
               margin: 0,
@@ -146,6 +153,8 @@ export function TicketCard({ ticket, onView, showReporter = false }: TicketCardP
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
+              minHeight: '34px',
+              width: '100%',
             }}
           >
             {ticket.description}
@@ -196,58 +205,84 @@ export function TicketCard({ ticket, onView, showReporter = false }: TicketCardP
       </div>
 
       {/* Footer */}
-      <div
-        style={{
-          padding: '10px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 6,
-        }}
-      >
-        {showReporter && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <User size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9.5,
-                color: 'var(--text-muted)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {ticket.reportedByEmail}
-            </span>
-          </div>
-        )}
-        {ticket.assignedToName && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <User size={10} style={{ color: 'var(--blue-400)', flexShrink: 0 }} />
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9.5,
-                color: 'var(--text-muted)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Assigned: {ticket.assignedToName}
-            </span>
-          </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '10px 16px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {/* Row 1: reporter (optional) + date */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          {showReporter ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+              <User size={10} style={{ color: 'var(--text-muted)', flexShrink: 0, opacity: 0.45 }} />
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 8.5,
+                  fontWeight: 500,
+                  color: 'var(--text-muted)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 130,
+                }}
+              >
+                {ticket.reportedByEmail}
+              </span>
+            </div>
+          ) : (
+            <div />
+          )}
           <span
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 9.5,
+              fontSize: 8,
               color: 'var(--text-muted)',
+              flexShrink: 0,
+              letterSpacing: '.02em',
+              opacity: 0.8,
             }}
           >
             {formatDate(ticket.createdAt)}
           </span>
+        </div>
+
+        {/* Row 2: assignee avatar + view button */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          {ticket.assignedToName ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  background: 'var(--blue-400)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 6.5,
+                  fontWeight: 600,
+                  color: '#fff',
+                  flexShrink: 0,
+                  border: '1.5px solid var(--surface)',
+                }}
+              >
+                {getInitials(ticket.assignedToName)}
+              </div>
+              <span
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 500,
+                  color: 'var(--text-body)',
+                  letterSpacing: '-0.01em',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {ticket.assignedToName}
+              </span>
+            </div>
+          ) : (
+            <div />
+          )}
           <Button variant="ghost" size="xs" onClick={onView}>
             View
           </Button>
