@@ -86,8 +86,10 @@ function AuthCallbackClient() {
       const hashParams = parseHashParams();
       const hashType = hashParams.get('type');
       const isInviteGoogleFlow = queryFlow === 'invite-google';
+      const isInviteMicrosoftFlow = queryFlow === 'invite-microsoft';
+      const isInviteOAuthFlow = isInviteGoogleFlow || isInviteMicrosoftFlow;
       const isInviteLinkFlow = queryFlow === 'invite' || queryType === 'invite' || hashType === 'invite';
-      const isInviteFlow = isInviteGoogleFlow || isInviteLinkFlow;
+      const isInviteFlow = isInviteOAuthFlow || isInviteLinkFlow;
 
       const toInviteWelcome = (
         reason?: string,
@@ -122,12 +124,23 @@ function AuthCallbackClient() {
 
       try {
         const queryError = searchParams.get('error');
+        const queryErrorCode = searchParams.get('error_code');
+        const queryErrorDescription = searchParams.get('error_description')?.toLowerCase();
         const queryCode = searchParams.get('code');
         const queryAccessToken = searchParams.get('access_token');
         const queryRefreshToken = searchParams.get('refresh_token');
         const queryTokenHash = searchParams.get('token_hash');
+        const providerMissingEmail =
+          queryError === 'server_error' &&
+          queryErrorCode === 'unexpected_failure' &&
+          queryErrorDescription?.includes('user email from external provider');
 
         if (queryError) {
+          if (providerMissingEmail) {
+            router.replace(isInviteFlow ? toInviteWelcome('provider_email_missing') : '/login?reason=provider_email_missing');
+            return;
+          }
+
           router.replace(isInviteFlow ? toInviteWelcome('auth_failed') : '/login?reason=auth_failed');
           return;
         }
@@ -229,7 +242,7 @@ function AuthCallbackClient() {
           return;
         }
 
-        if (isInviteGoogleFlow) {
+        if (isInviteOAuthFlow) {
           clearInviteFlowState();
           router.replace(nextPath);
           return;

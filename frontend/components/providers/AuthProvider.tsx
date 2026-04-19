@@ -15,6 +15,7 @@ interface AuthContextValue {
   authConfigured: boolean;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: (options?: { flow?: 'invite' }) => Promise<void>;
+  signInWithMicrosoft: (options?: { flow?: 'invite' }) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshMe: () => Promise<UserResponse | null>;
@@ -220,6 +221,35 @@ export function AuthProvider({
     }
   }, [supabase]);
 
+  const handleMicrosoftSignIn = React.useCallback(async (options?: { flow?: 'invite' }) => {
+    if (!supabase) {
+      throw new Error(
+        'Supabase authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+      );
+    }
+
+    const redirectUrl = new URL('/auth/callback', window.location.origin);
+
+    if (options?.flow === 'invite') {
+      redirectUrl.searchParams.set('flow', 'invite-microsoft');
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        redirectTo: redirectUrl.toString(),
+        scopes: 'openid profile email',
+        queryParams: {
+          prompt: 'select_account',
+        },
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }, [supabase]);
+
   const handlePasswordSignIn = React.useCallback(
     async (email: string, password: string) => {
       if (!supabase) {
@@ -308,11 +338,12 @@ export function AuthProvider({
       authConfigured,
       signInWithPassword: handlePasswordSignIn,
       signInWithGoogle: handleGoogleSignIn,
+      signInWithMicrosoft: handleMicrosoftSignIn,
       updatePassword: handleUpdatePassword,
       signOut: handleSignOut,
       refreshMe,
     }),
-    [appUser, authConfigured, handleGoogleSignIn, handlePasswordSignIn, handleSignOut, handleUpdatePassword, loading, refreshMe, session],
+    [appUser, authConfigured, handleGoogleSignIn, handleMicrosoftSignIn, handlePasswordSignIn, handleSignOut, handleUpdatePassword, loading, refreshMe, session],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

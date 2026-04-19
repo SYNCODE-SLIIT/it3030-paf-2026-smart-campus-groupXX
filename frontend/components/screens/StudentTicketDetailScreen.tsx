@@ -81,7 +81,7 @@ function priorityChipColor(priority: TicketPriority): 'neutral' | 'blue' | 'oran
 }
 
 function canEdit(status: TicketStatus) {
-  return status === 'OPEN' || status === 'IN_PROGRESS';
+  return status === 'OPEN';
 }
 
 function formatDateTime(iso: string) {
@@ -96,8 +96,8 @@ function formatDateTime(iso: string) {
   }).format(parsed);
 }
 
-export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
-  const { session } = useAuth();
+export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
+  const { session, appUser } = useAuth();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
@@ -138,10 +138,10 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
 
     try {
       const [ticketData, commentsData, attachmentsData, historyData] = await Promise.all([
-        getTicket(accessToken, ticketId),
-        listTicketComments(accessToken, ticketId),
-        listTicketAttachments(accessToken, ticketId),
-        getTicketHistory(accessToken, ticketId),
+        getTicket(accessToken, ticketRef),
+        listTicketComments(accessToken, ticketRef),
+        listTicketAttachments(accessToken, ticketRef),
+        getTicketHistory(accessToken, ticketRef),
       ]);
       setTicket(ticketData);
       setComments(commentsData);
@@ -156,7 +156,7 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, ticketId]);
+  }, [accessToken, ticketRef]);
 
   React.useEffect(() => {
     void load();
@@ -168,7 +168,7 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
 
     setEditSubmitting(true);
     try {
-      const updated = await updateTicket(accessToken, ticketId, {
+      const updated = await updateTicket(accessToken, ticketRef, {
         priority: editForm.priority || undefined,
         contactNote: editForm.contactNote.trim() || undefined,
       });
@@ -187,7 +187,7 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
 
     setCommentSubmitting(true);
     try {
-      const newComment = await addTicketComment(accessToken, ticketId, { commentText: commentText.trim() });
+      const newComment = await addTicketComment(accessToken, ticketRef, { commentText: commentText.trim() });
       setComments((prev) => [...prev, newComment]);
       setCommentText('');
     } catch (error) {
@@ -204,7 +204,7 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
     event.target.value = '';
     setAttachmentUploading(true);
     try {
-      const newAttachment = await uploadTicketAttachment(accessToken, ticketId, file);
+      const newAttachment = await uploadTicketAttachment(accessToken, ticketRef, file);
       setAttachments((prev) => [...prev, newAttachment]);
       setNotice({ variant: 'success', title: 'Uploaded', message: `${file.name} uploaded successfully.` });
     } catch (error) {
@@ -220,7 +220,7 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
 
     setDeletingAttachmentId(attachmentId);
     try {
-      await deleteTicketAttachment(accessToken, ticketId, attachmentId);
+      await deleteTicketAttachment(accessToken, ticketRef, attachmentId);
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
     } catch (error) {
       setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete the attachment.') });
@@ -250,6 +250,9 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
       </div>
     );
   }
+
+  const isCreator = appUser?.id === ticket.reportedById;
+  const canModify = isCreator && ticket.status === 'OPEN';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -420,24 +423,30 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
                 </div>
               ))}
 
-              <form onSubmit={handleAddComment} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                <Textarea
-                  id="comment-text"
-                  name="comment-text"
-                  label="Add a comment"
-                  placeholder="Write your comment here…"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  rows={3}
-                  resize="none"
-                  required
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Button type="submit" loading={commentSubmitting} size="sm">
-                    Add Comment
-                  </Button>
-                </div>
-              </form>
+              {ticket.status !== 'CLOSED' && ticket.status !== 'REJECTED' ? (
+                <form onSubmit={handleAddComment} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                  <Textarea
+                    id="comment-text"
+                    name="comment-text"
+                    label="Add a comment"
+                    placeholder="Write your comment here…"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    rows={3}
+                    resize="none"
+                    required
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button type="submit" loading={commentSubmitting} size="sm">
+                      Add Comment
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  Comments are disabled for {ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.
+                </p>
+              )}
             </div>
           )}
 
@@ -473,35 +482,44 @@ export function StudentTicketDetailScreen({ ticketId }: { ticketId: string }) {
                       {attachment.fileType} · {formatDateTime(attachment.uploadedAt)}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost-danger"
-                    size="xs"
-                    loading={deletingAttachmentId === attachment.id}
-                    iconLeft={<Trash2 size={12} />}
-                    onClick={() => { void handleDeleteAttachment(attachment.id, attachment.fileName); }}
-                  >
-                    Delete
-                  </Button>
+                  {canModify && (
+                    <Button
+                      variant="ghost-danger"
+                      size="xs"
+                      loading={deletingAttachmentId === attachment.id}
+                      iconLeft={<Trash2 size={12} />}
+                      onClick={() => { void handleDeleteAttachment(attachment.id, attachment.fileName); }}
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </div>
               ))}
 
-              <div style={{ marginTop: 4 }}>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  style={{ display: 'none' }}
-                  onChange={handleUpload}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  loading={attachmentUploading}
-                  iconLeft={<Upload size={14} />}
-                  onClick={() => { fileInputRef.current?.click(); }}
-                >
-                  Upload File
-                </Button>
-              </div>
+              {canModify && attachments.length < 3 && (
+                <div style={{ marginTop: 4 }}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={handleUpload}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={attachmentUploading}
+                    iconLeft={<Upload size={14} />}
+                    onClick={() => { fileInputRef.current?.click(); }}
+                  >
+                    Upload File
+                  </Button>
+                </div>
+              )}
+              {canModify && attachments.length >= 3 && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  Maximum of 3 attachments reached.
+                </p>
+              )}
             </div>
           )}
 

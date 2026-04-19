@@ -47,13 +47,13 @@ public class ResourceController {
         @RequestParam(required = false) String location,
         Authentication authentication
     ) {
-        currentUserService.requireCurrentUser(authentication);
+        currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return resourceService.getResources(search, category, status, location);
     }
 
     @GetMapping("/{id}")
     public ResourceResponse getResource(@PathVariable UUID id, Authentication authentication) {
-        currentUserService.requireCurrentUser(authentication);
+        currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return resourceService.getResourceById(id);
     }
 

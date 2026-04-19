@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.TicketCategory;
 import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
@@ -97,7 +98,12 @@ public class TicketService {
             TicketPriority priority) {
         Specification<TicketEntity> spec = (root, query, cb) -> cb.conjunction();
 
-        if (!isTicketManager(user)) {
+        if (isAdmin(user)) {
+            // admin sees all tickets
+        } else if (isTicketManager(user)) {
+            UUID userId = user.getId();
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("assignedTo").get("id"), userId));
+        } else {
             UUID userId = user.getId();
             spec = spec.and((root, query, cb) -> cb.equal(root.get("reportedBy").get("id"), userId));
         }
@@ -119,20 +125,20 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public TicketResponse getTicket(UserEntity user, UUID id) {
-        TicketEntity ticket = requireAccessibleTicket(user, id);
+    public TicketResponse getTicket(UserEntity user, String ticketRef) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
         return toTicketResponse(ticket);
     }
 
     @Transactional
-    public TicketResponse updateTicket(UserEntity user, UUID id, UpdateTicketRequest request) {
-        TicketEntity ticket = getTicketEntity(id);
+    public TicketResponse updateTicket(UserEntity user, String ticketRef, UpdateTicketRequest request) {
+        TicketEntity ticket = getTicketEntity(ticketRef);
 
         if (!ticket.getReportedBy().getId().equals(user.getId())) {
             throw new ForbiddenException("You can only update your own tickets.");
         }
-        if (ticket.getStatus() == TicketStatus.CLOSED || ticket.getStatus() == TicketStatus.REJECTED) {
-            throw new BadRequestException("Cannot update a ticket that is closed or rejected.");
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new BadRequestException("Ticket details can only be updated while the ticket is open.");
         }
 
         if (request.priority() != null) {
@@ -146,12 +152,16 @@ public class TicketService {
     }
 
     @Transactional
-    public TicketResponse updateStatus(UserEntity manager, UUID id, TicketStatusUpdateRequest request) {
-        if (!isTicketManager(manager)) {
-            throw new ForbiddenException("Ticket manager access is required.");
+    public TicketResponse updateStatus(UserEntity manager, String ticketRef, TicketStatusUpdateRequest request) {
+        if (request.assignedTo() != null) {
+            throw new BadRequestException("Ticket assignment must use the assignment endpoint.");
+        }
+        if (!isTicketManagerOrAdmin(manager)) {
+            throw new ForbiddenException("Ticket manager or admin access is required.");
         }
 
-        TicketEntity ticket = getTicketEntity(id);
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        requireTicketStatusManagementAccess(manager, ticket);
 
         if (ticket.getStatus() == TicketStatus.CLOSED) {
             throw new BadRequestException("Closed tickets cannot be updated.");
@@ -168,12 +178,6 @@ public class TicketService {
 
         TicketStatus oldStatus = ticket.getStatus();
         ticket.setStatus(request.newStatus());
-
-        if (request.assignedTo() != null) {
-            UserEntity assignee = userRepository.findById(request.assignedTo())
-                    .orElseThrow(() -> new NotFoundException("Assigned user not found."));
-            ticket.setAssignedTo(assignee);
-        }
 
         if (StringUtils.hasText(request.resolutionNotes())) {
             ticket.setResolutionNotes(request.resolutionNotes());
@@ -196,8 +200,31 @@ public class TicketService {
     }
 
     @Transactional
-    public TicketCommentResponse addComment(UserEntity user, UUID id, AddCommentRequest request) {
-        TicketEntity ticket = requireAccessibleTicket(user, id);
+    public TicketResponse assignTicket(UserEntity actor, String ticketRef, UUID assignedToUserId) {
+        if (!isAdmin(actor)) {
+            throw new ForbiddenException("Admin access is required to assign tickets.");
+        }
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new BadRequestException("Tickets cannot be reassigned after they are accepted.");
+        }
+        ticket.setAssignedTo(resolveAssignableAssignee(assignedToUserId));
+        return toTicketResponse(ticket);
+    }
+
+    @Transactional
+    public TicketCommentResponse addComment(UserEntity user, String ticketRef, AddCommentRequest request) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+
+        if (ticket.getStatus() == TicketStatus.CLOSED || ticket.getStatus() == TicketStatus.REJECTED) {
+            throw new BadRequestException("Cannot add comments to a closed or rejected ticket.");
+        }
+        if (isAdmin(user) && ticket.getStatus() != TicketStatus.IN_PROGRESS) {
+            throw new BadRequestException("Admins can only comment on in-progress tickets.");
+        }
+        if (isTicketManager(user) && ticket.getStatus() == TicketStatus.OPEN) {
+            throw new BadRequestException("Cannot comment on an open ticket before accepting it.");
+        }
 
         TicketCommentEntity comment = new TicketCommentEntity();
         comment.setId(UUID.randomUUID());
@@ -211,35 +238,39 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public List<TicketCommentResponse> listComments(UserEntity user, UUID id) {
-        requireAccessibleTicket(user, id);
-        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAsc(id)
+    public List<TicketCommentResponse> listComments(UserEntity user, String ticketRef) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId())
                 .stream()
                 .map(this::toCommentResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<TicketStatusHistoryResponse> getStatusHistory(UserEntity user, UUID id) {
-        requireAccessibleTicket(user, id);
-        return ticketStatusHistoryRepository.findByTicketIdOrderByChangedAtAsc(id)
+    public List<TicketStatusHistoryResponse> getStatusHistory(UserEntity user, String ticketRef) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        return ticketStatusHistoryRepository.findByTicketIdOrderByChangedAtAsc(ticket.getId())
                 .stream()
                 .map(this::toHistoryResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<TicketAttachmentResponse> listAttachments(UserEntity user, UUID id) {
-        requireAccessibleTicket(user, id);
-        return ticketAttachmentRepository.findByTicketIdOrderByUploadedAtAsc(id)
+    public List<TicketAttachmentResponse> listAttachments(UserEntity user, String ticketRef) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        return ticketAttachmentRepository.findByTicketIdOrderByUploadedAtAsc(ticket.getId())
                 .stream()
                 .map(this::toAttachmentResponse)
                 .toList();
     }
 
     @Transactional
-    public TicketAttachmentResponse addAttachment(UserEntity user, UUID id, AddTicketAttachmentRequest request) {
-        TicketEntity ticket = requireAccessibleTicket(user, id);
+    public TicketAttachmentResponse addAttachment(UserEntity user, String ticketRef, AddTicketAttachmentRequest request) {
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        requireAttachmentManagementAccess(user, ticket);
+        if (ticketAttachmentRepository.countByTicketId(ticket.getId()) >= 3) {
+            throw new BadRequestException("A ticket may have at most 3 attachments.");
+        }
 
         TicketAttachmentEntity attachment = new TicketAttachmentEntity();
         attachment.setId(UUID.randomUUID());
@@ -254,8 +285,12 @@ public class TicketService {
     }
 
     @Transactional
-    public TicketAttachmentResponse uploadAttachment(UserEntity user, UUID id, MultipartFile file) {
-        TicketEntity ticket = requireAccessibleTicket(user, id);
+    public TicketAttachmentResponse uploadAttachment(UserEntity user, String ticketRef, MultipartFile file) {
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        requireAttachmentManagementAccess(user, ticket);
+        if (ticketAttachmentRepository.countByTicketId(ticket.getId()) >= 3) {
+            throw new BadRequestException("A ticket may have at most 3 attachments.");
+        }
         StoredAttachment storedAttachment = ticketAttachmentStorageClient.upload(ticket.getId(), file);
 
         TicketAttachmentEntity attachment = new TicketAttachmentEntity();
@@ -271,9 +306,10 @@ public class TicketService {
     }
 
     @Transactional
-    public void deleteAttachment(UserEntity user, UUID id, UUID attachmentId) {
-        requireAccessibleTicket(user, id);
-        TicketAttachmentEntity attachment = ticketAttachmentRepository.findByIdAndTicketId(attachmentId, id)
+    public void deleteAttachment(UserEntity user, String ticketRef, UUID attachmentId) {
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        requireAttachmentManagementAccess(user, ticket);
+        TicketAttachmentEntity attachment = ticketAttachmentRepository.findByIdAndTicketId(attachmentId, ticket.getId())
                 .orElseThrow(() -> new NotFoundException("Ticket attachment not found."));
         ticketAttachmentStorageClient.deleteByPublicUrl(attachment.getFileUrl());
         ticketAttachmentRepository.delete(attachment);
@@ -292,17 +328,86 @@ public class TicketService {
         ticketStatusHistoryRepository.save(history);
     }
 
-    private TicketEntity requireAccessibleTicket(UserEntity user, UUID id) {
-        TicketEntity ticket = getTicketEntity(id);
-        if (!isTicketManager(user) && !ticket.getReportedBy().getId().equals(user.getId())) {
+    private void requireAttachmentManagementAccess(UserEntity user, TicketEntity ticket) {
+        if (!ticket.getReportedBy().getId().equals(user.getId())
+                && !(isTicketManager(user) && isAssignedTo(ticket, user))) {
+            throw new ForbiddenException("Only the ticket creator or assigned ticket manager can modify attachments.");
+        }
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new BadRequestException("Attachments cannot be modified once a ticket is no longer open.");
+        }
+    }
+
+    private TicketEntity requireAccessibleTicket(UserEntity user, String ticketRef) {
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        if (isAdmin(user)) {
+            return ticket;
+        }
+        if (isTicketManager(user)) {
+            if (isAssignedTo(ticket, user)) {
+                return ticket;
+            }
             throw new ForbiddenException("You do not have access to this ticket.");
         }
-        return ticket;
+        if (ticket.getReportedBy().getId().equals(user.getId())) {
+            return ticket;
+        }
+        throw new ForbiddenException("You do not have access to this ticket.");
+    }
+
+    private void requireTicketStatusManagementAccess(UserEntity user, TicketEntity ticket) {
+        if (isAdmin(user)) {
+            if (isAssignedTo(ticket, user)) {
+                return;
+            }
+            throw new ForbiddenException("Admins can only update tickets assigned to themselves.");
+        }
+        if (isTicketManager(user) && isAssignedTo(ticket, user)) {
+            return;
+        }
+        throw new ForbiddenException("You do not have access to this ticket.");
     }
 
     private TicketEntity getTicketEntity(UUID id) {
         return ticketRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Ticket not found."));
+    }
+
+    private TicketEntity getTicketEntity(String ticketRef) {
+        if (!StringUtils.hasText(ticketRef)) {
+            throw new NotFoundException("Ticket not found.");
+        }
+
+        String normalizedTicketRef = ticketRef.trim();
+        try {
+            return getTicketEntity(UUID.fromString(normalizedTicketRef));
+        } catch (IllegalArgumentException ignored) {
+            return ticketRepository.findByTicketCodeIgnoreCase(normalizedTicketRef)
+                    .orElseThrow(() -> new NotFoundException("Ticket not found."));
+        }
+    }
+
+    private UserEntity resolveAssignableAssignee(UUID assignedToUserId) {
+        UserEntity assignee = userRepository.findById(assignedToUserId)
+                .orElseThrow(() -> new NotFoundException("Assigned user not found."));
+        if (!isAssignableAssignee(assignee)) {
+            throw new BadRequestException("Tickets can only be assigned to active admins or ticket managers.");
+        }
+        return assignee;
+    }
+
+    private boolean isAssignableAssignee(UserEntity user) {
+        return user.getAccountStatus() == AccountStatus.ACTIVE
+                && (isAdmin(user) || isTicketManager(user));
+    }
+
+    private boolean isAssignedTo(TicketEntity ticket, UserEntity user) {
+        return ticket.getAssignedTo() != null
+                && ticket.getAssignedTo().getId().equals(user.getId());
+    }
+
+    private boolean isAdmin(UserEntity user) {
+        return user.getUserType() == UserType.ADMIN;
     }
 
     private boolean isTicketManager(UserEntity user) {
@@ -311,17 +416,41 @@ public class TicketService {
                 && user.getManagerProfile().getManagerRole() == ManagerRole.TICKET_MANAGER;
     }
 
+    private boolean isTicketManagerOrAdmin(UserEntity user) {
+        return isAdmin(user) || isTicketManager(user);
+    }
+
+    private String resolveAssignedToName(UserEntity user) {
+        if (user == null) return null;
+        if (isAdmin(user) && user.getAdminProfile() != null) {
+            return user.getAdminProfile().getFullName();
+        }
+        if (isTicketManager(user) && user.getManagerProfile() != null) {
+            if (user.getManagerProfile().getPreferredName() != null
+                    && !user.getManagerProfile().getPreferredName().isBlank()) {
+                return user.getManagerProfile().getPreferredName();
+            }
+            String first = user.getManagerProfile().getFirstName() != null ? user.getManagerProfile().getFirstName() : "";
+            String last = user.getManagerProfile().getLastName() != null ? user.getManagerProfile().getLastName() : "";
+            String full = (first + " " + last).trim();
+            return full.isBlank() ? user.getEmail() : full;
+        }
+        return user.getEmail();
+    }
+
     private TicketSummaryResponse toTicketSummaryResponse(TicketEntity ticket) {
         return new TicketSummaryResponse(
                 ticket.getId(),
                 ticket.getTicketCode(),
                 ticket.getTitle(),
+                ticket.getDescription(),
                 ticket.getCategory(),
                 ticket.getPriority(),
                 ticket.getStatus(),
                 ticket.getReportedBy().getId(),
                 ticket.getReportedBy().getEmail(),
                 ticket.getAssignedTo() != null ? ticket.getAssignedTo().getId() : null,
+                resolveAssignedToName(ticket.getAssignedTo()),
                 ticket.getCreatedAt());
     }
 
@@ -338,6 +467,7 @@ public class TicketService {
                 ticket.getReportedBy().getEmail(),
                 ticket.getAssignedTo() != null ? ticket.getAssignedTo().getId() : null,
                 ticket.getAssignedTo() != null ? ticket.getAssignedTo().getEmail() : null,
+                resolveAssignedToName(ticket.getAssignedTo()),
                 ticket.getResolutionNotes(),
                 ticket.getRejectionReason(),
                 ticket.getContactNote(),

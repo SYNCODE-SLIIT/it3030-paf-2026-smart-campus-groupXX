@@ -68,6 +68,18 @@ export const defaultSidebarSections: NavSection[] = [
   },
 ];
 
+function hasNestedPathMatch(href: string) {
+  return href.split('/').filter(Boolean).length > 1;
+}
+
+function isHrefActive(href: string, activePath: string) {
+  if (href === activePath) {
+    return true;
+  }
+
+  return hasNestedPathMatch(href) && activePath.startsWith(`${href}/`);
+}
+
 function SidebarNavItem({
   item,
   active,
@@ -253,10 +265,7 @@ export function Sidebar({
                 <SidebarNavItem
                   key={item.label}
                   item={item}
-                  active={
-                    active === item.label
-                    || (!!item.href && (item.href === activePath || (item.href !== '/admin' && activePath.startsWith(`${item.href}/`))))
-                  }
+                  active={item.href ? isHrefActive(item.href, activePath) : active === item.label}
                   onClick={() => handleNav(item)}
                 />
               ))}

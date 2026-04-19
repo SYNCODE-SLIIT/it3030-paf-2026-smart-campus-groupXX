@@ -120,7 +120,7 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
     setSubmitting(true);
     setError(null);
 
-    let ticketId: string;
+    let ticketRef: string;
     try {
       const ticket = await createTicket(accessToken, {
         title: s1.title.trim(),
@@ -129,7 +129,7 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
         priority: s2.priority as TicketPriority,
         contactNote: s2.contactNote.trim() || undefined,
       });
-      ticketId = ticket.id;
+      ticketRef = ticket.ticketCode;
     } catch (err) {
       setError(getErrorMessage(err, 'Could not create the ticket. Please try again.'));
       setSubmitting(false);
@@ -139,7 +139,7 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
     let uploadFailed = false;
     for (const staged of files) {
       try {
-        await uploadTicketAttachment(accessToken, ticketId, staged.file);
+        await uploadTicketAttachment(accessToken, ticketRef, staged.file);
       } catch {
         uploadFailed = true;
       }

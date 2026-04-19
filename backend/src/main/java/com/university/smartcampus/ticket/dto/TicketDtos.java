@@ -52,16 +52,23 @@ public final class TicketDtos {
     ) {
     }
 
+    public record AssignTicketRequest(
+        @NotNull UUID assignedTo
+    ) {
+    }
+
     public record TicketSummaryResponse(
         UUID id,
         String ticketCode,
         String title,
+        String description,
         TicketCategory category,
         TicketPriority priority,
         TicketStatus status,
         UUID reportedById,
         String reportedByEmail,
         UUID assignedToId,
+        String assignedToName,
         Instant createdAt
     ) {
     }
@@ -78,6 +85,7 @@ public final class TicketDtos {
         String reportedByEmail,
         UUID assignedToId,
         String assignedToEmail,
+        String assignedToName,
         String resolutionNotes,
         String rejectionReason,
         String contactNote,

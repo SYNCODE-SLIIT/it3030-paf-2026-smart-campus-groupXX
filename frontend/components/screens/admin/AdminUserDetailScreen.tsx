@@ -1,14 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, ArrowLeft, Copy, Edit3, Mail, Save, ShieldCheck, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Copy, Edit3, Mail, Save, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { ProfileFields } from '@/components/screens/admin/ProfileFields';
 import { RoleRadioGroup } from '@/components/screens/admin/RoleRadioGroup';
-import { UserIdentityCell } from '@/components/screens/admin/UserIdentityCell';
-import { Alert, Button, Card, Chip, Input, Select, Skeleton } from '@/components/ui';
+import { Alert, Avatar, Button, Card, Chip, Divider, Input, Select, Skeleton } from '@/components/ui';
 import {
   deleteUser,
   getErrorMessage,
@@ -91,6 +90,21 @@ function detailListPath(user: UserResponse | null) {
       return '/admin/admins';
     default:
       return '/admin/users';
+  }
+}
+
+function detailListLabel(user: UserResponse | null) {
+  switch (user?.userType) {
+    case 'STUDENT':
+      return 'Back to Students';
+    case 'FACULTY':
+      return 'Back to Faculty';
+    case 'MANAGER':
+      return 'Back to Managers';
+    case 'ADMIN':
+      return 'Back to Admins';
+    default:
+      return 'Back to Users';
   }
 }
 
@@ -470,6 +484,7 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
   const isSelf = appUser?.id === user.id;
   const suspended = user.accountStatus === 'SUSPENDED';
   const detailSections = buildDetailSections(user);
+  const backLabel = detailListLabel(user);
 
   return (
     <div className="admin-detail-shell">
@@ -477,7 +492,7 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         .admin-detail-shell {
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 22px;
         }
         .admin-detail-topbar {
           display: flex;
@@ -485,6 +500,14 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
           gap: 16px;
           align-items: flex-start;
           flex-wrap: wrap;
+        }
+        .admin-detail-heading-block {
+          display: grid;
+          gap: 12px;
+        }
+        .admin-detail-heading-copy {
+          display: grid;
+          gap: 7px;
         }
         .admin-summary-card {
           display: grid;
@@ -494,8 +517,21 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
           display: flex;
           justify-content: space-between;
           gap: 18px;
-          align-items: flex-start;
+          align-items: center;
           flex-wrap: wrap;
+        }
+        .admin-profile-identity {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          min-width: 260px;
+        }
+        .admin-profile-copy {
+          display: grid;
+          gap: 5px;
+        }
+        .admin-profile-copy p {
+          margin: 0;
         }
         .admin-action-cluster {
           display: flex;
@@ -589,12 +625,6 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
           display: grid;
           gap: 18px;
         }
-        .admin-secondary-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(260px, .38fr);
-          gap: 16px;
-          align-items: start;
-        }
         .admin-confirm-message {
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
@@ -603,9 +633,6 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
           box-shadow: var(--chip-shadow);
         }
         @media (max-width: 960px) {
-          .admin-secondary-grid {
-            grid-template-columns: 1fr;
-          }
           .admin-action-cluster {
             justify-content: flex-start;
           }
@@ -613,17 +640,25 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
       `}</style>
 
       <div className="admin-detail-topbar">
-        <div style={{ display: 'grid', gap: 12 }}>
-          <Button variant="ghost" size="sm" iconRight={<ArrowLeft size={14} />} onClick={() => router.push(detailListPath(user))}>
-            Back
+        <div className="admin-detail-heading-block">
+          <Button
+            variant="ghost-accent"
+            size="sm"
+            iconLeft={<ArrowLeft size={14} />}
+            onClick={() => router.push(detailListPath(user))}
+          >
+            {backLabel}
           </Button>
-          <div>
+          <div className="admin-detail-heading-copy">
             <p style={{ margin: '0 0 8px', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 900, letterSpacing: '.35em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
               User Details
             </p>
             <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 34, fontWeight: 900, letterSpacing: 0, lineHeight: 1.1, color: 'var(--text-h)' }}>
               {getUserDisplayName(user)}
             </h1>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>
+              Review profile information, account status, and access actions from one place.
+            </p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -650,12 +685,30 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
       <Card>
         <div className="admin-summary-card">
           <div className="admin-summary-main">
-            <UserIdentityCell
-              name={getUserDisplayName(user)}
-              email={user.email}
-              initials={avatarInitials(user)}
-              src={profileImageSrc(user)}
-            />
+            <div className="admin-profile-identity">
+              <Avatar
+                src={profileImageSrc(user) ?? undefined}
+                initials={avatarInitials(user)}
+                alt={getUserDisplayName(user)}
+                size="xl"
+                style={{
+                  width: 94,
+                  height: 94,
+                  fontSize: 30,
+                  border: '2px solid rgba(238,202,68,.32)',
+                  boxShadow: '0 8px 18px rgba(0,0,0,.28), 0 2px 10px rgba(238,202,68,.28)',
+                }}
+              />
+              <div className="admin-profile-copy">
+                <p style={{ color: 'var(--text-h)', fontFamily: 'var(--font-display)', fontSize: 29, fontWeight: 800, lineHeight: 1.05 }}>
+                  {getUserDisplayName(user)}
+                </p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>{user.email}</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12.5 }}>
+                  Profile and account overview
+                </p>
+              </div>
+            </div>
             <div style={{ display: 'grid', gap: 10, justifyItems: 'end' }}>
               <div className="admin-action-cluster">
                 <Button
@@ -707,6 +760,8 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
             </div>
           </div>
 
+          <Divider strong />
+
           <div className="admin-meta-grid">
             <MetaItem label="Role" value={getUserTypeLabel(user.userType)} />
             <MetaItem label="Account Status" value={getAccountStatusLabel(user.accountStatus)} />
@@ -720,100 +775,81 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         </div>
       </Card>
 
-      <div className="admin-secondary-grid">
-        <Card>
-          <div className="admin-detail-card-heading">
-            <div>
-              <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 850, color: 'var(--text-h)' }}>
-                User Details
-              </p>
-              <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
-                Profile information is read-only until an admin starts a controlled edit.
-              </p>
-            </div>
-            {isEditing ? (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                  Cancel
-                </Button>
-                <Button variant="glass" size="sm" loading={isSaving} iconLeft={<Save size={14} />} onClick={() => { void handleSave(); }}>
-                  Save
-                </Button>
-              </div>
-            ) : (
-              <Button variant="subtle" size="sm" iconLeft={<Edit3 size={14} />} onClick={() => setIsEditing(true)}>
-                Edit Profile
-              </Button>
-            )}
-          </div>
-
-          {isEditing ? (
-            <div className="admin-edit-form">
-              <div className="admin-editor-grid">
-                <Input label="Email" value={user.email} disabled />
-                <Select
-                  label="Account Status"
-                  value={accountStatus}
-                  onChange={(event) => setAccountStatus(event.target.value as AccountStatus)}
-                  options={accountStatusOptions}
-                  disabled={isSelf}
-                />
-              </div>
-
-              <ProfileFields
-                userType={user.userType}
-                studentForm={studentForm}
-                setStudentForm={setStudentForm}
-                facultyForm={facultyForm}
-                setFacultyForm={setFacultyForm}
-                adminForm={adminForm}
-                setAdminForm={setAdminForm}
-                managerForm={managerForm}
-                setManagerForm={setManagerForm}
-              />
-
-              {user.userType === 'MANAGER' && (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 900, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                    Manager Role
-                  </p>
-                  <RoleRadioGroup value={managerRole} onChange={setManagerRole} />
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="admin-section-grid">
-              {detailSections.map((section) => (
-                <section key={section.title} className="admin-detail-section">
-                  <h2>{section.title}</h2>
-                  <div className="admin-detail-field-grid">
-                    {section.items.map((item) => (
-                      <DetailItem key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card>
-          <div style={{ display: 'grid', gap: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ display: 'flex', color: 'var(--yellow-700)' }}>
-                <ShieldCheck size={18} />
-              </span>
-              <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
-                Access Link
-              </p>
-            </div>
-            <Input label="Latest Access Link" value={user.lastInviteReference ?? ''} readOnly />
-            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-muted)' }}>
-              Links are generated from the action buttons above. Suspended users must be reactivated before another link can be issued.
+      <Card>
+        <div className="admin-detail-card-heading">
+          <div>
+            <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 850, color: 'var(--text-h)' }}>
+              User Details
+            </p>
+            <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
+              Profile information is read-only until an admin starts a controlled edit.
             </p>
           </div>
-        </Card>
-      </div>
+          {isEditing ? (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+              <Button variant="glass" size="sm" loading={isSaving} iconLeft={<Save size={14} />} onClick={() => { void handleSave(); }}>
+                Save
+              </Button>
+            </div>
+          ) : (
+            <Button variant="subtle" size="sm" iconLeft={<Edit3 size={14} />} onClick={() => setIsEditing(true)}>
+              Edit Profile
+            </Button>
+          )}
+        </div>
+
+        {isEditing ? (
+          <div className="admin-edit-form">
+            <div className="admin-editor-grid">
+              <Input label="Email" value={user.email} disabled />
+              <Select
+                label="Account Status"
+                value={accountStatus}
+                onChange={(event) => setAccountStatus(event.target.value as AccountStatus)}
+                options={accountStatusOptions}
+                disabled={isSelf}
+              />
+            </div>
+
+            <ProfileFields
+              userType={user.userType}
+              studentForm={studentForm}
+              setStudentForm={setStudentForm}
+              facultyForm={facultyForm}
+              setFacultyForm={setFacultyForm}
+              adminForm={adminForm}
+              setAdminForm={setAdminForm}
+              managerForm={managerForm}
+              setManagerForm={setManagerForm}
+            />
+
+            {user.userType === 'MANAGER' && (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 900, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  Manager Role
+                </p>
+                <RoleRadioGroup value={managerRole} onChange={setManagerRole} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="admin-section-grid">
+            {detailSections.map((section) => (
+              <section key={section.title} className="admin-detail-section">
+                <h2>{section.title}</h2>
+                <div className="admin-detail-field-grid">
+                  {section.items.map((item) => (
+                    <DetailItem key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

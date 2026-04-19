@@ -6,6 +6,7 @@ import {
   Bell,
   BookOpen,
   Calendar,
+  CheckCircle2,
   FileText,
   GraduationCap,
   KeyRound,
@@ -13,6 +14,7 @@ import {
   LogOut,
   MessageSquare,
   ShieldCheck,
+  Ticket,
   Users,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -21,6 +23,7 @@ import { Navbar, type NavItem } from '@/components/layout/Navbar';
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
 import { useAuth } from '@/components/providers/AuthProvider';
 import type { UserResponse } from '@/lib/api-types';
+import { getManagerDashboardPath } from '@/lib/auth-routing';
 import { filterSectionsByRole } from '@/lib/nav-rbac';
 import { getUserDisplayName, getUserInitials, getUserTypeLabel } from '@/lib/user-display';
 import type { WorkspaceKind } from '@/lib/workspace';
@@ -51,7 +54,7 @@ function getBrandSubtitle(workspace: Exclude<WorkspaceKind, 'auto'>) {
   }
 }
 
-function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSection[] {
+function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: UserResponse): NavSection[] {
   switch (workspace) {
     case 'admin':
       return [
@@ -99,6 +102,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSecti
               href: '/admin/admins',
               allowedUserTypes: ['ADMIN'],
             },
+            {
+              label: 'Tickets',
+              icon: Ticket,
+              href: '/admin/tickets',
+              allowedUserTypes: ['ADMIN'],
+            },
           ],
         },
         {
@@ -139,27 +148,41 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>): NavSecti
             {
               label: 'Dashboard',
               icon: LayoutDashboard,
-              href: '/managers',
+              href: getManagerDashboardPath(user?.managerRole),
               allowedUserTypes: ['MANAGER'],
             },
             {
               label: 'Catalog',
               icon: BookOpen,
-              href: '/managers/catalog',
+              href: '/catalog-managers/catalog',
               allowedUserTypes: ['MANAGER'],
               allowedManagerRoles: ['CATALOG_MANAGER'],
             },
             {
               label: 'Bookings',
               icon: Calendar,
-              href: '/managers/bookings',
+              href: '/booking-managers/bookings',
               allowedUserTypes: ['MANAGER'],
               allowedManagerRoles: ['BOOKING_MANAGER'],
             },
             {
-              label: 'Tickets',
+              label: 'My Tickets',
               icon: MessageSquare,
-              href: '/managers/tickets',
+              href: '/ticket-managers/tickets',
+              allowedUserTypes: ['MANAGER'],
+              allowedManagerRoles: ['TICKET_MANAGER'],
+            },
+            {
+              label: 'Completed',
+              icon: CheckCircle2,
+              href: '/ticket-managers/completed',
+              allowedUserTypes: ['MANAGER'],
+              allowedManagerRoles: ['TICKET_MANAGER'],
+            },
+            {
+              label: 'Analytics',
+              icon: BarChart2,
+              href: '/ticket-managers/analytics',
               allowedUserTypes: ['MANAGER'],
               allowedManagerRoles: ['TICKET_MANAGER'],
             },
@@ -262,7 +285,7 @@ export function ProtectedShell({
   }, [router, signOut]);
 
   const resolvedSections = React.useMemo<NavSection[]>(() => {
-    return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace), user);
+    return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace, user), user);
   }, [resolvedWorkspace, sections, user]);
 
   if (resolvedWorkspace === 'students') {
