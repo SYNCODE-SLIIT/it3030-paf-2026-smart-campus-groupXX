@@ -1,8 +1,10 @@
 package com.university.smartcampus.user.service;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -23,6 +25,7 @@ import com.university.smartcampus.common.dto.ApiDtos.MessageResponse;
 import com.university.smartcampus.common.dto.ApiDtos.UserResponse;
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.AcademicYear;
+import com.university.smartcampus.common.enums.AppEnums.AdminAction;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.Semester;
 import com.university.smartcampus.common.enums.AppEnums.StudentFaculty;
@@ -69,6 +72,7 @@ public class UserManagementService {
     private final ProfileImageStorageClient profileImageStorageClient;
     private final SmartCampusProperties properties;
     private final UserIdentifierService userIdentifierService;
+    private final AuditLogService auditLogService;
 
     public UserManagementService(
             UserRepository userRepository,
@@ -80,7 +84,8 @@ public class UserManagementService {
             CurrentUserService currentUserService,
             ProfileImageStorageClient profileImageStorageClient,
             SmartCampusProperties properties,
-            UserIdentifierService userIdentifierService) {
+            UserIdentifierService userIdentifierService,
+            AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
         this.managerRepository = managerRepository;
@@ -91,10 +96,16 @@ public class UserManagementService {
         this.profileImageStorageClient = profileImageStorageClient;
         this.properties = properties;
         this.userIdentifierService = userIdentifierService;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request) {
+        return createUser(request, null);
+    }
+
+    @Transactional
+    public UserResponse createUser(CreateUserRequest request, UserEntity performedByAdmin) {
         String email = currentUserService.normalizeEmail(request.email());
         if (!StringUtils.hasText(email)) {
             throw new BadRequestException("Email is required.");
@@ -115,6 +126,16 @@ public class UserManagementService {
 
         if (request.sendInvite()) {
             recordDelivery(user, authProviderClient.sendInviteLink(user.getEmail()));
+        }
+
+        if (performedByAdmin != null) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("userType", enumName(user.getUserType()));
+            details.put("accountStatus", enumName(user.getAccountStatus()));
+            details.put("sendInvite", request.sendInvite());
+            details.put("inviteSendCount", user.getInviteSendCount());
+            details.put("managerRole", user.getManagerProfile() != null ? enumName(user.getManagerProfile().getManagerRole()) : null);
+            logAuditAction(AdminAction.USER_CREATED, performedByAdmin, user, details);
         }
 
         return userMapper.toUserResponse(user);
@@ -155,7 +176,14 @@ public class UserManagementService {
 
     @Transactional
     public UserResponse updateUser(UUID id, UpdateUserRequest request) {
+        return updateUser(id, request, null);
+    }
+
+    @Transactional
+    public UserResponse updateUser(UUID id, UpdateUserRequest request, UserEntity performedByAdmin) {
         UserEntity user = getUserEntity(id);
+        AccountStatus previousStatus = user.getAccountStatus();
+        Map<String, Object> before = snapshotForAudit(user);
 
         if (request.accountStatus() != null) {
             user.setAccountStatus(request.accountStatus());
@@ -171,11 +199,40 @@ public class UserManagementService {
             case MANAGER -> updateManagerProfile(user, request.managerProfile());
         }
 
+        if (performedByAdmin != null) {
+            Map<String, Object> after = snapshotForAudit(user);
+            Map<String, Object> changedFields = diffSnapshots(before, after);
+
+            if (!changedFields.isEmpty()) {
+                Map<String, Object> details = new LinkedHashMap<>();
+                details.put("changedFields", changedFields);
+                logAuditAction(AdminAction.USER_UPDATED, performedByAdmin, user, details);
+            }
+
+            if (!Objects.equals(previousStatus, user.getAccountStatus())) {
+                Map<String, Object> statusDetails = new LinkedHashMap<>();
+                statusDetails.put("oldStatus", enumName(previousStatus));
+                statusDetails.put("newStatus", enumName(user.getAccountStatus()));
+
+                if (user.getAccountStatus() == AccountStatus.SUSPENDED) {
+                    logAuditAction(AdminAction.USER_SUSPENDED, performedByAdmin, user, statusDetails);
+                }
+                if (user.getAccountStatus() == AccountStatus.ACTIVE) {
+                    logAuditAction(AdminAction.USER_ACTIVATED, performedByAdmin, user, statusDetails);
+                }
+            }
+        }
+
         return userMapper.toUserResponse(user);
     }
 
     @Transactional
     public UserResponse replaceManagerRole(UUID id, ManagerRole managerRole) {
+        return replaceManagerRole(id, managerRole, null);
+    }
+
+    @Transactional
+    public UserResponse replaceManagerRole(UUID id, ManagerRole managerRole, UserEntity performedByAdmin) {
         if (managerRole == null) {
             throw new BadRequestException("Managers must have one manager role.");
         }
@@ -186,24 +243,49 @@ public class UserManagementService {
         }
 
         ManagerEntity manager = user.getManagerProfile();
+        ManagerRole previousRole = manager.getManagerRole();
         manager.setManagerRole(managerRole);
         managerRepository.save(manager);
+
+        if (performedByAdmin != null && !Objects.equals(previousRole, managerRole)) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("oldManagerRole", enumName(previousRole));
+            details.put("newManagerRole", enumName(managerRole));
+            logAuditAction(AdminAction.MANAGER_ROLE_CHANGED, performedByAdmin, user, details);
+        }
 
         return userMapper.toUserResponse(user);
     }
 
     @Transactional
     public MessageResponse resendInvite(UUID id) {
+        return resendInvite(id, null);
+    }
+
+    @Transactional
+    public MessageResponse resendInvite(UUID id, UserEntity performedByAdmin) {
         UserEntity user = getUserEntity(id);
         if (user.getAccountStatus() == AccountStatus.SUSPENDED) {
             throw new BadRequestException("Suspended users cannot receive login links.");
         }
+
+        int previousInviteCount = user.getInviteSendCount();
 
         AuthProviderClient.DeliveryResult delivery = user.getAccountStatus() == AccountStatus.INVITED
                 ? authProviderClient.sendInviteLink(user.getEmail())
                 : authProviderClient.sendMagicLink(user.getEmail());
 
         recordDelivery(user, delivery);
+
+        if (performedByAdmin != null) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("oldInviteSendCount", previousInviteCount);
+            details.put("newInviteSendCount", user.getInviteSendCount());
+            details.put("deliveryMethod", delivery.deliveryMethod() != null ? delivery.deliveryMethod().name() : null);
+            details.put("redirectUri", delivery.redirectUri());
+            logAuditAction(AdminAction.INVITE_RESENT, performedByAdmin, user, details);
+        }
+
         return new MessageResponse("Access link generated.");
     }
 
@@ -221,10 +303,41 @@ public class UserManagementService {
 
     @Transactional
     public MessageResponse deleteUser(UUID id, UUID requestingAdminId) {
+        UserEntity requestingAdmin = userRepository.findById(requestingAdminId).orElse(null);
+        if (requestingAdmin != null) {
+            return deleteUser(id, requestingAdmin);
+        }
+
         UserEntity user = getUserEntity(id);
 
         if (user.getId().equals(requestingAdminId)) {
             throw new BadRequestException("You cannot delete your own admin account.");
+        }
+
+        UUID authUserId = user.getAuthUserId();
+        String email = user.getEmail();
+
+        userRepository.delete(user);
+        userRepository.flush();
+        authIdentityClient.deleteIdentity(authUserId, email);
+
+        return new MessageResponse("User deleted.");
+    }
+
+    @Transactional
+    public MessageResponse deleteUser(UUID id, UserEntity requestingAdmin) {
+        UserEntity user = getUserEntity(id);
+
+        if (requestingAdmin != null && user.getId().equals(requestingAdmin.getId())) {
+            throw new BadRequestException("You cannot delete your own admin account.");
+        }
+
+        if (requestingAdmin != null) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("userType", enumName(user.getUserType()));
+            details.put("accountStatus", enumName(user.getAccountStatus()));
+            details.put("inviteSendCount", user.getInviteSendCount());
+            logAuditAction(AdminAction.USER_DELETED, requestingAdmin, user, details);
         }
 
         UUID authUserId = user.getAuthUserId();
@@ -542,6 +655,91 @@ public class UserManagementService {
 
     private boolean hasManagerRole(UserEntity user, ManagerRole managerRole) {
         return user.getManagerProfile() != null && user.getManagerProfile().hasManagerRole(managerRole);
+    }
+
+    private void logAuditAction(AdminAction action, UserEntity performedByAdmin, UserEntity targetUser, Map<String, Object> details) {
+        if (performedByAdmin == null || targetUser == null) {
+            return;
+        }
+
+        auditLogService.logAction(
+            action,
+            performedByAdmin.getId(),
+            performedByAdmin.getEmail(),
+            targetUser.getId(),
+            targetUser.getEmail(),
+            details
+        );
+    }
+
+    private Map<String, Object> snapshotForAudit(UserEntity user) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+
+        snapshot.put("accountStatus", enumName(user.getAccountStatus()));
+
+        if (user.getStudentProfile() != null) {
+            StudentEntity student = user.getStudentProfile();
+            snapshot.put("student.firstName", student.getFirstName());
+            snapshot.put("student.lastName", student.getLastName());
+            snapshot.put("student.preferredName", student.getPreferredName());
+            snapshot.put("student.phoneNumber", student.getPhoneNumber());
+            snapshot.put("student.facultyName", enumName(student.getFacultyName()));
+            snapshot.put("student.programName", enumName(student.getProgramName()));
+            snapshot.put("student.academicYear", enumName(student.getAcademicYear()));
+            snapshot.put("student.semester", enumName(student.getSemester()));
+            snapshot.put("student.profileImageUrl", student.getProfileImageUrl());
+            snapshot.put("student.emailNotificationsEnabled", student.getEmailNotificationsEnabled());
+            snapshot.put("student.smsNotificationsEnabled", student.getSmsNotificationsEnabled());
+        }
+
+        if (user.getFacultyProfile() != null) {
+            FacultyEntity faculty = user.getFacultyProfile();
+            snapshot.put("faculty.firstName", faculty.getFirstName());
+            snapshot.put("faculty.lastName", faculty.getLastName());
+            snapshot.put("faculty.preferredName", faculty.getPreferredName());
+            snapshot.put("faculty.phoneNumber", faculty.getPhoneNumber());
+            snapshot.put("faculty.department", faculty.getDepartment());
+            snapshot.put("faculty.designation", faculty.getDesignation());
+        }
+
+        if (user.getAdminProfile() != null) {
+            AdminEntity admin = user.getAdminProfile();
+            snapshot.put("admin.fullName", admin.getFullName());
+            snapshot.put("admin.phoneNumber", admin.getPhoneNumber());
+        }
+
+        if (user.getManagerProfile() != null) {
+            ManagerEntity manager = user.getManagerProfile();
+            snapshot.put("manager.firstName", manager.getFirstName());
+            snapshot.put("manager.lastName", manager.getLastName());
+            snapshot.put("manager.preferredName", manager.getPreferredName());
+            snapshot.put("manager.phoneNumber", manager.getPhoneNumber());
+            snapshot.put("manager.managerRole", enumName(manager.getManagerRole()));
+        }
+
+        return snapshot;
+    }
+
+    private Map<String, Object> diffSnapshots(Map<String, Object> before, Map<String, Object> after) {
+        Map<String, Object> changedFields = new LinkedHashMap<>();
+
+        for (String field : before.keySet()) {
+            Object oldValue = before.get(field);
+            Object newValue = after.get(field);
+
+            if (!Objects.equals(oldValue, newValue)) {
+                Map<String, Object> values = new LinkedHashMap<>();
+                values.put("old", oldValue);
+                values.put("new", newValue);
+                changedFields.put(field, values);
+            }
+        }
+
+        return changedFields;
+    }
+
+    private String enumName(Enum<?> value) {
+        return value == null ? null : value.name();
     }
 
     private void require(boolean condition, String message) {

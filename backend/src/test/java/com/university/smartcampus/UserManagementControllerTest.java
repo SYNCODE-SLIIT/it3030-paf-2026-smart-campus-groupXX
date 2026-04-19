@@ -117,6 +117,75 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void adminCanListAuditLogs() throws Exception {
+        CreateUserRequest request = new CreateUserRequest(
+            "audit-log-student@campus.test",
+            UserType.STUDENT,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        mockMvc.perform(post("/api/admin/users")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/admin/audit-logs")
+                .with(jwtFor("admin@campus.test"))
+                .param("action", "USER_CREATED")
+                .param("size", "5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].action").value("USER_CREATED"))
+            .andExpect(jsonPath("$.items[0].performedByEmail").value("admin@campus.test"))
+            .andExpect(jsonPath("$.items[0].targetUserEmail").value("audit-log-student@campus.test"));
+    }
+
+    @Test
+    void adminCanListAuditLogsForSpecificUser() throws Exception {
+        CreateUserRequest request = new CreateUserRequest(
+            "audit-user@campus.test",
+            UserType.STUDENT,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        mockMvc.perform(post("/api/admin/users")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isCreated());
+
+        UserEntity created = userRepository.findByEmailIgnoreCase("audit-user@campus.test").orElseThrow();
+
+        mockMvc.perform(get("/api/admin/audit-logs/user/{id}", created.getId())
+                .with(jwtFor("admin@campus.test"))
+                .param("size", "5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].targetUserId").value(created.getId().toString()));
+    }
+
+    @Test
+    void nonAdminCannotAccessAuditLogs() throws Exception {
+        seedStudent("student.no.audit@campus.test", AccountStatus.ACTIVE, true);
+
+        mockMvc.perform(get("/api/admin/audit-logs")
+                .with(jwtFor("student.no.audit@campus.test")))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/audit-logs"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void unauthenticatedUserCannotAccessAdminUsersEndpoint() throws Exception {
         mockMvc.perform(get("/api/admin/users"))
             .andExpect(status().isUnauthorized());

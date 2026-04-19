@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.university.smartcampus.common.dto.ApiDtos.UserResponse;
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.AcademicYear;
+import com.university.smartcampus.common.enums.AppEnums.AdminAction;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.Semester;
 import com.university.smartcampus.common.enums.AppEnums.StudentFaculty;
@@ -30,9 +31,13 @@ import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.ticket.entity.TicketEntity;
 import com.university.smartcampus.ticket.repository.TicketRepository;
 import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
+import com.university.smartcampus.user.dto.AdminDtos.UpdateUserRequest;
 import com.university.smartcampus.user.dto.StudentDtos.StudentOnboardingRequest;
+import com.university.smartcampus.user.entity.AdminEntity;
+import com.university.smartcampus.user.entity.ManagerEntity;
 import com.university.smartcampus.user.entity.StudentEntity;
 import com.university.smartcampus.user.entity.UserEntity;
+import com.university.smartcampus.user.repository.AuditLogRepository;
 import com.university.smartcampus.user.repository.UserRepository;
 import com.university.smartcampus.user.service.UserManagementService;
 
@@ -51,6 +56,9 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private TicketRepository ticketRepository;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -87,6 +95,30 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
         assertThat(recordingAuthProviderClient.deliveries()).hasSize(1);
         assertThat(response.lastInviteReference()).isNotBlank();
         assertThat(response.inviteSendCount()).isEqualTo(1);
+    }
+
+    @Test
+    void createUserWithAdminActorWritesAuditLog() {
+        UserEntity admin = seedAdmin("admin.audit@campus.test");
+
+        CreateUserRequest request = new CreateUserRequest(
+            "audited-manager@campus.test",
+            UserType.MANAGER,
+            true,
+            null,
+            null,
+            null,
+            null,
+            ManagerRole.CATALOG_MANAGER
+        );
+
+        UserResponse response = userManagementService.createUser(request, admin);
+
+        var entries = auditLogRepository.findByTargetUserIdOrderByCreatedAtDesc(response.id());
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).getAction()).isEqualTo(AdminAction.USER_CREATED);
+        assertThat(entries.get(0).getPerformedById()).isEqualTo(admin.getId());
+        assertThat(entries.get(0).getTargetUserEmail()).isEqualTo("audited-manager@campus.test");
     }
 
     @Test
@@ -164,6 +196,59 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void updateUserWithStatusChangeWritesUpdateAndSuspendAuditLogs() {
+        UserEntity admin = seedAdmin("admin-status@campus.test");
+        UserEntity studentUser = seedStudent("student-status@campus.test");
+
+        userManagementService.updateUser(
+            studentUser.getId(),
+            new UpdateUserRequest(AccountStatus.SUSPENDED, null, null, null, null),
+            admin
+        );
+
+        var entries = auditLogRepository.findByTargetUserIdOrderByCreatedAtDesc(studentUser.getId());
+        assertThat(entries).extracting(entry -> entry.getAction())
+            .contains(AdminAction.USER_UPDATED, AdminAction.USER_SUSPENDED);
+    }
+
+    @Test
+    void resendInviteWithAdminActorWritesAuditLog() {
+        UserEntity admin = seedAdmin("admin-invite@campus.test");
+        UserEntity studentUser = seedStudent("invite-student@campus.test");
+
+        userManagementService.resendInvite(studentUser.getId(), admin);
+
+        var entries = auditLogRepository.findByTargetUserIdOrderByCreatedAtDesc(studentUser.getId());
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).getAction()).isEqualTo(AdminAction.INVITE_RESENT);
+    }
+
+    @Test
+    void replaceManagerRoleWithAdminActorWritesAuditLog() {
+        UserEntity admin = seedAdmin("admin-manager@campus.test");
+        UserEntity manager = seedManager("manager-role@campus.test", ManagerRole.CATALOG_MANAGER);
+
+        userManagementService.replaceManagerRole(manager.getId(), ManagerRole.TICKET_MANAGER, admin);
+
+        var entries = auditLogRepository.findByTargetUserIdOrderByCreatedAtDesc(manager.getId());
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).getAction()).isEqualTo(AdminAction.MANAGER_ROLE_CHANGED);
+    }
+
+    @Test
+    void deleteUserWithAdminActorWritesAuditLog() {
+        UserEntity admin = seedAdmin("admin-delete@campus.test");
+        UserEntity studentUser = seedStudent("delete-audited@campus.test");
+
+        userManagementService.deleteUser(studentUser.getId(), admin);
+
+        var entries = auditLogRepository.findByPerformedByIdOrderByCreatedAtDesc(admin.getId());
+        assertThat(entries).isNotEmpty();
+        assertThat(entries.get(0).getAction()).isEqualTo(AdminAction.USER_DELETED);
+        assertThat(entries.get(0).getTargetUserEmail()).isEqualTo("delete-audited@campus.test");
+    }
+
+    @Test
     void deleteUserCascadesReportedTickets() {
         UserEntity reporter = seedStudent("ticket-reporter@campus.test");
         reporter.setAuthUserId(UUID.randomUUID());
@@ -230,6 +315,44 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
         student.setUser(user);
         student.setOnboardingCompleted(false);
         user.setStudentProfile(student);
+
+        return userRepository.save(user);
+    }
+
+    private UserEntity seedAdmin(String email) {
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setEmail(email);
+        user.setUserType(UserType.ADMIN);
+        user.setAccountStatus(AccountStatus.ACTIVE);
+        user.setInvitedAt(Instant.now());
+        user.setActivatedAt(Instant.now());
+
+        AdminEntity adminProfile = new AdminEntity();
+        adminProfile.setUser(user);
+        adminProfile.setFullName("Admin User");
+        adminProfile.setEmployeeNumber("ADM-001");
+        user.setAdminProfile(adminProfile);
+
+        return userRepository.save(user);
+    }
+
+    private UserEntity seedManager(String email, ManagerRole managerRole) {
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setEmail(email);
+        user.setUserType(UserType.MANAGER);
+        user.setAccountStatus(AccountStatus.ACTIVE);
+        user.setInvitedAt(Instant.now());
+        user.setActivatedAt(Instant.now());
+
+        ManagerEntity manager = new ManagerEntity();
+        manager.setUser(user);
+        manager.setFirstName("Manager");
+        manager.setLastName("User");
+        manager.setEmployeeNumber("MGR-001");
+        manager.setManagerRole(managerRole);
+        user.setManagerProfile(manager);
 
         return userRepository.save(user);
     }
