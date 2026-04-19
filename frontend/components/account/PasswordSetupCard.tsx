@@ -70,7 +70,7 @@ function policyErrorMessage(password: string) {
 
 export function PasswordSetupCard({
   title = 'Password',
-  description = 'Set a password for future email sign-in. Google sign-in still works.',
+  description = 'Set a password for future email sign-in. Google and Microsoft sign-in still work.',
   compact = false,
   onPasswordSaved,
   policyPortalTargetId,

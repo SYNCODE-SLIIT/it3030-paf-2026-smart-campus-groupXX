@@ -59,6 +59,12 @@ export function getLoginReasonAlert(reason: string | null) {
         title: 'Authentication failed',
         message: 'We could not complete the sign-in flow. Please try again.',
       };
+    case 'provider_email_missing':
+      return {
+        variant: 'error' as const,
+        title: 'Microsoft account email unavailable',
+        message: 'Microsoft did not return an email for this account. Use an account with a mailbox, or ask your admin to enable the email claim in Azure.',
+      };
     case 'signed_out':
       return {
         variant: 'info' as const,

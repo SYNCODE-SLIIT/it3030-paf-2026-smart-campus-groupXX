@@ -177,6 +177,7 @@ export interface ErrorResponse {
   error: string;
   message: string;
   path: string;
+  code?: string;
 }
 
 export interface StudentProfileResponse {

@@ -57,7 +57,7 @@ public class TicketController {
     public TicketResponse createTicket(
             @Valid @RequestBody CreateTicketRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.createTicket(user, request);
     }
 
@@ -67,13 +67,13 @@ public class TicketController {
             @RequestParam(required = false) TicketCategory category,
             @RequestParam(required = false) TicketPriority priority,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.listTickets(user, status, category, priority);
     }
 
     @GetMapping("/{ticketRef}")
     public TicketResponse getTicket(@PathVariable String ticketRef, Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.getTicket(user, ticketRef);
     }
 
@@ -82,7 +82,7 @@ public class TicketController {
             @PathVariable String ticketRef,
             @Valid @RequestBody UpdateTicketRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.updateTicket(user, ticketRef, request);
     }
 
@@ -91,7 +91,7 @@ public class TicketController {
             @PathVariable String ticketRef,
             @Valid @RequestBody TicketStatusUpdateRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.updateStatus(user, ticketRef, request);
     }
 
@@ -100,13 +100,13 @@ public class TicketController {
             @PathVariable String ticketRef,
             @Valid @RequestBody AssignTicketRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.assignTicket(user, ticketRef, request.assignedTo());
     }
 
     @GetMapping("/{ticketRef}/comments")
     public List<TicketCommentResponse> listComments(@PathVariable String ticketRef, Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.listComments(user, ticketRef);
     }
 
@@ -116,13 +116,13 @@ public class TicketController {
             @PathVariable String ticketRef,
             @Valid @RequestBody AddCommentRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.addComment(user, ticketRef, request);
     }
 
     @GetMapping("/{ticketRef}/attachments")
     public List<TicketAttachmentResponse> listAttachments(@PathVariable String ticketRef, Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.listAttachments(user, ticketRef);
     }
 
@@ -132,7 +132,7 @@ public class TicketController {
             @PathVariable String ticketRef,
             @Valid @RequestBody AddTicketAttachmentRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.addAttachment(user, ticketRef, request);
     }
 
@@ -142,7 +142,7 @@ public class TicketController {
             @PathVariable String ticketRef,
             @RequestPart("file") MultipartFile file,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.uploadAttachment(user, ticketRef, file);
     }
 
@@ -152,7 +152,7 @@ public class TicketController {
             @PathVariable String ticketRef,
             @PathVariable UUID attachmentId,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         ticketService.deleteAttachment(user, ticketRef, attachmentId);
     }
 
@@ -160,7 +160,7 @@ public class TicketController {
     public List<TicketStatusHistoryResponse> getStatusHistory(
             @PathVariable String ticketRef,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.getStatusHistory(user, ticketRef);
     }
 }

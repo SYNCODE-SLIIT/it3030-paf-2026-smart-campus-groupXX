@@ -69,6 +69,8 @@ interface RequestOptions {
 }
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
+const ONBOARDING_REQUIRED_ERROR_CODE = 'ONBOARDING_REQUIRED';
+const STUDENT_ONBOARDING_PATH = '/students/onboarding';
 
 const STATUS_MESSAGES: Partial<Record<number, string>> = {
   0: 'Cannot reach the backend service. Please check that the backend is running and try again.',
@@ -136,6 +138,32 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function isOnboardingRequiredError(status: number, details: ErrorResponse | null) {
+  if (status !== 403 || !details) {
+    return false;
+  }
+
+  if (details.code === ONBOARDING_REQUIRED_ERROR_CODE) {
+    return true;
+  }
+
+  return details.message.toLowerCase().includes('complete onboarding');
+}
+
+function redirectToOnboardingIfRequired(status: number, details: ErrorResponse | null) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (!isOnboardingRequiredError(status, details)) {
+    return;
+  }
+
+  if (window.location.pathname !== STUDENT_ONBOARDING_PATH) {
+    window.location.assign(STUDENT_ONBOARDING_PATH);
+  }
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers({
     Accept: 'application/json',
@@ -194,6 +222,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     } catch {
       details = null;
     }
+
+    redirectToOnboardingIfRequired(response.status, details);
 
     throw new ApiError(
       response.status,
@@ -458,6 +488,8 @@ export async function uploadStudentProfileImage(accessToken: string, file: File)
       details = null;
     }
 
+    redirectToOnboardingIfRequired(response.status, details);
+
     throw new ApiError(
       response.status,
       details?.message ?? `Request failed with status ${response.status}.`,
@@ -552,6 +584,9 @@ export async function uploadTicketAttachment(
   if (!response.ok) {
     let details: ErrorResponse | null = null;
     try { details = await response.json(); } catch { details = null; }
+
+    redirectToOnboardingIfRequired(response.status, details);
+
     throw new ApiError(response.status, details?.message ?? `Upload failed with status ${response.status}.`, details);
   }
 

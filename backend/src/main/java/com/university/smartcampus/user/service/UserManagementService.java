@@ -239,11 +239,11 @@ public class UserManagementService {
 
     @Transactional
     public SessionSyncResponse syncSession(Jwt jwt) {
-        String email = currentUserService.normalizedEmailFromJwt(jwt);
         UUID subject = currentUserService.subjectFromJwt(jwt);
 
-        UserEntity user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ForbiddenException("This authenticated account has not been provisioned."));
+        UserEntity user = userRepository.findByAuthUserId(subject)
+            .orElseGet(() -> userRepository.findByEmailIgnoreCase(currentUserService.normalizedEmailFromJwt(jwt))
+                .orElseThrow(() -> new ForbiddenException("This authenticated account has not been provisioned.")));
 
         if (user.getAccountStatus() == AccountStatus.SUSPENDED) {
             throw new ForbiddenException("This account is suspended.");

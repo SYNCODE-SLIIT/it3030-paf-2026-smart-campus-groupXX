@@ -19,6 +19,7 @@ import com.university.smartcampus.common.exception.ConflictException;
 import com.university.smartcampus.common.exception.ExternalServiceException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.common.exception.OnboardingRequiredException;
 import com.university.smartcampus.common.exception.UnauthorizedException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -54,6 +55,17 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Uploaded file is too large.", request);
     }
 
+    @ExceptionHandler(OnboardingRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleOnboardingRequired(OnboardingRequiredException exception,
+            HttpServletRequest request) {
+        return build(
+            HttpStatus.FORBIDDEN,
+            exception.getMessage(),
+            OnboardingRequiredException.CODE,
+            request
+        );
+    }
+
     @ExceptionHandler({ ForbiddenException.class, AccessDeniedException.class })
     public ResponseEntity<ErrorResponse> handleForbidden(Exception exception, HttpServletRequest request) {
         return build(HttpStatus.FORBIDDEN, exception.getMessage(), request);
@@ -81,12 +93,17 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, HttpServletRequest request) {
+        return build(status, message, null, request);
+    }
+
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, String code, HttpServletRequest request) {
         ErrorResponse body = new ErrorResponse(
                 Instant.now(),
                 status.value(),
                 status.getReasonPhrase(),
                 message,
-                request.getRequestURI());
+                request.getRequestURI(),
+                code);
         return ResponseEntity.status(status).body(body);
     }
 }

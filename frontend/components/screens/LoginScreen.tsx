@@ -24,10 +24,11 @@ type AlertState = {
 
 export function LoginScreen({ reason }: { reason: string | null }) {
   const router = useRouter();
-  const { authConfigured, appUser, refreshMe, signInWithGoogle, signInWithPassword } = useAuth();
+  const { authConfigured, appUser, refreshMe, signInWithGoogle, signInWithMicrosoft, signInWithPassword } = useAuth();
   const initialAlert = React.useMemo(() => getLoginReasonAlert(reason), [reason]);
   const [alert, setAlert] = React.useState<AlertState>(initialAlert);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
+  const [isMicrosoftLoading, setIsMicrosoftLoading] = React.useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = React.useState(false);
 
   React.useEffect(() => {
@@ -51,6 +52,21 @@ export function LoginScreen({ reason }: { reason: string | null }) {
         message: getErrorMessage(error, 'We could not start Google authentication.'),
       });
       setIsGoogleLoading(false);
+    }
+  }
+
+  async function handleMicrosoftSignIn() {
+    setAlert(null);
+    setIsMicrosoftLoading(true);
+    try {
+      await signInWithMicrosoft();
+    } catch (error) {
+      setAlert({
+        variant: 'error',
+        title: 'Microsoft sign-in failed',
+        message: getErrorMessage(error, 'We could not start Microsoft authentication.'),
+      });
+      setIsMicrosoftLoading(false);
     }
   }
 
@@ -135,12 +151,16 @@ export function LoginScreen({ reason }: { reason: string | null }) {
               alert={alert}
               isPasswordLoading={isPasswordLoading}
               isGoogleLoading={isGoogleLoading}
+              isMicrosoftLoading={isMicrosoftLoading}
               authConfigured={authConfigured}
               onPasswordSubmit={(email, password) => {
                 void handlePasswordSubmit(email, password);
               }}
               onGoogleSignIn={() => {
                 void handleGoogleSignIn();
+              }}
+              onMicrosoftSignIn={() => {
+                void handleMicrosoftSignIn();
               }}
             />
           </div>
