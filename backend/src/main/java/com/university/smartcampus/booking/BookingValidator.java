@@ -62,6 +62,21 @@ public class BookingValidator {
         }
     }
 
+    public void ensureNoPendingOrApprovedOverlap(UUID resourceId, Instant startTime, Instant endTime, UUID bookingIdToExclude) {
+        Objects.requireNonNull(resourceId, "Resource id is required.");
+        Objects.requireNonNull(bookingIdToExclude, "Booking id is required.");
+        boolean overlapping = bookingRepository.existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThanAndIdNot(
+            resourceId,
+            PENDING_OR_APPROVED,
+            endTime,
+            startTime,
+            bookingIdToExclude
+        );
+        if (overlapping) {
+            throw new BadRequestException("This resource already has a booking in the requested time range.");
+        }
+    }
+
     public void ensureNoApprovedOverlap(UUID resourceId, Instant startTime, Instant endTime, UUID bookingIdToExclude) {
         Objects.requireNonNull(resourceId, "Resource id is required.");
         Objects.requireNonNull(bookingIdToExclude, "Booking id is required.");

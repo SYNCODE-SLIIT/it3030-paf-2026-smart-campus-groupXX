@@ -2,9 +2,13 @@ import {
   type AccountStatus,
   type AddCommentRequest,
   type BookingDecisionRequest,
+  type BookingModificationResponse,
+  type BookingNotificationResponse,
   type BookingResponse,
   type CancelBookingRequest,
+  type CheckInResponse,
   type CreateBookingRequest,
+  type CreateRecurringBookingRequest,
   type CreateResourceRequest,
   type CreateTicketRequest,
   type CreateUserRequest,
@@ -12,6 +16,9 @@ import {
   type ManagerRole,
   type ManagerRoleUpdateRequest,
   type MessageResponse,
+  type ModificationDecisionRequest,
+  type RecurringBookingResponse,
+  type RequestModificationRequest,
   type ResourceResponse,
   type SessionSyncResponse,
   type StudentOnboardingRequest,
@@ -416,6 +423,126 @@ export async function cancelApprovedBookingAsManager(
     method: 'POST',
     accessToken,
     body: payload,
+  });
+}
+
+// Recurring Bookings
+export async function createRecurringBooking(accessToken: string, payload: CreateRecurringBookingRequest) {
+  return request<RecurringBookingResponse>('/api/recurring-bookings', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function listMyRecurringBookings(accessToken: string) {
+  return request<RecurringBookingResponse[]>('/api/recurring-bookings', {
+    accessToken,
+  });
+}
+
+export async function getRecurringBooking(accessToken: string, bookingId: string) {
+  return request<RecurringBookingResponse>(`/api/recurring-bookings/${bookingId}`, {
+    accessToken,
+  });
+}
+
+export async function deactivateRecurringBooking(accessToken: string, bookingId: string) {
+  return request<RecurringBookingResponse>(`/api/recurring-bookings/${bookingId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+// Booking Modifications
+export async function requestBookingModification(
+  accessToken: string,
+  bookingId: string,
+  payload: RequestModificationRequest,
+) {
+  return request<BookingModificationResponse>(`/api/bookings/${bookingId}/modifications`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function listModificationsForBooking(bookingId: string) {
+  return request<BookingModificationResponse[]>(`/api/bookings/${bookingId}/modifications`);
+}
+
+export async function listPendingModifications(accessToken: string) {
+  return request<BookingModificationResponse[]>('/api/admin/modifications/pending', {
+    accessToken,
+  });
+}
+
+export async function approveModification(
+  accessToken: string,
+  modificationId: string,
+  payload?: ModificationDecisionRequest,
+) {
+  return request<BookingModificationResponse>(`/api/admin/modifications/${modificationId}/approve`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function rejectModification(
+  accessToken: string,
+  modificationId: string,
+  payload?: ModificationDecisionRequest,
+) {
+  return request<BookingModificationResponse>(`/api/admin/modifications/${modificationId}/reject`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+// Booking Check-In
+export async function checkInBooking(accessToken: string, bookingId: string) {
+  return request<CheckInResponse>(`/api/bookings/${bookingId}/check-in`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function getCheckInStatus(bookingId: string) {
+  return request<CheckInResponse>(`/api/bookings/${bookingId}/check-in`);
+}
+
+export async function markBookingAsNoShow(accessToken: string, bookingId: string) {
+  return request<CheckInResponse>(`/api/admin/bookings/${bookingId}/mark-no-show`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function completeBooking(accessToken: string, bookingId: string) {
+  return request<CheckInResponse>(`/api/admin/bookings/${bookingId}/complete`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+// Booking Notifications
+export async function listBookingNotifications(accessToken: string) {
+  return request<BookingNotificationResponse[]>('/api/notifications/bookings', {
+    accessToken,
+  });
+}
+
+export async function listUnreadNotifications(accessToken: string) {
+  return request<BookingNotificationResponse[]>('/api/notifications/bookings/unread', {
+    accessToken,
+  });
+}
+
+export async function markNotificationAsRead(notificationId: string) {
+  return request<void>(`/api/notifications/bookings/${notificationId}/read`, {
+    method: 'POST',
   });
 }
 

@@ -6,7 +6,22 @@ export type AuthDeliveryMethod = 'INVITE_EMAIL' | 'LOGIN_LINK_EMAIL';
 
 export type ManagerRole = 'CATALOG_MANAGER' | 'BOOKING_MANAGER' | 'TICKET_MANAGER';
 
-export type BookingStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export type BookingStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'CHECKED_IN' | 'COMPLETED' | 'NO_SHOW';
+
+export type RecurrencePattern = 'NONE' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+
+export type CheckInStatus = 'PENDING' | 'CHECKED_IN' | 'NO_SHOW';
+
+export type ModificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export type NotificationType =
+  | 'BOOKING_APPROVED'
+  | 'BOOKING_REJECTED'
+  | 'BOOKING_CANCELLED'
+  | 'BOOKING_REMINDER_24H'
+  | 'BOOKING_REMINDER_1H'
+  | 'MODIFICATION_APPROVED'
+  | 'MODIFICATION_REJECTED';
 
 export type ResourceCategory =
   | 'SPACES'
@@ -169,6 +184,75 @@ export interface BookingResponse {
   cancellationReason: string | null;
   decidedAt: string | null;
   cancelledAt: string | null;
+  checkInStatus: CheckInStatus | null;
+  checkedInAt: string | null;
+}
+
+export interface CreateRecurringBookingRequest {
+  resourceId: string;
+  recurrencePattern: RecurrencePattern;
+  startDate: string;
+  endDate?: string | null;
+  occurrenceCount?: number | null;
+  startTime: string;
+  endTime: string;
+  purpose?: string | null;
+}
+
+export interface RecurringBookingResponse {
+  id: string;
+  resource: ResourceSummary;
+  requesterId: string;
+  recurrencePattern: RecurrencePattern;
+  startDate: string;
+  endDate: string | null;
+  occurrenceCount: number | null;
+  startTime: string;
+  endTime: string;
+  purpose: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface RequestModificationRequest {
+  requestedStartTime: string;
+  requestedEndTime: string;
+  reason?: string;
+}
+
+export interface ModificationDecisionRequest {
+  decisionReason?: string;
+}
+
+export interface BookingModificationResponse {
+  id: string;
+  bookingId: string;
+  requestedStartTime: string;
+  requestedEndTime: string;
+  reason: string | null;
+  status: ModificationStatus;
+  decidedAt: string | null;
+  decisionReason: string | null;
+}
+
+export interface CheckInRequest {
+  notes?: string;
+}
+
+export interface CheckInResponse {
+  bookingId: string;
+  checkInStatus: CheckInStatus;
+  checkedInAt: string | null;
+}
+
+export interface BookingNotificationResponse {
+  id: string;
+  bookingId: string;
+  notificationType: NotificationType;
+  sentAt: string;
+  readAt: string | null;
+  emailSent: boolean;
+  smsSent: boolean;
 }
 
 export interface ErrorResponse {
