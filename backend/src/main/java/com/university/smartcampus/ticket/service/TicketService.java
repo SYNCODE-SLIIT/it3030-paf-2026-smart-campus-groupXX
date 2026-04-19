@@ -137,8 +137,8 @@ public class TicketService {
         if (!ticket.getReportedBy().getId().equals(user.getId())) {
             throw new ForbiddenException("You can only update your own tickets.");
         }
-        if (ticket.getStatus() == TicketStatus.CLOSED || ticket.getStatus() == TicketStatus.REJECTED) {
-            throw new BadRequestException("Cannot update a ticket that is closed or rejected.");
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new BadRequestException("Ticket details can only be updated while the ticket is open.");
         }
 
         if (request.priority() != null) {
@@ -261,7 +261,11 @@ public class TicketService {
 
     @Transactional
     public TicketAttachmentResponse addAttachment(UserEntity user, String ticketRef, AddTicketAttachmentRequest request) {
-        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        requireCreatorWithOpenTicket(user, ticket);
+        if (ticketAttachmentRepository.countByTicketId(ticket.getId()) >= 3) {
+            throw new BadRequestException("A ticket may have at most 3 attachments.");
+        }
 
         TicketAttachmentEntity attachment = new TicketAttachmentEntity();
         attachment.setId(UUID.randomUUID());
@@ -277,7 +281,11 @@ public class TicketService {
 
     @Transactional
     public TicketAttachmentResponse uploadAttachment(UserEntity user, String ticketRef, MultipartFile file) {
-        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        requireCreatorWithOpenTicket(user, ticket);
+        if (ticketAttachmentRepository.countByTicketId(ticket.getId()) >= 3) {
+            throw new BadRequestException("A ticket may have at most 3 attachments.");
+        }
         StoredAttachment storedAttachment = ticketAttachmentStorageClient.upload(ticket.getId(), file);
 
         TicketAttachmentEntity attachment = new TicketAttachmentEntity();
@@ -294,7 +302,8 @@ public class TicketService {
 
     @Transactional
     public void deleteAttachment(UserEntity user, String ticketRef, UUID attachmentId) {
-        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketEntity ticket = getTicketEntity(ticketRef);
+        requireCreatorWithOpenTicket(user, ticket);
         TicketAttachmentEntity attachment = ticketAttachmentRepository.findByIdAndTicketId(attachmentId, ticket.getId())
                 .orElseThrow(() -> new NotFoundException("Ticket attachment not found."));
         ticketAttachmentStorageClient.deleteByPublicUrl(attachment.getFileUrl());
@@ -312,6 +321,15 @@ public class TicketService {
         history.setNote(note);
         history.setChangedAt(Instant.now());
         ticketStatusHistoryRepository.save(history);
+    }
+
+    private void requireCreatorWithOpenTicket(UserEntity user, TicketEntity ticket) {
+        if (!ticket.getReportedBy().getId().equals(user.getId())) {
+            throw new ForbiddenException("Only the ticket creator can modify attachments.");
+        }
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new BadRequestException("Attachments cannot be modified once a ticket is no longer open.");
+        }
     }
 
     private TicketEntity requireAccessibleTicket(UserEntity user, String ticketRef) {

@@ -2,20 +2,18 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Paperclip, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, Paperclip } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Button, Card, Chip, Tabs, Textarea } from '@/components/ui';
 import {
   addTicketComment,
-  deleteTicketAttachment,
   getErrorMessage,
   getTicket,
   getTicketHistory,
   listTicketAttachments,
   listTicketComments,
   updateTicketStatus,
-  uploadTicketAttachment,
 } from '@/lib/api-client';
 import type {
   TicketAttachmentResponse,
@@ -87,10 +85,6 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
 
   const [commentText, setCommentText] = React.useState('');
   const [commentSubmitting, setCommentSubmitting] = React.useState(false);
-  const [attachmentUploading, setAttachmentUploading] = React.useState(false);
-  const [deletingAttachmentId, setDeletingAttachmentId] = React.useState<string | null>(null);
-
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const load = React.useCallback(async () => {
     if (!accessToken) { setLoading(false); setLoadError('Your session is unavailable.'); return; }
@@ -152,36 +146,6 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
       setNotice({ variant: 'error', title: 'Comment failed', message: getErrorMessage(error, 'Could not post the comment.') });
     } finally {
       setCommentSubmitting(false);
-    }
-  }
-
-  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file || !accessToken) return;
-    event.target.value = '';
-    setAttachmentUploading(true);
-    try {
-      const attachment = await uploadTicketAttachment(accessToken, ticketRef, file);
-      setAttachments((prev) => [...prev, attachment]);
-      setNotice({ variant: 'success', title: 'Uploaded', message: `${file.name} uploaded.` });
-    } catch (error) {
-      setNotice({ variant: 'error', title: 'Upload failed', message: getErrorMessage(error, 'Could not upload the file.') });
-    } finally {
-      setAttachmentUploading(false);
-    }
-  }
-
-  async function handleDeleteAttachment(attachmentId: string, fileName: string) {
-    if (!accessToken) return;
-    if (!window.confirm(`Delete attachment "${fileName}"?`)) return;
-    setDeletingAttachmentId(attachmentId);
-    try {
-      await deleteTicketAttachment(accessToken, ticketRef, attachmentId);
-      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
-    } catch (error) {
-      setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete.') });
-    } finally {
-      setDeletingAttachmentId(null);
     }
   }
 
@@ -444,17 +408,8 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
                     </a>
                     <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>{a.fileType} · {formatDateTime(a.uploadedAt)}</p>
                   </div>
-                  <Button variant="ghost-danger" size="xs" loading={deletingAttachmentId === a.id} iconLeft={<Trash2 size={12} />} onClick={() => { void handleDeleteAttachment(a.id, a.fileName); }}>
-                    Delete
-                  </Button>
                 </div>
               ))}
-              <div style={{ marginTop: 4 }}>
-                <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleUpload} />
-                <Button variant="ghost" size="sm" loading={attachmentUploading} iconLeft={<Upload size={14} />} onClick={() => { fileInputRef.current?.click(); }}>
-                  Upload File
-                </Button>
-              </div>
             </div>
           )}
 

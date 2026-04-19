@@ -13,4 +13,6 @@ public interface TicketAttachmentRepository extends JpaRepository<TicketAttachme
     List<TicketAttachmentEntity> findByTicketIdOrderByUploadedAtAsc(UUID ticketId);
 
     Optional<TicketAttachmentEntity> findByIdAndTicketId(UUID id, UUID ticketId);
+
+    long countByTicketId(UUID ticketId);
 }

@@ -81,7 +81,7 @@ function priorityChipColor(priority: TicketPriority): 'neutral' | 'blue' | 'oran
 }
 
 function canEdit(status: TicketStatus) {
-  return status === 'OPEN' || status === 'IN_PROGRESS';
+  return status === 'OPEN';
 }
 
 function formatDateTime(iso: string) {
@@ -97,7 +97,7 @@ function formatDateTime(iso: string) {
 }
 
 export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
-  const { session } = useAuth();
+  const { session, appUser } = useAuth();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
@@ -250,6 +250,9 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
       </div>
     );
   }
+
+  const isCreator = appUser?.id === ticket.reportedById;
+  const canModify = isCreator && ticket.status === 'OPEN';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -479,35 +482,44 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
                       {attachment.fileType} · {formatDateTime(attachment.uploadedAt)}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost-danger"
-                    size="xs"
-                    loading={deletingAttachmentId === attachment.id}
-                    iconLeft={<Trash2 size={12} />}
-                    onClick={() => { void handleDeleteAttachment(attachment.id, attachment.fileName); }}
-                  >
-                    Delete
-                  </Button>
+                  {canModify && (
+                    <Button
+                      variant="ghost-danger"
+                      size="xs"
+                      loading={deletingAttachmentId === attachment.id}
+                      iconLeft={<Trash2 size={12} />}
+                      onClick={() => { void handleDeleteAttachment(attachment.id, attachment.fileName); }}
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </div>
               ))}
 
-              <div style={{ marginTop: 4 }}>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  style={{ display: 'none' }}
-                  onChange={handleUpload}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  loading={attachmentUploading}
-                  iconLeft={<Upload size={14} />}
-                  onClick={() => { fileInputRef.current?.click(); }}
-                >
-                  Upload File
-                </Button>
-              </div>
+              {canModify && attachments.length < 3 && (
+                <div style={{ marginTop: 4 }}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={handleUpload}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={attachmentUploading}
+                    iconLeft={<Upload size={14} />}
+                    onClick={() => { fileInputRef.current?.click(); }}
+                  >
+                    Upload File
+                  </Button>
+                </div>
+              )}
+              {canModify && attachments.length >= 3 && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  Maximum of 3 attachments reached.
+                </p>
+              )}
             </div>
           )}
 
