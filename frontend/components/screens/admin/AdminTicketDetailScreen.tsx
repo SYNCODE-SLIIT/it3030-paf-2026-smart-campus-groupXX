@@ -216,7 +216,9 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
   }
 
   const isClosed = ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
-  const canComment = ticket.status !== 'OPEN' && !isClosed;
+  const isAssignedToMe = Boolean(appUser && ticket.assignedToId === appUser.id);
+  const canManageStatus = isAssignedToMe && !isClosed;
+  const canComment = ticket.status === 'IN_PROGRESS';
 
   const managerOptions = managers.map((m) => ({ value: m.id, label: getManagerDisplayName(m) }));
 
@@ -266,31 +268,39 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
         <p style={{ margin: '0 0 12px', fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--text-h)' }}>
           Assignment
         </p>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <Select
-              id="assign-select"
-              name="assign-select"
-              label="Assign to ticket manager"
-              value={selectedAssignee}
-              onChange={(e) => setSelectedAssignee(e.target.value)}
-              options={[
-                { value: '', label: 'Select a manager…' },
-                ...managerOptions,
-              ]}
-            />
+        {ticket.status === 'OPEN' ? (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <Select
+                id="assign-select"
+                name="assign-select"
+                label="Assign to ticket manager"
+                value={selectedAssignee}
+                onChange={(e) => setSelectedAssignee(e.target.value)}
+                options={[
+                  { value: '', label: 'Select a manager…' },
+                  ...managerOptions,
+                ]}
+              />
+            </div>
+            <Button size="sm" onClick={() => { void handleAssign(); }} loading={assigning} disabled={!selectedAssignee || selectedAssignee === ticket.assignedToId}>
+              Assign
+            </Button>
+            <Button variant="subtle" size="sm" onClick={() => { void handleAssignToSelf(); }} loading={assigning}>
+              Assign to Myself
+            </Button>
           </div>
-          <Button size="sm" onClick={() => { void handleAssign(); }} loading={assigning} disabled={!selectedAssignee || selectedAssignee === ticket.assignedToId}>
-            Assign
-          </Button>
-          <Button variant="subtle" size="sm" onClick={() => { void handleAssignToSelf(); }} loading={assigning}>
-            Assign to Myself
-          </Button>
-        </div>
+        ) : (
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>
+            {ticket.assignedToName
+              ? `Assigned to ${ticket.assignedToName}. Assignment is locked after acceptance.`
+              : 'Assignment is locked after acceptance.'}
+          </p>
+        )}
       </Card>
 
       {/* Status Actions */}
-      {!isClosed && (
+      {canManageStatus && (
         <Card>
           <p style={{ margin: '0 0 12px', fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--text-h)' }}>
             Status Actions
@@ -414,7 +424,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
                 <Alert variant="info" title="Comments locked">
                   {isClosed
                     ? `Comments are disabled for ${ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.`
-                    : 'Comments are available after the ticket is accepted (In Progress).'}
+                    : 'Comments are available while the ticket is in progress.'}
                 </Alert>
               )}
               {comments.length === 0 && canComment && (

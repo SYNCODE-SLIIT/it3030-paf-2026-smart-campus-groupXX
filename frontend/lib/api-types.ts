@@ -357,7 +357,6 @@ export interface TicketResponse extends TicketSummaryResponse {
 export interface TicketStatusUpdateRequest {
   newStatus: TicketStatus;
   note?: string;
-  assignedTo?: string;
   resolutionNotes?: string;
   rejectionReason?: string;
 }

@@ -153,12 +153,15 @@ public class TicketService {
 
     @Transactional
     public TicketResponse updateStatus(UserEntity manager, String ticketRef, TicketStatusUpdateRequest request) {
+        if (request.assignedTo() != null) {
+            throw new BadRequestException("Ticket assignment must use the assignment endpoint.");
+        }
         if (!isTicketManagerOrAdmin(manager)) {
             throw new ForbiddenException("Ticket manager or admin access is required.");
         }
 
         TicketEntity ticket = getTicketEntity(ticketRef);
-        requireTicketManagementAccess(manager, ticket);
+        requireTicketStatusManagementAccess(manager, ticket);
 
         if (ticket.getStatus() == TicketStatus.CLOSED) {
             throw new BadRequestException("Closed tickets cannot be updated.");
@@ -175,10 +178,6 @@ public class TicketService {
 
         TicketStatus oldStatus = ticket.getStatus();
         ticket.setStatus(request.newStatus());
-
-        if (request.assignedTo() != null) {
-            ticket.setAssignedTo(resolveAssignableAssignee(request.assignedTo()));
-        }
 
         if (StringUtils.hasText(request.resolutionNotes())) {
             ticket.setResolutionNotes(request.resolutionNotes());
@@ -206,6 +205,9 @@ public class TicketService {
             throw new ForbiddenException("Admin access is required to assign tickets.");
         }
         TicketEntity ticket = getTicketEntity(ticketRef);
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new BadRequestException("Tickets cannot be reassigned after they are accepted.");
+        }
         ticket.setAssignedTo(resolveAssignableAssignee(assignedToUserId));
         return toTicketResponse(ticket);
     }
@@ -217,7 +219,10 @@ public class TicketService {
         if (ticket.getStatus() == TicketStatus.CLOSED || ticket.getStatus() == TicketStatus.REJECTED) {
             throw new BadRequestException("Cannot add comments to a closed or rejected ticket.");
         }
-        if (isTicketManagerOrAdmin(user) && ticket.getStatus() == TicketStatus.OPEN) {
+        if (isAdmin(user) && ticket.getStatus() != TicketStatus.IN_PROGRESS) {
+            throw new BadRequestException("Admins can only comment on in-progress tickets.");
+        }
+        if (isTicketManager(user) && ticket.getStatus() == TicketStatus.OPEN) {
             throw new BadRequestException("Cannot comment on an open ticket before accepting it.");
         }
 
@@ -262,7 +267,7 @@ public class TicketService {
     @Transactional
     public TicketAttachmentResponse addAttachment(UserEntity user, String ticketRef, AddTicketAttachmentRequest request) {
         TicketEntity ticket = getTicketEntity(ticketRef);
-        requireCreatorWithOpenTicket(user, ticket);
+        requireAttachmentManagementAccess(user, ticket);
         if (ticketAttachmentRepository.countByTicketId(ticket.getId()) >= 3) {
             throw new BadRequestException("A ticket may have at most 3 attachments.");
         }
@@ -282,7 +287,7 @@ public class TicketService {
     @Transactional
     public TicketAttachmentResponse uploadAttachment(UserEntity user, String ticketRef, MultipartFile file) {
         TicketEntity ticket = getTicketEntity(ticketRef);
-        requireCreatorWithOpenTicket(user, ticket);
+        requireAttachmentManagementAccess(user, ticket);
         if (ticketAttachmentRepository.countByTicketId(ticket.getId()) >= 3) {
             throw new BadRequestException("A ticket may have at most 3 attachments.");
         }
@@ -303,7 +308,7 @@ public class TicketService {
     @Transactional
     public void deleteAttachment(UserEntity user, String ticketRef, UUID attachmentId) {
         TicketEntity ticket = getTicketEntity(ticketRef);
-        requireCreatorWithOpenTicket(user, ticket);
+        requireAttachmentManagementAccess(user, ticket);
         TicketAttachmentEntity attachment = ticketAttachmentRepository.findByIdAndTicketId(attachmentId, ticket.getId())
                 .orElseThrow(() -> new NotFoundException("Ticket attachment not found."));
         ticketAttachmentStorageClient.deleteByPublicUrl(attachment.getFileUrl());
@@ -323,9 +328,10 @@ public class TicketService {
         ticketStatusHistoryRepository.save(history);
     }
 
-    private void requireCreatorWithOpenTicket(UserEntity user, TicketEntity ticket) {
-        if (!ticket.getReportedBy().getId().equals(user.getId())) {
-            throw new ForbiddenException("Only the ticket creator can modify attachments.");
+    private void requireAttachmentManagementAccess(UserEntity user, TicketEntity ticket) {
+        if (!ticket.getReportedBy().getId().equals(user.getId())
+                && !(isTicketManager(user) && isAssignedTo(ticket, user))) {
+            throw new ForbiddenException("Only the ticket creator or assigned ticket manager can modify attachments.");
         }
         if (ticket.getStatus() != TicketStatus.OPEN) {
             throw new BadRequestException("Attachments cannot be modified once a ticket is no longer open.");
@@ -349,9 +355,12 @@ public class TicketService {
         throw new ForbiddenException("You do not have access to this ticket.");
     }
 
-    private void requireTicketManagementAccess(UserEntity user, TicketEntity ticket) {
+    private void requireTicketStatusManagementAccess(UserEntity user, TicketEntity ticket) {
         if (isAdmin(user)) {
-            return;
+            if (isAssignedTo(ticket, user)) {
+                return;
+            }
+            throw new ForbiddenException("Admins can only update tickets assigned to themselves.");
         }
         if (isTicketManager(user) && isAssignedTo(ticket, user)) {
             return;

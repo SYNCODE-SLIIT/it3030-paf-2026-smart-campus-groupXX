@@ -1,8 +1,8 @@
 package com.university.smartcampus.user.service;
 
 import java.time.Instant;
-import java.util.Locale;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -32,6 +32,8 @@ import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
 import com.university.smartcampus.config.SmartCampusProperties;
+import com.university.smartcampus.ticket.entity.TicketEntity;
+import com.university.smartcampus.ticket.repository.TicketRepository;
 import com.university.smartcampus.user.dto.AdminDtos.AdminProfileInput;
 import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
 import com.university.smartcampus.user.dto.AdminDtos.FacultyProfileInput;
@@ -69,6 +71,7 @@ public class UserManagementService {
     private final ProfileImageStorageClient profileImageStorageClient;
     private final SmartCampusProperties properties;
     private final UserIdentifierService userIdentifierService;
+    private final TicketRepository ticketRepository;
 
     public UserManagementService(
             UserRepository userRepository,
@@ -80,7 +83,8 @@ public class UserManagementService {
             CurrentUserService currentUserService,
             ProfileImageStorageClient profileImageStorageClient,
             SmartCampusProperties properties,
-            UserIdentifierService userIdentifierService) {
+            UserIdentifierService userIdentifierService,
+            TicketRepository ticketRepository) {
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
         this.managerRepository = managerRepository;
@@ -91,6 +95,7 @@ public class UserManagementService {
         this.profileImageStorageClient = profileImageStorageClient;
         this.properties = properties;
         this.userIdentifierService = userIdentifierService;
+        this.ticketRepository = ticketRepository;
     }
 
     @Transactional
@@ -230,11 +235,22 @@ public class UserManagementService {
         UUID authUserId = user.getAuthUserId();
         String email = user.getEmail();
 
+        detachUserFromTickets(user.getId());
+
         userRepository.delete(user);
         userRepository.flush();
         authIdentityClient.deleteIdentity(authUserId, email);
 
         return new MessageResponse("User deleted.");
+    }
+
+    private void detachUserFromTickets(UUID userId) {
+        for (TicketEntity ticket : ticketRepository.findByAssignedToId(userId)) {
+            ticket.setAssignedTo(null);
+        }
+
+        ticketRepository.deleteAll(ticketRepository.findByReportedById(userId));
+        ticketRepository.flush();
     }
 
     @Transactional

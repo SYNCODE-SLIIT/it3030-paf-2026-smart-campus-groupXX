@@ -267,6 +267,22 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void adminCanReassignOpenTicket() throws Exception {
+        seedAdmin("otheradmin@campus.test");
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.OPEN));
+        UserEntity otherAdmin = userRepository.findByEmailIgnoreCase("otheradmin@campus.test").orElseThrow();
+        AssignTicketRequest request = new AssignTicketRequest(otherAdmin.getId());
+
+        mockMvc.perform(put("/api/tickets/{id}/assign", ticket.getId())
+                        .with(jwtFor("admin@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedToEmail").value("otheradmin@campus.test"));
+    }
+
+    @Test
     void adminCanAssignTicketToAdmin() throws Exception {
         TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
         UserEntity admin = userRepository.findByEmailIgnoreCase("admin@campus.test").orElseThrow();
@@ -278,6 +294,31 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assignedToEmail").value("admin@campus.test"));
+    }
+
+    @Test
+    void adminCannotReassignTicketAfterAcceptance() throws Exception {
+        UserEntity manager = userRepository.findByEmailIgnoreCase("ticketmgr@campus.test").orElseThrow();
+        UserEntity admin = userRepository.findByEmailIgnoreCase("admin@campus.test").orElseThrow();
+
+        for (TicketStatus ticketStatus : new TicketStatus[] {
+                TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REJECTED }) {
+            TicketEntity ticket = assignTicketTo("admin@campus.test",
+                    seedTicket("student@campus.test", ticketStatus));
+            AssignTicketRequest request = new AssignTicketRequest(manager.getId());
+
+            mockMvc.perform(put("/api/tickets/{id}/assign", ticket.getId())
+                            .with(jwtFor("admin@campus.test"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            "Tickets cannot be reassigned after they are accepted."));
+
+            TicketEntity persisted = ticketRepository.findById(ticket.getId()).orElseThrow();
+            assertThat(persisted.getAssignedTo().getId()).isEqualTo(admin.getId());
+            assertThat(persisted.getStatus()).isEqualTo(ticketStatus);
+        }
     }
 
     @Test
@@ -298,7 +339,7 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void statusUpdateCannotAssignTicketToInvalidUser() throws Exception {
+    void statusUpdateRejectsAssignmentPayload() throws Exception {
         TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
                 seedTicket("student@campus.test", TicketStatus.OPEN));
         UserEntity student = userRepository.findByEmailIgnoreCase("student@campus.test").orElseThrow();
@@ -311,7 +352,7 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(
-                        "Tickets can only be assigned to active admins or ticket managers."));
+                        "Ticket assignment must use the assignment endpoint."));
 
         TicketEntity persisted = ticketRepository.findById(ticket.getId()).orElseThrow();
         UserEntity manager = userRepository.findByEmailIgnoreCase("ticketmgr@campus.test").orElseThrow();
@@ -348,6 +389,94 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
                 .andExpect(jsonPath("$.assignedToEmail").value("ticketmgr@campus.test"));
+    }
+
+    @Test
+    void adminCannotAcceptUnassignedTicket() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
+        TicketStatusUpdateRequest request = new TicketStatusUpdateRequest(
+                TicketStatus.IN_PROGRESS, null, null, null, null);
+
+        mockMvc.perform(put("/api/tickets/{id}/status", ticket.getId())
+                        .with(jwtFor("admin@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(
+                        "Admins can only update tickets assigned to themselves."));
+
+        assertThat(ticketRepository.findById(ticket.getId()).orElseThrow().getStatus())
+                .isEqualTo(TicketStatus.OPEN);
+    }
+
+    @Test
+    void adminCannotAcceptTicketAssignedToSomeoneElse() throws Exception {
+        seedAdmin("otheradmin@campus.test");
+        TicketStatusUpdateRequest request = new TicketStatusUpdateRequest(
+                TicketStatus.IN_PROGRESS, null, null, null, null);
+
+        for (String assigneeEmail : new String[] { "ticketmgr@campus.test", "otheradmin@campus.test" }) {
+            TicketEntity ticket = assignTicketTo(assigneeEmail,
+                    seedTicket("student@campus.test", TicketStatus.OPEN));
+
+            mockMvc.perform(put("/api/tickets/{id}/status", ticket.getId())
+                            .with(jwtFor("admin@campus.test"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.message").value(
+                            "Admins can only update tickets assigned to themselves."));
+
+            assertThat(ticketRepository.findById(ticket.getId()).orElseThrow().getStatus())
+                    .isEqualTo(TicketStatus.OPEN);
+        }
+    }
+
+    @Test
+    void adminCanAcceptTicketAssignedToSelf() throws Exception {
+        TicketEntity ticket = assignTicketTo("admin@campus.test",
+                seedTicket("student@campus.test", TicketStatus.OPEN));
+        TicketStatusUpdateRequest request = new TicketStatusUpdateRequest(
+                TicketStatus.IN_PROGRESS, "Started working on it.", null, null, null);
+
+        mockMvc.perform(put("/api/tickets/{id}/status", ticket.getId())
+                        .with(jwtFor("admin@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.assignedToEmail").value("admin@campus.test"));
+    }
+
+    @Test
+    void adminCannotResolveRejectOrCloseTicketAssignedToSomeoneElse() throws Exception {
+        TicketStatusUpdateRequest resolveRequest = new TicketStatusUpdateRequest(
+                TicketStatus.RESOLVED, "Resolved note.", null, "Resolved by another user.", null);
+        TicketStatusUpdateRequest rejectRequest = new TicketStatusUpdateRequest(
+                TicketStatus.REJECTED, "Reject note.", null, null, "Rejected by another user.");
+        TicketStatusUpdateRequest closeRequest = new TicketStatusUpdateRequest(
+                TicketStatus.CLOSED, "Close note.", null, null, null);
+
+        assertAdminCannotUpdateOtherUsersTicket(resolveRequest);
+        assertAdminCannotUpdateOtherUsersTicket(rejectRequest);
+        assertAdminCannotUpdateOtherUsersTicket(closeRequest);
+    }
+
+    @Test
+    void adminCanResolveOwnInProgressTicket() throws Exception {
+        TicketEntity ticket = assignTicketTo("admin@campus.test",
+                seedTicket("student@campus.test", TicketStatus.IN_PROGRESS));
+        TicketStatusUpdateRequest request = new TicketStatusUpdateRequest(
+                TicketStatus.RESOLVED, null, null, "Restarted the access point.", null);
+
+        mockMvc.perform(put("/api/tickets/{id}/status", ticket.getId())
+                        .with(jwtFor("admin@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.resolutionNotes").value("Restarted the access point."))
+                .andExpect(jsonPath("$.assignedToEmail").value("admin@campus.test"));
     }
 
     @Test
@@ -444,6 +573,39 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userEmail").value("ticketmgr@campus.test"));
+    }
+
+    @Test
+    void adminCanAddCommentToAnyInProgressTicket() throws Exception {
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.IN_PROGRESS));
+        AddCommentRequest request = new AddCommentRequest("Following up as admin.");
+
+        mockMvc.perform(post("/api/tickets/{id}/comments", ticket.getId())
+                        .with(jwtFor("admin@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userEmail").value("admin@campus.test"))
+                .andExpect(jsonPath("$.commentText").value("Following up as admin."));
+    }
+
+    @Test
+    void adminCannotAddCommentToOpenOrResolvedTicket() throws Exception {
+        AddCommentRequest request = new AddCommentRequest("Admin comment.");
+
+        for (TicketStatus ticketStatus : new TicketStatus[] { TicketStatus.OPEN, TicketStatus.RESOLVED }) {
+            TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                    seedTicket("student@campus.test", ticketStatus));
+
+            mockMvc.perform(post("/api/tickets/{id}/comments", ticket.getId())
+                            .with(jwtFor("admin@campus.test"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            "Admins can only comment on in-progress tickets."));
+        }
     }
 
     @Test
@@ -660,6 +822,24 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                         "Tickets can only be assigned to active admins or ticket managers."));
     }
 
+    private void assertAdminCannotUpdateOtherUsersTicket(TicketStatusUpdateRequest request) throws Exception {
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.IN_PROGRESS));
+
+        mockMvc.perform(put("/api/tickets/{id}/status", ticket.getId())
+                        .with(jwtFor("admin@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(
+                        "Admins can only update tickets assigned to themselves."));
+
+        TicketEntity persisted = ticketRepository.findById(ticket.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(TicketStatus.IN_PROGRESS);
+        assertThat(persisted.getResolutionNotes()).isNull();
+        assertThat(persisted.getRejectionReason()).isNull();
+    }
+
     private void seedAdmin(String email) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
@@ -672,7 +852,7 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
         AdminEntity admin = new AdminEntity();
         admin.setUser(user);
         admin.setFullName("Admin User");
-        admin.setEmployeeNumber("ADM-001");
+        admin.setEmployeeNumber("ADM-" + UUID.randomUUID().toString().substring(0, 8));
         user.setAdminProfile(admin);
 
         userRepository.save(user);
