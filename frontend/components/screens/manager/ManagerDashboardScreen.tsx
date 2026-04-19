@@ -213,7 +213,7 @@ export function ManagerDashboardScreen() {
             <SectionHeader
               title="Needs Attention"
               caption="Urgent and high priority open tickets."
-              onViewAll={() => router.push('/managers/tickets?status=OPEN')}
+              onViewAll={() => router.push('/ticket-managers/tickets?status=OPEN')}
             />
             {needsAttention.length === 0 ? (
               <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>No urgent or high priority open tickets right now.</p>
@@ -224,7 +224,7 @@ export function ManagerDashboardScreen() {
                     key={ticket.id}
                     ticket={ticket}
                     showReporter
-                    onView={() => router.push(`/managers/tickets/${ticket.ticketCode}`)}
+                    onView={() => router.push(`/ticket-managers/tickets/${ticket.ticketCode}`)}
                   />
                 ))}
               </div>
@@ -235,7 +235,7 @@ export function ManagerDashboardScreen() {
             <SectionHeader
               title="Currently In Progress"
               caption="Tickets you are actively working on."
-              onViewAll={() => router.push('/managers/tickets?status=IN_PROGRESS')}
+              onViewAll={() => router.push('/ticket-managers/tickets?status=IN_PROGRESS')}
             />
             {inProgressTickets.length === 0 ? (
               <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>No tickets in progress right now.</p>
@@ -246,7 +246,7 @@ export function ManagerDashboardScreen() {
                     key={ticket.id}
                     ticket={ticket}
                     showReporter
-                    onView={() => router.push(`/managers/tickets/${ticket.ticketCode}`)}
+                    onView={() => router.push(`/ticket-managers/tickets/${ticket.ticketCode}`)}
                   />
                 ))}
               </div>

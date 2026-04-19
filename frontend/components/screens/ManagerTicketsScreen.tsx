@@ -241,7 +241,7 @@ function ManagerTicketsScreenInner() {
                           <Button
                             variant="ghost"
                             size="xs"
-                            onClick={() => { router.push(`/managers/tickets/${ticket.ticketCode}`); }}
+                            onClick={() => { router.push(`/ticket-managers/tickets/${ticket.ticketCode}`); }}
                           >
                             View
                           </Button>

@@ -7,11 +7,11 @@ type HomePathUser = Pick<UserResponse, 'userType'> & Partial<Pick<UserResponse, 
 export function getManagerDashboardPath(managerRole?: ManagerRole | null) {
   switch (managerRole) {
     case 'CATALOG_MANAGER':
-      return '/managers/dashboard/catalog';
+      return '/catalog-managers';
     case 'BOOKING_MANAGER':
-      return '/managers/dashboard/bookings';
+      return '/booking-managers';
     case 'TICKET_MANAGER':
-      return '/managers/dashboard/tickets';
+      return '/ticket-managers';
     default:
       return '/managers';
   }
