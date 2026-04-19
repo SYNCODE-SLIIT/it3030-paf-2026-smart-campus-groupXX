@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 
+import { ManagerDashboardScreen } from '@/components/screens/manager/ManagerDashboardScreen';
 import { WorkspacePlaceholderScreen } from '@/components/screens/WorkspacePlaceholderScreen';
 import type { ManagerRole } from '@/lib/api-types';
 import { requireManagerRole } from '@/lib/server-auth';
@@ -51,6 +52,10 @@ export default async function ManagerDashboardPage({ params }: { params: Promise
   }
 
   await requireManagerRole([config.managerRole]);
+
+  if (area === 'tickets') {
+    return <ManagerDashboardScreen />;
+  }
 
   return (
     <WorkspacePlaceholderScreen
