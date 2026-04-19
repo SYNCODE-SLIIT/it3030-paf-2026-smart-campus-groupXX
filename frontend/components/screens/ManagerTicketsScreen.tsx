@@ -118,7 +118,7 @@ export function ManagerTicketsScreen() {
           </p>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 330px)', gap: 16 }}>
           {filtered.map((ticket) => (
             <TicketCard
               key={ticket.id}

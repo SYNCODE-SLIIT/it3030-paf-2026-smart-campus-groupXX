@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Button, Card, Tabs } from '@/components/ui';
 import { TicketCard } from '@/components/tickets';
-import { getErrorMessage, listMyTickets } from '@/lib/api-client';
-import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
+import { assignTicket, getErrorMessage, listMyTickets, listUsers } from '@/lib/api-client';
+import type { TicketPriority, TicketStatus, TicketSummaryResponse, UserResponse } from '@/lib/api-types';
 
 type NoticeState = {
   variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
@@ -58,14 +58,29 @@ function sortByDate(tickets: TicketSummaryResponse[], order: SortOrder): TicketS
   });
 }
 
+interface AssignOption {
+  id: string;
+  label: string;
+}
+
+function getDisplayName(user: UserResponse): string {
+  if (user.userType === 'ADMIN') return user.adminProfile?.fullName || user.email;
+  const preferred = user.managerProfile?.preferredName;
+  if (preferred) return preferred;
+  const full = `${user.managerProfile?.firstName ?? ''} ${user.managerProfile?.lastName ?? ''}`.trim();
+  return full || user.email;
+}
+
 interface SectionProps {
   label: string;
   color: string;
   tickets: TicketSummaryResponse[];
   onView: (code: string) => void;
+  assignOptions?: AssignOption[];
+  onAssign?: (ticketCode: string, userId: string) => void;
 }
 
-function TicketSection({ label, color, tickets, onView }: SectionProps) {
+function TicketSection({ label, color, tickets, onView, assignOptions, onAssign }: SectionProps) {
   if (tickets.length === 0) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -94,14 +109,26 @@ function TicketSection({ label, color, tickets, onView }: SectionProps) {
           {tickets.length}
         </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 16,
+          overflowX: 'auto',
+          paddingTop: 16,
+          paddingBottom: 12,
+          scrollbarWidth: 'thin',
+        }}
+      >
         {tickets.map((ticket) => (
-          <TicketCard
-            key={ticket.id}
-            ticket={ticket}
-            showReporter
-            onView={() => onView(ticket.ticketCode)}
-          />
+          <div key={ticket.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
+            <TicketCard
+              ticket={ticket}
+              showReporter
+              onView={() => onView(ticket.ticketCode)}
+              assignOptions={assignOptions}
+              onAssign={onAssign ? (userId) => onAssign(ticket.ticketCode, userId) : undefined}
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -114,6 +141,7 @@ export function AdminTicketsScreen() {
   const accessToken = session?.access_token ?? null;
 
   const [tickets, setTickets] = React.useState<TicketSummaryResponse[]>([]);
+  const [managers, setManagers] = React.useState<UserResponse[]>([]);
   const [mainTab, setMainTab] = React.useState<MainTab>('unassigned');
   const [queueFilter, setQueueFilter] = React.useState<QueueFilter>('all');
   const [sortOrder, setSortOrder] = React.useState<SortOrder>('oldest');
@@ -143,6 +171,38 @@ export function AdminTicketsScreen() {
   React.useEffect(() => {
     void reload();
   }, [reload]);
+
+  React.useEffect(() => {
+    if (!accessToken) return;
+    listUsers(accessToken, { userType: 'MANAGER', managerRole: 'TICKET_MANAGER' })
+      .then(setManagers)
+      .catch(() => {});
+  }, [accessToken]);
+
+  const assignOptions = React.useMemo<AssignOption[]>(() => {
+    const opts: AssignOption[] = [];
+    if (appUser) {
+      opts.push({ id: appUser.id, label: `${getDisplayName(appUser)} (You)` });
+    }
+    for (const m of managers) {
+      opts.push({ id: m.id, label: getDisplayName(m) });
+    }
+    return opts;
+  }, [appUser, managers]);
+
+  const handleAssign = React.useCallback(
+    async (ticketCode: string, userId: string) => {
+      if (!accessToken) return;
+      try {
+        const updated = await assignTicket(accessToken, ticketCode, { assignedTo: userId });
+        setTickets((prev) => prev.map((t) => (t.ticketCode === ticketCode ? updated : t)));
+        setNotice({ variant: 'success', title: 'Assigned', message: `Ticket ${ticketCode} has been assigned.` });
+      } catch (err) {
+        setNotice({ variant: 'error', title: 'Assignment failed', message: getErrorMessage(err, 'Could not assign ticket.') });
+      }
+    },
+    [accessToken],
+  );
 
   const queueFiltered = React.useMemo(() => {
     if (queueFilter === 'mine' && appUser) {
@@ -323,6 +383,8 @@ export function AdminTicketsScreen() {
             color={PRIORITY_COLOR[priority]}
             tickets={t}
             onView={handleView}
+            assignOptions={mainTab === 'unassigned' ? assignOptions : undefined}
+            onAssign={mainTab === 'unassigned' ? handleAssign : undefined}
           />
         ))}
       </div>

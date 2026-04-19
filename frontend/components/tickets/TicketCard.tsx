@@ -3,10 +3,17 @@ import { User } from 'lucide-react';
 import { Button, Chip } from '@/components/ui';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
 
+interface AssignOption {
+  id: string;
+  label: string;
+}
+
 interface TicketCardProps {
   ticket: TicketSummaryResponse;
   onView: () => void;
   showReporter?: boolean;
+  assignOptions?: AssignOption[];
+  onAssign?: (userId: string) => void;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -79,9 +86,22 @@ function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-LK', { year: 'numeric', month: 'short', day: '2-digit' }).format(d);
 }
 
-export function TicketCard({ ticket, onView, showReporter = false }: TicketCardProps) {
+export function TicketCard({ ticket, onView, showReporter = false, assignOptions, onAssign }: TicketCardProps) {
   const [hovered, setHovered] = React.useState(false);
+  const [assignOpen, setAssignOpen] = React.useState(false);
+  const assignRef = React.useRef<HTMLDivElement>(null);
   const segs = STATUS_SEGS[ticket.status];
+
+  React.useEffect(() => {
+    if (!assignOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (assignRef.current && !assignRef.current.contains(e.target as Node)) {
+        setAssignOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [assignOpen]);
 
   return (
     <div
@@ -94,13 +114,15 @@ export function TicketCard({ ticket, onView, showReporter = false }: TicketCardP
         boxShadow: hovered ? 'var(--card-shadow-hover)' : 'var(--card-shadow)',
         transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
         transition: 'transform .22s ease, box-shadow .22s ease',
-        overflow: 'hidden',
+        position: 'relative',
+        overflow: assignOpen ? 'visible' : 'hidden',
+        zIndex: assignOpen ? 10 : 'auto',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
       {/* Priority stripe */}
-      <div style={{ height: 3, background: PRIORITY_STRIPE[ticket.priority] }} />
+      <div style={{ height: 3, background: PRIORITY_STRIPE[ticket.priority], borderTopLeftRadius: 'var(--radius-md)', borderTopRightRadius: 'var(--radius-md)' }} />
 
       {/* Header */}
       <div
@@ -243,7 +265,7 @@ export function TicketCard({ ticket, onView, showReporter = false }: TicketCardP
           </span>
         </div>
 
-        {/* Row 2: assignee avatar + view button */}
+        {/* Row 2: assignee avatar / assign button + view button */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           {ticket.assignedToName ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -279,6 +301,66 @@ export function TicketCard({ ticket, onView, showReporter = false }: TicketCardP
               >
                 {ticket.assignedToName}
               </span>
+            </div>
+          ) : assignOptions && assignOptions.length > 0 && onAssign ? (
+            <div ref={assignRef} style={{ position: 'relative' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setAssignOpen((v) => !v); }}
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                  background: 'none',
+                  border: '1px dashed var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                }}
+              >
+                + Assign
+              </button>
+              {assignOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: 'var(--card-shadow-hover)',
+                    minWidth: 170,
+                    zIndex: 200,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {assignOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => { onAssign(opt.id); setAssignOpen(false); }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '7px 12px',
+                        fontSize: 11,
+                        color: 'var(--text-body)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-hover, rgba(0,0,0,0.04))'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div />
