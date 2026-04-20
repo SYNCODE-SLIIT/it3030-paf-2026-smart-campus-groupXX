@@ -4,9 +4,9 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Skeleton, Tabs } from '@/components/ui';
+import { Alert, Button, Card, Dialog, Skeleton, Tabs } from '@/components/ui';
 import { TicketCard } from '@/components/tickets';
-import { assignTicket, getErrorMessage, listMyTickets, listUsers } from '@/lib/api-client';
+import { assignTicket, deleteTicket, getErrorMessage, listMyTickets, listUsers } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse, UserResponse } from '@/lib/api-types';
 
 type NoticeState = {
@@ -78,9 +78,10 @@ interface SectionProps {
   onView: (code: string) => void;
   assignOptions?: AssignOption[];
   onAssign?: (ticketCode: string, userId: string) => void;
+  onDelete?: (ticketCode: string) => void;
 }
 
-function TicketSection({ label, color, tickets, onView, assignOptions, onAssign }: SectionProps) {
+function TicketSection({ label, color, tickets, onView, assignOptions, onAssign, onDelete }: SectionProps) {
   if (tickets.length === 0) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -128,6 +129,7 @@ function TicketSection({ label, color, tickets, onView, assignOptions, onAssign 
               onView={() => onView(ticket.ticketCode)}
               assignOptions={assignOptions}
               onAssign={onAssign ? (userId) => onAssign(ticket.ticketCode, userId) : undefined}
+              onDelete={onDelete ? () => onDelete(ticket.ticketCode) : undefined}
             />
           </div>
         ))}
@@ -149,6 +151,8 @@ export function AdminTicketsScreen() {
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<NoticeState>(null);
+  const [deleteConfirmCode, setDeleteConfirmCode] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const reload = React.useCallback(async () => {
     if (!accessToken) {
@@ -235,6 +239,25 @@ export function AdminTicketsScreen() {
   const summaryAssigned   = tickets.filter((t) => t.assignedToId !== null && t.status === 'OPEN').length;
   const summaryInProgress = tickets.filter((t) => t.status === 'IN_PROGRESS').length;
   const summaryDone       = tickets.filter((t) => DONE_STATUSES.has(t.status)).length;
+
+  const handleDeleteRequest = React.useCallback((ticketCode: string) => {
+    setDeleteConfirmCode(ticketCode);
+  }, []);
+
+  const handleDeleteConfirm = React.useCallback(async () => {
+    if (!accessToken || !deleteConfirmCode) return;
+    setDeleting(true);
+    try {
+      await deleteTicket(accessToken, deleteConfirmCode);
+      setTickets((prev) => prev.filter((t) => t.ticketCode !== deleteConfirmCode));
+      setNotice({ variant: 'success', title: 'Deleted', message: `Ticket ${deleteConfirmCode} has been permanently deleted.` });
+      setDeleteConfirmCode(null);
+    } catch (err) {
+      setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(err, 'Could not delete the ticket.') });
+    } finally {
+      setDeleting(false);
+    }
+  }, [accessToken, deleteConfirmCode]);
 
   const handleView = React.useCallback(
     (code: string) => { router.push(`/admin/tickets/${code}`); },
@@ -360,6 +383,7 @@ export function AdminTicketsScreen() {
               color={DONE_STATUS_COLOR[status] ?? 'var(--border)'}
               tickets={t}
               onView={handleView}
+              onDelete={handleDeleteRequest}
             />
           ))}
         </div>
@@ -539,6 +563,27 @@ export function AdminTicketsScreen() {
 
         {renderContent()}
       </div>
+
+      <Dialog
+        open={deleteConfirmCode !== null}
+        onClose={() => { if (!deleting) setDeleteConfirmCode(null); }}
+        title="Delete Ticket"
+        size="sm"
+      >
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-body)' }}>
+            This will permanently delete ticket <strong>{deleteConfirmCode}</strong> and all its attachments. This action cannot be undone.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmCode(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" loading={deleting} onClick={() => { void handleDeleteConfirm(); }}>
+              Delete Ticket
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

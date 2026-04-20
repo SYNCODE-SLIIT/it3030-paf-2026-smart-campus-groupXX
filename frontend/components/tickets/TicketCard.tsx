@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { User } from 'lucide-react';
+import { Trash2, User } from 'lucide-react';
 import { Button, Chip } from '@/components/ui';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
 
@@ -17,6 +17,7 @@ interface TicketCardProps {
   showReporter?: boolean;
   assignOptions?: AssignOption[];
   onAssign?: (userId: string) => void;
+  onDelete?: () => void;
 }
 
 type AssignMenuPosition = {
@@ -97,7 +98,7 @@ function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-LK', { year: 'numeric', month: 'short', day: '2-digit' }).format(d);
 }
 
-export function TicketCard({ ticket, onView, showReporter = false, assignOptions, onAssign }: TicketCardProps) {
+export function TicketCard({ ticket, onView, showReporter = false, assignOptions, onAssign, onDelete }: TicketCardProps) {
   const [assignOpen, setAssignOpen] = React.useState(false);
   const [assignMenuPosition, setAssignMenuPosition] = React.useState<AssignMenuPosition | null>(null);
   const assignRef = React.useRef<HTMLDivElement>(null);
@@ -448,9 +449,36 @@ export function TicketCard({ ticket, onView, showReporter = false, assignOptions
           ) : (
             <div />
           )}
-          <Button variant="ghost" size="xs" onClick={onView}>
-            View
-          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {onDelete && (
+              <button
+                type="button"
+                aria-label="Delete ticket"
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 26,
+                  height: 26,
+                  background: 'none',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  color: 'var(--red-500)',
+                  padding: 0,
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+            <Button variant="ghost" size="xs" onClick={onView}>
+              View
+            </Button>
+          </div>
         </div>
       </div>
     </div>

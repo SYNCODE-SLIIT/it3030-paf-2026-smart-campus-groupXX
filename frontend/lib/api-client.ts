@@ -661,6 +661,10 @@ export async function updateTicket(
   return request<TicketResponse>(ticketApiPath(ticketRef), { method: 'PATCH', accessToken, body: payload });
 }
 
+export async function deleteTicket(accessToken: string, ticketRef: string): Promise<void> {
+  return request<void>(ticketApiPath(ticketRef), { method: 'DELETE', accessToken });
+}
+
 export async function listTicketComments(
   accessToken: string,
   ticketRef: string,
