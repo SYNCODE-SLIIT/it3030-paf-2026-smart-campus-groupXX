@@ -1,6 +1,7 @@
 package com.university.smartcampus.auth.provider;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -11,6 +12,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.university.smartcampus.common.enums.AppEnums.AuthDeliveryMethod;
 import com.university.smartcampus.common.exception.ExternalServiceException;
@@ -20,6 +22,10 @@ import com.university.smartcampus.config.SmartCampusProperties;
 @ConditionalOnProperty(prefix = "app.auth.delivery", name = "mode", havingValue = "supabase", matchIfMissing = true)
 public class SupabaseAuthProviderClient implements AuthProviderClient {
 
+    private static final String INVITE_FLOW_QUERY_PARAM = "flow";
+    private static final String INVITE_FLOW_VALUE = "invite";
+    private static final String INVITE_EMAIL_QUERY_PARAM = "invite_email";
+
     private final SmartCampusProperties properties;
 
     public SupabaseAuthProviderClient(SmartCampusProperties properties) {
@@ -28,7 +34,7 @@ public class SupabaseAuthProviderClient implements AuthProviderClient {
 
     @Override
     public DeliveryResult sendInviteLink(String email) {
-        String redirectUri = properties.getAuth().getSupabase().getInviteRedirectTo();
+        String redirectUri = withInviteRedirectContext(properties.getAuth().getSupabase().getInviteRedirectTo(), email);
 
         try {
             return generateLink(
@@ -49,6 +55,28 @@ public class SupabaseAuthProviderClient implements AuthProviderClient {
 
             throw exception;
         }
+    }
+
+    private String withInviteRedirectContext(String redirectUri, String inviteEmail) {
+        if (!StringUtils.hasText(redirectUri)) {
+            return redirectUri;
+        }
+
+        try {
+            String normalizedEmail = normalizeEmail(inviteEmail);
+
+            return UriComponentsBuilder.fromUriString(redirectUri)
+                    .replaceQueryParam(INVITE_FLOW_QUERY_PARAM, INVITE_FLOW_VALUE)
+                    .replaceQueryParam(INVITE_EMAIL_QUERY_PARAM, normalizedEmail)
+                    .build(true)
+                    .toUriString();
+        } catch (IllegalArgumentException exception) {
+            return redirectUri;
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 
     @Override

@@ -10,9 +10,10 @@ import { Alert, Button, Card, Input } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api-client';
 import { getPostAuthRedirect, needsStudentOnboarding } from '@/lib/auth-routing';
 import {
-  isInviteFlowEmailMatch,
+  isInviteExpectedEmailMatch,
   primeInviteFlowState,
   readInviteFlowState,
+  resolveInviteExpectedEmail,
 } from '@/lib/invite-flow';
 
 type NoticeState = {
@@ -65,6 +66,12 @@ function inviteReasonNotice(reason: string | null, remainingAttempts: number | n
           remainingAttempts && remainingAttempts > 0
             ? `Please choose the invited account. ${remainingAttempts} tries left.`
             : 'Please choose the invited account.',
+      };
+    case 'switch_account':
+      return {
+        variant: 'warning' as const,
+        title: 'Switch account required',
+        message: 'You are already signed in with a different account. Switch account to continue this invite.',
       };
     case 'invite_expired':
       return {
@@ -138,22 +145,37 @@ function AuthWelcomeContent() {
   }, [reason]);
 
   React.useEffect(() => {
-    if (reason) {
+    if (reason && reason !== 'switch_account') {
       return;
     }
 
-    const inviteEmail = appUser?.email ?? session?.user?.email ?? inviteEmailHint ?? null;
+    const inviteEmail = resolveInviteExpectedEmail(inviteEmailHint, inviteFlowState?.expectedEmail, appUser?.email);
     if (!inviteEmail) {
       return;
     }
 
-    setInviteFlowState(primeInviteFlowState(inviteEmail));
-  }, [appUser?.email, inviteEmailHint, reason, session?.user?.email]);
+    setInviteFlowState(
+      primeInviteFlowState(inviteEmail, {
+        resetWrongAccountAttempts: Boolean(inviteEmailHint),
+      }),
+    );
+  }, [appUser?.email, inviteEmailHint, inviteFlowState?.expectedEmail, reason]);
 
-  const hasInviteRetryState = !!inviteFlowState;
-  const mismatchedInviteSession = !isInviteFlowEmailMatch(inviteFlowState, session?.user?.email);
-  const shouldHidePasswordSetup = !!session && hasInviteRetryState && mismatchedInviteSession;
-  const hasInviteContext = !!(session || inviteFlowState?.expectedEmail || inviteEmailHint);
+  const expectedInviteEmail = resolveInviteExpectedEmail(
+    inviteFlowState?.expectedEmail,
+    inviteEmailHint,
+    appUser?.email,
+  );
+  const mismatchedInviteSession =
+    !!expectedInviteEmail &&
+    !!session?.user?.email &&
+    !isInviteExpectedEmailMatch(expectedInviteEmail, session.user.email);
+  const mismatchedInviteAppUser =
+    !!expectedInviteEmail && !!appUser?.email && !isInviteExpectedEmailMatch(expectedInviteEmail, appUser.email);
+  const requiresAccountSwitch =
+    !!session && (reason === 'switch_account' || mismatchedInviteSession || mismatchedInviteAppUser);
+  const shouldHidePasswordSetup = !!session && requiresAccountSwitch;
+  const hasInviteContext = !!(session || expectedInviteEmail || inviteEmailHint);
 
   React.useEffect(() => {
     if (loading || !session?.user?.id) {
@@ -173,8 +195,7 @@ function AuthWelcomeContent() {
     void refreshMe().finally(() => setIsHydratingUser(false));
   }, [appUser, isHydratingUser, lastHydratedSessionUserId, loading, refreshMe, session]);
 
-  const displayEmail =
-    inviteFlowState?.expectedEmail ?? inviteEmailHint ?? session?.user?.email ?? appUser?.email ?? 'Invited account';
+  const displayEmail = expectedInviteEmail ?? session?.user?.email ?? appUser?.email ?? 'Invited account';
 
   if (loading || isHydratingUser) {
     return (
@@ -249,12 +270,42 @@ function AuthWelcomeContent() {
     );
   }
 
+  const switchAccountReturnPath = (() => {
+    const params = new URLSearchParams();
+    if (expectedInviteEmail) {
+      params.set('email', expectedInviteEmail);
+    }
+
+    const query = params.toString();
+    return query ? `/auth/welcome?${query}` : '/auth/welcome';
+  })();
+
+  function handleSwitchAccount() {
+    setNotice({
+      variant: 'info',
+      title: 'Switching account',
+      message: 'Signing out the current account and preparing invite sign-in...',
+    });
+
+    window.location.assign(`/auth/logout?next=${encodeURIComponent(switchAccountReturnPath)}`);
+  }
+
   async function handleGoogleSignIn() {
+    if (requiresAccountSwitch) {
+      setNotice({
+        variant: 'warning',
+        title: 'Switch account required',
+        message: 'Sign out from the current account first, then continue with the invited account.',
+      });
+      return;
+    }
+
     setNotice(null);
     setIsGoogleLoading(true);
 
     try {
-      setInviteFlowState(primeInviteFlowState(displayEmail));
+      const inviteEmail = resolveInviteExpectedEmail(expectedInviteEmail, displayEmail);
+      setInviteFlowState(primeInviteFlowState(inviteEmail, { resetWrongAccountAttempts: true }));
       await signInWithGoogle({ flow: 'invite' });
     } catch (error) {
       setNotice({
@@ -267,11 +318,21 @@ function AuthWelcomeContent() {
   }
 
   async function handleMicrosoftSignIn() {
+    if (requiresAccountSwitch) {
+      setNotice({
+        variant: 'warning',
+        title: 'Switch account required',
+        message: 'Sign out from the current account first, then continue with the invited account.',
+      });
+      return;
+    }
+
     setNotice(null);
     setIsMicrosoftLoading(true);
 
     try {
-      setInviteFlowState(primeInviteFlowState(displayEmail));
+      const inviteEmail = resolveInviteExpectedEmail(expectedInviteEmail, displayEmail);
+      setInviteFlowState(primeInviteFlowState(inviteEmail, { resetWrongAccountAttempts: true }));
       await signInWithMicrosoft({ flow: 'invite' });
     } catch (error) {
       setNotice({
@@ -671,6 +732,12 @@ function AuthWelcomeContent() {
             </Alert>
           )}
 
+          {requiresAccountSwitch ? (
+            <Alert variant="warning" title="Switch account required">
+              You are currently signed in with another account. Switch account first, then continue invite authentication.
+            </Alert>
+          ) : null}
+
           {!session ? (
             <Alert variant="info" title="Authentication required">
               Continue with Google or Microsoft sign-in below. Password setup will appear after invite authentication is complete.
@@ -681,6 +748,17 @@ function AuthWelcomeContent() {
             <Alert variant="warning" title="Profile still loading">
               Your invite session is active, but profile sync is still running. Wait a moment, or continue with Google or Microsoft sign-in.
             </Alert>
+          ) : null}
+
+          {requiresAccountSwitch ? (
+            <Button
+              variant="primary"
+              size="md"
+              disabled={isGoogleLoading || isMicrosoftLoading || isPasswordRedirecting}
+              onClick={handleSwitchAccount}
+            >
+              Switch account
+            </Button>
           ) : null}
 
           <div className="welcome-divider">
@@ -695,7 +773,7 @@ function AuthWelcomeContent() {
                 variant="subtle"
                 size="md"
                 loading={isGoogleLoading}
-                disabled={isMicrosoftLoading || isPasswordRedirecting}
+                disabled={isMicrosoftLoading || isPasswordRedirecting || requiresAccountSwitch}
                 iconLeft={<GoogleLogo size={18} />}
                 onClick={() => {
                   void handleGoogleSignIn();
@@ -714,7 +792,7 @@ function AuthWelcomeContent() {
                 variant="subtle"
                 size="md"
                 loading={isMicrosoftLoading}
-                disabled={isGoogleLoading || isPasswordRedirecting}
+                disabled={isGoogleLoading || isPasswordRedirecting || requiresAccountSwitch}
                 iconLeft={<MicrosoftLogo size={18} />}
                 onClick={() => {
                   void handleMicrosoftSignIn();

@@ -250,6 +250,43 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void activeUnboundSessionSyncIsRejectedUntilProvisionedIdentityLinked() throws Exception {
+        seedFaculty("active.unbound@campus.test", AccountStatus.ACTIVE);
+
+        mockMvc.perform(post("/api/auth/session/sync")
+                .with(jwtFor("active.unbound@campus.test")))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("This authenticated account must be invited before first sign-in."));
+    }
+
+    @Test
+    void invitedUnboundSessionSyncRejectsExplicitUnverifiedEmailClaim() throws Exception {
+        seedStudent("invite.unverified@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(post("/api/auth/session/sync")
+                .with(jwt().jwt(jwt -> jwt
+                    .subject(UUID.randomUUID().toString())
+                    .claim("email", "invite.unverified@campus.test")
+                    .claim("email_verified", false))))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("Verified email is required to activate an invited account."));
+    }
+
+    @Test
+    void invitedUnboundSessionSyncAcceptsExplicitVerifiedEmailClaim() throws Exception {
+        seedStudent("invite.verified@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(post("/api/auth/session/sync")
+                .with(jwt().jwt(jwt -> jwt
+                    .subject(UUID.randomUUID().toString())
+                    .claim("email", "invite.verified@campus.test")
+                    .claim("email_verified", true))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.nextStep").value("ONBOARDING"))
+            .andExpect(jsonPath("$.user.authUserId").isNotEmpty());
+    }
+
+    @Test
     void studentSessionSyncBindsIdentityAndRequiresOnboarding() throws Exception {
         seedStudent("new.student@campus.test", AccountStatus.INVITED, false);
 

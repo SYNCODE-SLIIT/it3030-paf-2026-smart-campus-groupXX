@@ -9,10 +9,11 @@ import { ApiError, getErrorMessage, syncSession } from '@/lib/api-client';
 import { getPostAuthRedirect } from '@/lib/auth-routing';
 import {
   clearInviteFlowState,
-  isInviteFlowEmailMatch,
+  isInviteExpectedEmailMatch,
   primeInviteFlowState,
   readInviteFlowState,
   recordWrongInviteAccountAttempt,
+  resolveInviteExpectedEmail,
 } from '@/lib/invite-flow';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser';
 
@@ -83,6 +84,7 @@ function AuthCallbackClient() {
     const completeAuth = async () => {
       const queryFlow = searchParams.get('flow');
       const queryType = searchParams.get('type');
+      const queryInviteEmailHint = searchParams.get('invite_email') ?? searchParams.get('email');
       const hashParams = parseHashParams();
       const hashType = hashParams.get('type');
       const isInviteGoogleFlow = queryFlow === 'invite-google';
@@ -90,6 +92,7 @@ function AuthCallbackClient() {
       const isInviteOAuthFlow = isInviteGoogleFlow || isInviteMicrosoftFlow;
       const isInviteLinkFlow = queryFlow === 'invite' || queryType === 'invite' || hashType === 'invite';
       const isInviteFlow = isInviteOAuthFlow || isInviteLinkFlow;
+      let receivedFreshAuthPayload = false;
 
       const toInviteWelcome = (
         reason?: string,
@@ -144,6 +147,7 @@ function AuthCallbackClient() {
           router.replace(isInviteFlow ? toInviteWelcome('auth_failed') : '/login?reason=auth_failed');
           return;
         }
+
         let accessToken: string | null = null;
 
         const loadExistingAccessToken = async () => {
@@ -154,6 +158,7 @@ function AuthCallbackClient() {
         };
 
         if (queryCode) {
+          receivedFreshAuthPayload = true;
           setStatusMessage('Verifying your login code...');
           const authResult = await supabase.auth.exchangeCodeForSession(queryCode);
           if (authResult.error) {
@@ -165,6 +170,7 @@ function AuthCallbackClient() {
             accessToken = authResult.data.session?.access_token ?? null;
           }
         } else if (queryAccessToken && queryRefreshToken) {
+          receivedFreshAuthPayload = true;
           setStatusMessage('Finalizing your authentication session...');
           const authResult = await supabase.auth.setSession({
             access_token: queryAccessToken,
@@ -175,6 +181,7 @@ function AuthCallbackClient() {
           }
           accessToken = authResult.data.session?.access_token ?? null;
         } else if (hashParams.get('access_token') && hashParams.get('refresh_token')) {
+          receivedFreshAuthPayload = true;
           setStatusMessage('Validating your invitation link...');
           const authResult = await supabase.auth.setSession({
             access_token: hashParams.get('access_token')!,
@@ -185,6 +192,7 @@ function AuthCallbackClient() {
           }
           accessToken = authResult.data.session?.access_token ?? null;
         } else if (queryTokenHash && isEmailOtpType(queryType)) {
+          receivedFreshAuthPayload = true;
           setStatusMessage('Verifying your email token...');
           const authResult = await supabase.auth.verifyOtp({
             token_hash: queryTokenHash,
@@ -200,7 +208,7 @@ function AuthCallbackClient() {
 
         if (!accessToken) {
           if (isInviteFlow) {
-            router.replace(toInviteWelcome('auth_required'));
+            router.replace(toInviteWelcome('auth_required', undefined, undefined, queryInviteEmailHint ?? undefined));
           } else {
             router.replace('/login?reason=auth_failed');
           }
@@ -208,26 +216,25 @@ function AuthCallbackClient() {
         }
 
         if (isInviteFlow) {
+          if (queryInviteEmailHint) {
+            primeInviteFlowState(queryInviteEmailHint, { resetWrongAccountAttempts: true });
+          }
+
           const inviteFlowState = readInviteFlowState();
+          const expectedInviteEmail = resolveInviteExpectedEmail(inviteFlowState?.expectedEmail, queryInviteEmailHint);
+
           const {
             data: { session: inviteSession },
           } = await supabase.auth.getSession();
-          const inviteEmailMismatch =
-            inviteFlowState &&
+
+          const shouldRequireAccountSwitch =
+            !!expectedInviteEmail &&
             !!inviteSession?.user?.email &&
-            !isInviteFlowEmailMatch(inviteFlowState, inviteSession.user.email);
+            !receivedFreshAuthPayload &&
+            !isInviteExpectedEmailMatch(expectedInviteEmail, inviteSession.user.email);
 
-          if (inviteEmailMismatch) {
-            const retryState = recordWrongInviteAccountAttempt();
-
-            if (retryState?.exhausted) {
-              clearInviteFlowState();
-              await supabase.auth.signOut();
-              router.replace(toInviteWelcome('invite_expired'));
-              return;
-            }
-
-            router.replace(toInviteWelcome('wrong_account', undefined, retryState?.remainingAttempts));
+          if (shouldRequireAccountSwitch) {
+            router.replace(toInviteWelcome('switch_account', undefined, undefined, expectedInviteEmail));
             return;
           }
         }
@@ -235,7 +242,30 @@ function AuthCallbackClient() {
         setStatusMessage('Finalizing your Smart Campus access...');
         const synced = await syncSession(accessToken);
         const syncedUserEmail = synced.user.email;
-        primeInviteFlowState(synced.user.email);
+
+        if (isInviteFlow) {
+          const inviteFlowState = readInviteFlowState();
+          const expectedInviteEmail = resolveInviteExpectedEmail(inviteFlowState?.expectedEmail, queryInviteEmailHint);
+
+          if (expectedInviteEmail && !isInviteExpectedEmailMatch(expectedInviteEmail, syncedUserEmail)) {
+            const retryState = recordWrongInviteAccountAttempt();
+
+            if (retryState?.exhausted) {
+              clearInviteFlowState();
+              await supabase.auth.signOut();
+              router.replace(toInviteWelcome('invite_expired', undefined, undefined, expectedInviteEmail));
+              return;
+            }
+
+            router.replace(
+              toInviteWelcome('wrong_account', undefined, retryState?.remainingAttempts, expectedInviteEmail),
+            );
+            return;
+          }
+
+          primeInviteFlowState(expectedInviteEmail ?? syncedUserEmail);
+        }
+
         const nextPath = getPostAuthRedirect(synced.user, synced.nextStep);
 
         if (cancelled) {
@@ -260,12 +290,28 @@ function AuthCallbackClient() {
           data: { session: failedSession },
         } = await supabase.auth.getSession();
         const inviteFlowState = readInviteFlowState();
+        const expectedInviteEmail = resolveInviteExpectedEmail(inviteFlowState?.expectedEmail, queryInviteEmailHint);
+
+        const shouldRequireAccountSwitch =
+          isInviteFlow &&
+          accessDenied &&
+          !!expectedInviteEmail &&
+          !!failedSession?.user?.email &&
+          !receivedFreshAuthPayload &&
+          !isInviteExpectedEmailMatch(expectedInviteEmail, failedSession.user.email);
+
+        if (shouldRequireAccountSwitch) {
+          router.replace(toInviteWelcome('switch_account', undefined, undefined, expectedInviteEmail));
+          return;
+        }
+
         const wrongInviteAccount =
           isInviteFlow &&
           accessDenied &&
-          inviteFlowState &&
+          !!expectedInviteEmail &&
           !!failedSession?.user?.email &&
-          !isInviteFlowEmailMatch(inviteFlowState, failedSession.user.email);
+          receivedFreshAuthPayload &&
+          !isInviteExpectedEmailMatch(expectedInviteEmail, failedSession.user.email);
 
         if (wrongInviteAccount) {
           const retryState = recordWrongInviteAccountAttempt();
@@ -273,12 +319,12 @@ function AuthCallbackClient() {
           if (retryState?.exhausted) {
             clearInviteFlowState();
             await supabase.auth.signOut();
-            router.replace(toInviteWelcome('invite_expired', undefined, undefined, inviteFlowState.expectedEmail));
+            router.replace(toInviteWelcome('invite_expired', undefined, undefined, expectedInviteEmail));
             return;
           }
 
           router.replace(
-            toInviteWelcome('wrong_account', undefined, retryState?.remainingAttempts, inviteFlowState.expectedEmail),
+            toInviteWelcome('wrong_account', undefined, retryState?.remainingAttempts, expectedInviteEmail),
           );
           return;
         }
@@ -286,7 +332,11 @@ function AuthCallbackClient() {
         await supabase.auth.signOut();
 
         if (accessDenied) {
-          router.replace(isInviteFlow ? toInviteWelcome('access_denied') : '/login?reason=access_denied');
+          router.replace(
+            isInviteFlow
+              ? toInviteWelcome('access_denied', undefined, undefined, expectedInviteEmail ?? undefined)
+              : '/login?reason=access_denied',
+          );
           return;
         }
 

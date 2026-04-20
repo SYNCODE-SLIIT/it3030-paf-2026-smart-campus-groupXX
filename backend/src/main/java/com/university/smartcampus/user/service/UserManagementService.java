@@ -11,6 +11,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -61,6 +63,8 @@ import com.university.smartcampus.user.storage.ProfileImageStorageClient;
 
 @Service
 public class UserManagementService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserManagementService.class);
 
     private static final String NEXT_STEP_DASHBOARD = "DASHBOARD";
     private static final String NEXT_STEP_ONBOARDING = "ONBOARDING";
@@ -372,17 +376,22 @@ public class UserManagementService {
 
     @Transactional
     public SessionSyncResponse syncSession(Jwt jwt) {
+        CurrentUserService.ResolvedUserResult resolvedUser = currentUserService.resolveProvisionedUser(jwt);
         UUID subject = currentUserService.subjectFromJwt(jwt);
-
-        UserEntity user = userRepository.findByAuthUserId(subject)
-            .orElseGet(() -> userRepository.findByEmailIgnoreCase(currentUserService.normalizedEmailFromJwt(jwt))
-                .orElseThrow(() -> new ForbiddenException("This authenticated account has not been provisioned.")));
+        UserEntity user = resolvedUser.user();
 
         if (user.getAccountStatus() == AccountStatus.SUSPENDED) {
             throw new ForbiddenException("This account is suspended.");
         }
 
-        if (user.getAuthUserId() == null || !Objects.equals(user.getAuthUserId(), subject)) {
+        if (resolvedUser.emailFallbackUsed()) {
+            LOGGER.warn(
+                    "Linking invited account {} to auth subject {} via verified email fallback.",
+                    user.getEmail(),
+                    subject);
+        }
+
+        if (user.getAuthUserId() == null) {
             user.setAuthUserId(subject);
         }
 
