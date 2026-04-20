@@ -120,6 +120,16 @@ public class TicketController {
         return ticketService.addComment(user, ticketRef, request);
     }
 
+    @DeleteMapping("/{ticketRef}/comments/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteComment(
+            @PathVariable String ticketRef,
+            @PathVariable UUID commentId,
+            Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        ticketService.deleteComment(user, ticketRef, commentId);
+    }
+
     @GetMapping("/{ticketRef}/attachments")
     public List<TicketAttachmentResponse> listAttachments(@PathVariable String ticketRef, Authentication authentication) {
         UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);

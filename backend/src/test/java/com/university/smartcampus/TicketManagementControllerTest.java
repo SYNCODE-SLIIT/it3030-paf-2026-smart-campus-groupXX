@@ -36,8 +36,10 @@ import com.university.smartcampus.ticket.dto.TicketDtos.AssignTicketRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.CreateTicketRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketStatusUpdateRequest;
 import com.university.smartcampus.ticket.entity.TicketAttachmentEntity;
+import com.university.smartcampus.ticket.entity.TicketCommentEntity;
 import com.university.smartcampus.ticket.entity.TicketEntity;
 import com.university.smartcampus.ticket.repository.TicketAttachmentRepository;
+import com.university.smartcampus.ticket.repository.TicketCommentRepository;
 import com.university.smartcampus.ticket.repository.TicketRepository;
 import com.university.smartcampus.ticket.repository.TicketStatusHistoryRepository;
 import com.university.smartcampus.user.entity.AdminEntity;
@@ -68,6 +70,9 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     private TicketAttachmentRepository ticketAttachmentRepository;
 
     @Autowired
+    private TicketCommentRepository ticketCommentRepository;
+
+    @Autowired
     private TicketStatusHistoryRepository ticketStatusHistoryRepository;
 
     @Autowired
@@ -80,6 +85,7 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     void setUp() {
         mockMvc = webAppContextSetup(context).apply(springSecurity()).build();
         ticketAttachmentRepository.deleteAll();
+        ticketCommentRepository.deleteAll();
         ticketAttachmentStorageClient.reset();
         ticketStatusHistoryRepository.deleteAll();
         ticketRepository.deleteAll();
@@ -609,6 +615,124 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void reporterCanDeleteOwnLatestComment() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
+        TicketCommentEntity comment = seedComment(
+                ticket, "student@campus.test", "Please prioritise this.", Instant.parse("2026-04-20T08:00:00Z"));
+
+        mockMvc.perform(delete("/api/tickets/{id}/comments/{commentId}", ticket.getId(), comment.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isNoContent());
+
+        assertThat(ticketCommentRepository.findById(comment.getId())).isEmpty();
+
+        mockMvc.perform(get("/api/tickets/{id}/comments", ticket.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void reporterCannotDeleteOwnOlderComment() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
+        TicketCommentEntity olderComment = seedComment(
+                ticket, "student@campus.test", "First note.", Instant.parse("2026-04-20T08:00:00Z"));
+        seedComment(ticket, "student@campus.test", "Newer note.", Instant.parse("2026-04-20T09:00:00Z"));
+
+        mockMvc.perform(delete("/api/tickets/{id}/comments/{commentId}", ticket.getId(), olderComment.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Only the latest ticket comment can be deleted."));
+
+        assertThat(ticketCommentRepository.findById(olderComment.getId())).isPresent();
+    }
+
+    @Test
+    void assignedTicketManagerCannotDeleteReporterComment() throws Exception {
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.IN_PROGRESS));
+        TicketCommentEntity comment = seedComment(
+                ticket, "student@campus.test", "Student update.", Instant.parse("2026-04-20T08:00:00Z"));
+
+        mockMvc.perform(delete("/api/tickets/{id}/comments/{commentId}", ticket.getId(), comment.getId())
+                        .with(jwtFor("ticketmgr@campus.test")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("You can only delete your own comments."));
+
+        assertThat(ticketCommentRepository.findById(comment.getId())).isPresent();
+    }
+
+    @Test
+    void assignedTicketManagerCanDeleteOwnLatestComment() throws Exception {
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.IN_PROGRESS));
+        seedComment(ticket, "student@campus.test", "Student update.", Instant.parse("2026-04-20T08:00:00Z"));
+        TicketCommentEntity managerComment = seedComment(
+                ticket, "ticketmgr@campus.test", "Manager update.", Instant.parse("2026-04-20T09:00:00Z"));
+
+        mockMvc.perform(delete("/api/tickets/{id}/comments/{commentId}", ticket.getId(), managerComment.getId())
+                        .with(jwtFor("ticketmgr@campus.test")))
+                .andExpect(status().isNoContent());
+
+        assertThat(ticketCommentRepository.findById(managerComment.getId())).isEmpty();
+    }
+
+    @Test
+    void adminCanDeleteAnyonesLatestComment() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.RESOLVED);
+        TicketCommentEntity comment = seedComment(
+                ticket, "student@campus.test", "Final student note.", Instant.parse("2026-04-20T08:00:00Z"));
+
+        mockMvc.perform(delete("/api/tickets/{id}/comments/{commentId}", ticket.getId(), comment.getId())
+                        .with(jwtFor("admin@campus.test")))
+                .andExpect(status().isNoContent());
+
+        assertThat(ticketCommentRepository.findById(comment.getId())).isEmpty();
+    }
+
+    @Test
+    void adminCannotDeleteOlderComment() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.IN_PROGRESS);
+        TicketCommentEntity olderComment = seedComment(
+                ticket, "student@campus.test", "Student note.", Instant.parse("2026-04-20T08:00:00Z"));
+        seedComment(ticket, "admin@campus.test", "Admin note.", Instant.parse("2026-04-20T09:00:00Z"));
+
+        mockMvc.perform(delete("/api/tickets/{id}/comments/{commentId}", ticket.getId(), olderComment.getId())
+                        .with(jwtFor("admin@campus.test")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Only the latest ticket comment can be deleted."));
+
+        assertThat(ticketCommentRepository.findById(olderComment.getId())).isPresent();
+    }
+
+    @Test
+    void deleteCommentWithMismatchedTicketReturnsNotFound() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
+        TicketEntity otherTicket = seedTicket("student@campus.test", TicketStatus.OPEN);
+        TicketCommentEntity comment = seedComment(
+                ticket, "student@campus.test", "Ticket comment.", Instant.parse("2026-04-20T08:00:00Z"));
+
+        mockMvc.perform(delete("/api/tickets/{id}/comments/{commentId}", otherTicket.getId(), comment.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Ticket comment not found."));
+    }
+
+    @Test
+    void userCannotDeleteCommentOnInaccessibleTicket() throws Exception {
+        seedStudent("other4@campus.test");
+        TicketEntity ticket = seedTicket("other4@campus.test", TicketStatus.OPEN);
+        TicketCommentEntity comment = seedComment(
+                ticket, "other4@campus.test", "Private note.", Instant.parse("2026-04-20T08:00:00Z"));
+
+        mockMvc.perform(delete("/api/tickets/{id}/comments/{commentId}", ticket.getId(), comment.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isForbidden());
+
+        assertThat(ticketCommentRepository.findById(comment.getId())).isPresent();
+    }
+
+    @Test
     void reporterCanAddAndListAttachmentMetadata() throws Exception {
         TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
         AddTicketAttachmentRequest request = new AddTicketAttachmentRequest(
@@ -963,5 +1087,17 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
         attachment.setFileType("application/pdf");
         attachment.setUploadedAt(Instant.now());
         return ticketAttachmentRepository.save(attachment);
+    }
+
+    private TicketCommentEntity seedComment(TicketEntity ticket, String userEmail, String text, Instant createdAt) {
+        UserEntity user = userRepository.findByEmailIgnoreCase(userEmail).orElseThrow();
+        TicketCommentEntity comment = new TicketCommentEntity();
+        comment.setId(UUID.randomUUID());
+        comment.setTicket(ticket);
+        comment.setUser(user);
+        comment.setCommentText(text);
+        comment.setEdited(false);
+        comment.setCreatedAt(createdAt);
+        return ticketCommentRepository.save(comment);
     }
 }

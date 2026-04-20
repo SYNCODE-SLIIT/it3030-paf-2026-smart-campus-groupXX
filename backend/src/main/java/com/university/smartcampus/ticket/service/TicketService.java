@@ -240,10 +240,30 @@ public class TicketService {
     @Transactional(readOnly = true)
     public List<TicketCommentResponse> listComments(UserEntity user, String ticketRef) {
         TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
-        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId())
+        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAscIdAsc(ticket.getId())
                 .stream()
                 .map(this::toCommentResponse)
                 .toList();
+    }
+
+    @Transactional
+    public void deleteComment(UserEntity user, String ticketRef, UUID commentId) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketCommentEntity comment = ticketCommentRepository.findByIdAndTicketId(commentId, ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket comment not found."));
+
+        if (!isAdmin(user) && !comment.getUser().getId().equals(user.getId())) {
+            throw new ForbiddenException("You can only delete your own comments.");
+        }
+
+        TicketCommentEntity latestComment = ticketCommentRepository
+                .findFirstByTicketIdOrderByCreatedAtDescIdDesc(ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket comment not found."));
+        if (!latestComment.getId().equals(comment.getId())) {
+            throw new BadRequestException("Only the latest ticket comment can be deleted.");
+        }
+
+        ticketCommentRepository.delete(comment);
     }
 
     @Transactional(readOnly = true)
