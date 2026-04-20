@@ -188,6 +188,19 @@ export interface BookingResponse {
   checkedInAt: string | null;
 }
 
+export interface TimeRangeResponse {
+  startTime: string;
+  endTime: string;
+}
+
+export interface ResourceRemainingRangesResponse {
+  resourceId: string;
+  date: string;
+  windowStart: string;
+  windowEnd: string;
+  remainingRanges: TimeRangeResponse[];
+}
+
 export interface CreateRecurringBookingRequest {
   resourceId: string;
   recurrencePattern: RecurrencePattern;

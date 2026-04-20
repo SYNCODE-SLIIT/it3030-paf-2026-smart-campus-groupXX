@@ -25,6 +25,7 @@ import {
   checkInBooking,
   createBooking,
   createRecurringBooking,
+  getResourceRemainingRanges,
   getErrorMessage,
   listBookingNotifications,
   listMyBookings,
@@ -33,7 +34,14 @@ import {
   markNotificationAsRead,
   requestBookingModification,
 } from '@/lib/api-client';
-import type { BookingResponse, BookingStatus, ResourceResponse, RecurringBookingResponse, BookingNotificationResponse } from '@/lib/api-types';
+import type {
+  BookingNotificationResponse,
+  BookingResponse,
+  BookingStatus,
+  RecurringBookingResponse,
+  ResourceRemainingRangesResponse,
+  ResourceResponse,
+} from '@/lib/api-types';
 import { RecurringBookingForm } from '@/components/booking/RecurringBookingForm';
 import { BookingModificationModal } from '@/components/booking/BookingModificationModal';
 import { BookingCheckInPanel } from '@/components/booking/BookingCheckInPanel';
@@ -109,6 +117,14 @@ function localDateTimeToIso(value: string) {
   return parsed.toISOString();
 }
 
+function getIsoDate(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString().slice(0, 10);
+}
+
 export function RequesterBookingsScreenEnhanced({
   workspaceLabel,
 }: {
@@ -128,6 +144,9 @@ export function RequesterBookingsScreenEnhanced({
   const [activeTab, setActiveTab] = React.useState<TabType>('bookings');
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<NoticeState>(null);
+  const [remainingRanges, setRemainingRanges] = React.useState<ResourceRemainingRangesResponse | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = React.useState(false);
+  const [availabilityError, setAvailabilityError] = React.useState<string | null>(null);
 
   // Modals
   const [showRecurringForm, setShowRecurringForm] = React.useState(false);
@@ -168,6 +187,32 @@ export function RequesterBookingsScreenEnhanced({
   React.useEffect(() => {
     void reload();
   }, [reload]);
+
+  React.useEffect(() => {
+    async function loadRemainingRanges() {
+      if (!accessToken || !form.resourceId) {
+        setRemainingRanges(null);
+        setAvailabilityError(null);
+        return;
+      }
+
+      const date = getIsoDate(form.startTime) ?? new Date().toISOString().slice(0, 10);
+
+      setAvailabilityLoading(true);
+      setAvailabilityError(null);
+      try {
+        const response = await getResourceRemainingRanges(accessToken, form.resourceId, date);
+        setRemainingRanges(response);
+      } catch (error) {
+        setRemainingRanges(null);
+        setAvailabilityError(getErrorMessage(error, 'Could not load remaining ranges.'));
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    }
+
+    void loadRemainingRanges();
+  }, [accessToken, form.resourceId, form.startTime]);
 
   // Handlers
   async function handleCreateBooking(event: React.FormEvent<HTMLFormElement>) {
@@ -401,6 +446,38 @@ export function RequesterBookingsScreenEnhanced({
                     </Button>
                   </div>
                 </form>
+              </Card>
+
+              <Card style={{ padding: 16 }}>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-h)' }}>Remaining Time Ranges</p>
+                  {!form.resourceId && (
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+                      Select a resource to see currently available slots.
+                    </p>
+                  )}
+                  {availabilityLoading && (
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Loading remaining ranges...</p>
+                  )}
+                  {availabilityError && (
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-error)' }}>{availabilityError}</p>
+                  )}
+                  {remainingRanges && !availabilityLoading && !availabilityError && (
+                    remainingRanges.remainingRanges.length === 0 ? (
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+                        No remaining ranges for the selected date.
+                      </p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {remainingRanges.remainingRanges.map((range, index) => (
+                          <Chip key={`${range.startTime}-${range.endTime}-${index}`} color="blue">
+                            {formatDateTime(range.startTime)} - {formatDateTime(range.endTime)}
+                          </Chip>
+                        ))}
+                      </div>
+                    )
+                  )}
+                </div>
               </Card>
 
               {/* Bookings List */}

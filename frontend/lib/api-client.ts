@@ -20,6 +20,7 @@ import {
   type ModificationDecisionRequest,
   type RecurringBookingResponse,
   type RequestModificationRequest,
+  type ResourceRemainingRangesResponse,
   type ResourceResponse,
   type SessionSyncResponse,
   type StudentOnboardingRequest,
@@ -422,6 +423,17 @@ export async function cancelMyBooking(accessToken: string, bookingId: string, pa
     method: 'POST',
     accessToken,
     body: payload,
+  });
+}
+
+export async function getResourceRemainingRanges(
+  accessToken: string,
+  resourceId: string,
+  date: string,
+) {
+  const query = new URLSearchParams({ date }).toString();
+  return request<ResourceRemainingRangesResponse>(`/api/bookings/resources/${resourceId}/remaining-ranges?${query}`, {
+    accessToken,
   });
 }
 

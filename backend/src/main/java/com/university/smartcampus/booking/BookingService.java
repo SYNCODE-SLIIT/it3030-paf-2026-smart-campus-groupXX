@@ -1,6 +1,9 @@
 package com.university.smartcampus.booking;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -19,6 +22,12 @@ import com.university.smartcampus.user.entity.UserEntity;
 
 @Service
 public class BookingService {
+
+    private static final List<BookingStatus> BLOCKING_STATUSES = List.of(
+        BookingStatus.PENDING,
+        BookingStatus.APPROVED,
+        BookingStatus.CHECKED_IN
+    );
 
     private final BookingRepository bookingRepository;
     private final ResourceService resourceService;
@@ -95,6 +104,74 @@ public class BookingService {
     @Transactional(readOnly = true)
     public BookingDtos.BookingResponse getBooking(UUID bookingId) {
         return toResponse(requireBooking(bookingId));
+    }
+
+    @Transactional(readOnly = true)
+    public BookingDtos.ResourceRemainingRangesResponse getRemainingRangesForResource(UUID resourceId, LocalDate date) {
+        Objects.requireNonNull(resourceId, "Resource id is required.");
+        Objects.requireNonNull(date, "Date is required.");
+
+        ResourceEntity resource = resourceService.requireActiveResource(resourceId);
+        if (!resource.isBookable()) {
+            throw new BadRequestException("This resource is not available for booking.");
+        }
+
+        ZoneId zoneId = ZoneId.systemDefault();
+        Instant dayStart = date.atStartOfDay(zoneId).toInstant();
+        Instant dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant();
+
+        Instant now = bookingValidator.currentInstant();
+        Instant windowStart = dayStart.isBefore(now) ? now : dayStart;
+
+        if (!windowStart.isBefore(dayEnd)) {
+            return new BookingDtos.ResourceRemainingRangesResponse(
+                resourceId,
+                date,
+                windowStart,
+                dayEnd,
+                List.of()
+            );
+        }
+
+        List<BookingEntity> blockedBookings = bookingRepository
+            .findAllByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThanOrderByStartTimeAsc(
+                resourceId,
+                BLOCKING_STATUSES,
+                dayEnd,
+                windowStart
+            );
+
+        List<BookingDtos.TimeRange> remainingRanges = new ArrayList<>();
+        Instant cursor = windowStart;
+
+        for (BookingEntity booking : blockedBookings) {
+            Instant blockedStart = booking.getStartTime().isAfter(windowStart) ? booking.getStartTime() : windowStart;
+            Instant blockedEnd = booking.getEndTime().isBefore(dayEnd) ? booking.getEndTime() : dayEnd;
+
+            if (!blockedStart.isBefore(blockedEnd)) {
+                continue;
+            }
+
+            if (cursor.isBefore(blockedStart)) {
+                remainingRanges.add(new BookingDtos.TimeRange(cursor, blockedStart));
+            }
+
+            if (cursor.isBefore(blockedEnd)) {
+                cursor = blockedEnd;
+            }
+        }
+
+        if (cursor.isBefore(dayEnd)) {
+            remainingRanges.add(new BookingDtos.TimeRange(cursor, dayEnd));
+        }
+
+        return new BookingDtos.ResourceRemainingRangesResponse(
+            resourceId,
+            date,
+            windowStart,
+            dayEnd,
+            remainingRanges
+        );
     }
 
 
