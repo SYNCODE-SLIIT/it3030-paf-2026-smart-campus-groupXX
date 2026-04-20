@@ -1,8 +1,9 @@
 package com.university.smartcampus.resource;
 
-import java.time.LocalTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.domain.Sort;
@@ -25,11 +26,34 @@ import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
 @Service
 public class ResourceService {
 
+    private static final Set<String> ALLOWED_MANAGED_BY_ROLES = Set.of(
+        "CATALOG_MANAGER",
+        "LIBRARY_MANAGER",
+        "TECHNICAL_MANAGER",
+        "FACILITIES_MANAGER",
+        "MAINTENANCE_MANAGER",
+        "SPORTS_MANAGER",
+        "EVENTS_MANAGER",
+        "TRANSPORT_MANAGER"
+    );
+
     private final ResourceRepository resourceRepository;
+    private final ResourceTypeRepository resourceTypeRepository;
+    private final LocationRepository locationRepository;
+    private final ResourceFeatureRepository resourceFeatureRepository;
     private final ResourceMapper resourceMapper;
 
-    public ResourceService(ResourceRepository resourceRepository, ResourceMapper resourceMapper) {
+    public ResourceService(
+        ResourceRepository resourceRepository,
+        ResourceTypeRepository resourceTypeRepository,
+        LocationRepository locationRepository,
+        ResourceFeatureRepository resourceFeatureRepository,
+        ResourceMapper resourceMapper
+    ) {
         this.resourceRepository = resourceRepository;
+        this.resourceTypeRepository = resourceTypeRepository;
+        this.locationRepository = locationRepository;
+        this.resourceFeatureRepository = resourceFeatureRepository;
         this.resourceMapper = resourceMapper;
     }
 
@@ -38,12 +62,19 @@ public class ResourceService {
         String normalizedCode = normalizeRequiredCode(request.code());
         String normalizedName = normalizeRequiredName(request.name());
         ensureCodeAvailable(normalizedCode, null);
-        validateAvailability(request.availableFrom(), request.availableTo());
 
         ResourceEntity resource = resourceMapper.toEntity(request);
+        ResourceType resourceType = requireResourceType(request.resourceTypeId());
+        Location location = requireLocation(request.locationId());
+
         resource.setId(UUID.randomUUID());
         resource.setCode(normalizedCode);
         resource.setName(normalizedName);
+        resource.setResourceType(resourceType);
+        resource.setLocationEntity(location);
+        resource.setManagedByRole(normalizeManagedByRole(request.managedByRole()));
+        resource.setFeatures(resolveFeatures(request.featureCodes()));
+        syncLegacyCompatibilityFields(resource, resourceType, location);
         return resourceMapper.toResourceResponse(resourceRepository.save(resource));
     }
 
@@ -87,29 +118,35 @@ public class ResourceService {
     @Transactional
     public ResourceResponse updateResource(UUID id, UpdateResourceRequest request) {
         ResourceEntity resource = getResourceEntity(id);
-        String normalizedCode = null;
         String normalizedName = null;
-
-        if (request.code() != null) {
-            normalizedCode = normalizeRequiredCode(request.code());
-            ensureCodeAvailable(normalizedCode, resource.getId());
-        }
+        ResourceType nextResourceType = resource.getResourceType();
+        Location nextLocation = resource.getLocationEntity();
 
         if (request.name() != null) {
             normalizedName = normalizeRequiredName(request.name());
         }
 
-        LocalTime nextAvailableFrom = request.availableFrom() != null ? request.availableFrom() : resource.getAvailableFrom();
-        LocalTime nextAvailableTo = request.availableTo() != null ? request.availableTo() : resource.getAvailableTo();
-        validateAvailability(nextAvailableFrom, nextAvailableTo);
+        if (request.resourceTypeId() != null) {
+            nextResourceType = requireResourceType(request.resourceTypeId());
+            resource.setResourceType(nextResourceType);
+        }
+
+        if (request.locationId() != null) {
+            nextLocation = requireLocation(request.locationId());
+            resource.setLocationEntity(nextLocation);
+        }
 
         resourceMapper.applyUpdate(resource, request);
-        if (normalizedCode != null) {
-            resource.setCode(normalizedCode);
-        }
         if (normalizedName != null) {
             resource.setName(normalizedName);
         }
+        if (request.managedByRole() != null) {
+            resource.setManagedByRole(normalizeManagedByRole(request.managedByRole()));
+        }
+        if (request.featureCodes() != null) {
+            resource.setFeatures(resolveFeatures(request.featureCodes()));
+        }
+        syncLegacyCompatibilityFields(resource, nextResourceType, nextLocation);
 
         return resourceMapper.toResourceResponse(resource);
     }
@@ -149,12 +186,6 @@ public class ResourceService {
         }
     }
 
-    private void validateAvailability(LocalTime availableFrom, LocalTime availableTo) {
-        if (availableFrom != null && availableTo != null && !availableFrom.isBefore(availableTo)) {
-            throw new BadRequestException("Available from must be earlier than available to.");
-        }
-    }
-
     private String normalizeRequiredCode(String code) {
         if (!StringUtils.hasText(code)) {
             throw new BadRequestException("Code is required.");
@@ -167,6 +198,76 @@ public class ResourceService {
             throw new BadRequestException("Name is required.");
         }
         return name.trim();
+    }
+
+    private ResourceType requireResourceType(UUID resourceTypeId) {
+        return resourceTypeRepository.findById(resourceTypeId)
+            .orElseThrow(() -> new NotFoundException("Resource type not found."));
+    }
+
+    private Location requireLocation(UUID locationId) {
+        return locationRepository.findById(locationId)
+            .orElseThrow(() -> new NotFoundException("Location not found."));
+    }
+
+    private Set<ResourceFeature> resolveFeatures(List<String> featureCodes) {
+        if (featureCodes == null || featureCodes.isEmpty()) {
+            return new HashSet<>();
+        }
+
+        Set<ResourceFeature> features = new HashSet<>();
+        Set<String> missingCodes = new HashSet<>();
+
+        for (String featureCode : featureCodes) {
+            String normalizedFeatureCode = normalizeFeatureCode(featureCode);
+            ResourceFeature feature = resourceFeatureRepository.findByCodeIgnoreCase(normalizedFeatureCode)
+                .orElse(null);
+
+            if (feature == null) {
+                missingCodes.add(normalizedFeatureCode);
+                continue;
+            }
+
+            features.add(feature);
+        }
+
+        if (!missingCodes.isEmpty()) {
+            throw new BadRequestException("Unknown feature codes: " + String.join(", ", missingCodes));
+        }
+
+        return features;
+    }
+
+    private String normalizeManagedByRole(String managedByRole) {
+        if (!StringUtils.hasText(managedByRole)) {
+            return null;
+        }
+
+        String normalizedManagedByRole = managedByRole.trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_MANAGED_BY_ROLES.contains(normalizedManagedByRole)) {
+            throw new BadRequestException("Managed by role is invalid.");
+        }
+
+        return normalizedManagedByRole;
+    }
+
+    private String normalizeFeatureCode(String featureCode) {
+        if (!StringUtils.hasText(featureCode)) {
+            throw new BadRequestException("Feature codes must not be blank.");
+        }
+
+        return featureCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void syncLegacyCompatibilityFields(ResourceEntity resource, ResourceType resourceType, Location location) {
+        if (resourceType != null) {
+            resource.setCategory(resourceType.getCategory());
+            resource.setSubcategory(resourceType.getName());
+        }
+
+        if (location != null) {
+            resource.setLocation(location.getLocationName());
+        }
     }
 
     private String likeValue(String value) {

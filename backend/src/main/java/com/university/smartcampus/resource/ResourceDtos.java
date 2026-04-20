@@ -27,34 +27,31 @@ public final class ResourceDtos {
     public record CreateResourceRequest(
         @NotBlank String code,
         @NotBlank String name,
-        @NotNull ResourceCategory category,
-        String subcategory,
         String description,
-        String location,
+        @NotNull UUID resourceTypeId,
+        @NotNull UUID locationId,
         @PositiveOrZero Integer capacity,
         @PositiveOrZero Integer quantity,
         @NotNull ResourceStatus status,
         boolean bookable,
         boolean movable,
-        LocalTime availableFrom,
-        LocalTime availableTo
+        String managedByRole,
+        List<String> featureCodes
     ) {
     }
 
     public record UpdateResourceRequest(
-        String code,
         String name,
-        ResourceCategory category,
-        String subcategory,
         String description,
-        String location,
+        UUID resourceTypeId,
+        UUID locationId,
         @PositiveOrZero Integer capacity,
         @PositiveOrZero Integer quantity,
         ResourceStatus status,
         Boolean bookable,
         Boolean movable,
-        LocalTime availableFrom,
-        LocalTime availableTo
+        String managedByRole,
+        List<String> featureCodes
     ) {
     }
 

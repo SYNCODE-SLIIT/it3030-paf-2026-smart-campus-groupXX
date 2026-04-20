@@ -21,38 +21,22 @@ public class ResourceMapper {
         ResourceEntity resource = new ResourceEntity();
         resource.setCode(trim(request.code()));
         resource.setName(trim(request.name()));
-        resource.setCategory(request.category());
-        resource.setSubcategory(trimToNull(request.subcategory()));
         resource.setDescription(trimToNull(request.description()));
-        resource.setLocation(trimToNull(request.location()));
         resource.setCapacity(request.capacity());
         resource.setQuantity(request.quantity());
         resource.setStatus(request.status());
         resource.setBookable(request.bookable());
         resource.setMovable(request.movable());
-        resource.setAvailableFrom(request.availableFrom());
-        resource.setAvailableTo(request.availableTo());
+        resource.setManagedByRole(trimToNull(request.managedByRole()));
         return resource;
     }
 
     public void applyUpdate(ResourceEntity resource, UpdateResourceRequest request) {
-        if (request.code() != null) {
-            resource.setCode(trim(request.code()));
-        }
         if (request.name() != null) {
             resource.setName(trim(request.name()));
         }
-        if (request.category() != null) {
-            resource.setCategory(request.category());
-        }
-        if (request.subcategory() != null) {
-            resource.setSubcategory(trimToNull(request.subcategory()));
-        }
         if (request.description() != null) {
             resource.setDescription(trimToNull(request.description()));
-        }
-        if (request.location() != null) {
-            resource.setLocation(trimToNull(request.location()));
         }
         if (request.capacity() != null) {
             resource.setCapacity(request.capacity());
@@ -69,11 +53,8 @@ public class ResourceMapper {
         if (request.movable() != null) {
             resource.setMovable(request.movable());
         }
-        if (request.availableFrom() != null) {
-            resource.setAvailableFrom(request.availableFrom());
-        }
-        if (request.availableTo() != null) {
-            resource.setAvailableTo(request.availableTo());
+        if (request.managedByRole() != null) {
+            resource.setManagedByRole(trimToNull(request.managedByRole()));
         }
     }
 
