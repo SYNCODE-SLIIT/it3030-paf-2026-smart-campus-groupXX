@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import { Alert, Button, Textarea } from '@/components/ui';
 import type { TicketCommentResponse } from '@/lib/api-types';
 import { SEC_HD_LABEL, formatDateTime } from './ticketDetailHelpers';
@@ -12,6 +13,9 @@ interface TicketCommentsCardProps {
   onCommentChange: (text: string) => void;
   onCommentSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   formIdPrefix: string;
+  currentUserId?: string;
+  onDeleteComment?: (commentId: string) => void;
+  commentDeleting?: string | null;
 }
 
 function CountPill({ count }: { count: number }) {
@@ -42,7 +46,12 @@ export function TicketCommentsCard({
   onCommentChange,
   onCommentSubmit,
   formIdPrefix,
+  currentUserId,
+  onDeleteComment,
+  commentDeleting,
 }: TicketCommentsCardProps) {
+  const lastCommentId = comments.length > 0 ? comments[comments.length - 1].id : null;
+  const [deleteHovered, setDeleteHovered] = React.useState(false);
   return (
     <div
       style={{
@@ -93,6 +102,31 @@ export function TicketCommentsCard({
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatDateTime(comment.createdAt)}</span>
               {comment.isEdited && (
                 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>(edited)</span>
+              )}
+              {comment.id === lastCommentId && comment.userId === currentUserId && onDeleteComment && (
+                <button
+                  type="button"
+                  onClick={() => onDeleteComment(comment.id)}
+                  disabled={commentDeleting === comment.id}
+                  onMouseEnter={() => setDeleteHovered(true)}
+                  onMouseLeave={() => setDeleteHovered(false)}
+                  style={{
+                    marginLeft: 'auto',
+                    background: deleteHovered && commentDeleting !== comment.id ? 'var(--surface-3, rgba(0,0,0,0.06))' : 'none',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm, 4px)',
+                    cursor: commentDeleting === comment.id ? 'not-allowed' : 'pointer',
+                    padding: '2px 4px',
+                    color: deleteHovered && commentDeleting !== comment.id ? 'var(--text-body)' : 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    opacity: commentDeleting === comment.id ? 0.4 : 1,
+                    transition: 'background 0.15s, color 0.15s',
+                  }}
+                  aria-label="Delete comment"
+                >
+                  <Trash2 size={13} />
+                </button>
               )}
             </div>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-body)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>

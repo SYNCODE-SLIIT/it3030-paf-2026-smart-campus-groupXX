@@ -676,6 +676,14 @@ export async function addTicketComment(
   return request<TicketCommentResponse>(`${ticketApiPath(ticketRef)}/comments`, { method: 'POST', accessToken, body: payload });
 }
 
+export async function deleteTicketComment(
+  accessToken: string,
+  ticketRef: string,
+  commentId: string,
+): Promise<void> {
+  return request<void>(`${ticketApiPath(ticketRef)}/comments/${commentId}`, { method: 'DELETE', accessToken });
+}
+
 export async function listTicketAttachments(
   accessToken: string,
   ticketRef: string,

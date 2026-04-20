@@ -9,6 +9,7 @@ import { Alert, Button, Input, Select, Skeleton } from '@/components/ui';
 import {
   addTicketComment,
   deleteTicketAttachment,
+  deleteTicketComment,
   getErrorMessage,
   getTicket,
   getTicketHistory,
@@ -62,6 +63,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
 
   const [commentText, setCommentText] = React.useState('');
   const [commentSubmitting, setCommentSubmitting] = React.useState(false);
+  const [commentDeleting, setCommentDeleting] = React.useState<string | null>(null);
 
   const [attachmentUploading, setAttachmentUploading] = React.useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = React.useState<string | null>(null);
@@ -125,6 +127,19 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
       setNotice({ variant: 'error', title: 'Comment failed', message: getErrorMessage(error, 'Could not post the comment.') });
     } finally {
       setCommentSubmitting(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    if (!accessToken) return;
+    setCommentDeleting(commentId);
+    try {
+      await deleteTicketComment(accessToken, ticketRef, commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete the comment.') });
+    } finally {
+      setCommentDeleting(null);
     }
   }
 
@@ -236,6 +251,9 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             onCommentChange={setCommentText}
             onCommentSubmit={handleAddComment}
             formIdPrefix="student"
+            currentUserId={appUser?.id}
+            onDeleteComment={handleDeleteComment}
+            commentDeleting={commentDeleting}
           />
           <TicketAttachmentsCard
             attachments={attachments}
