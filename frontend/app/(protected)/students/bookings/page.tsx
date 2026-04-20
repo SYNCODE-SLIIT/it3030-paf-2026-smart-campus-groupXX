@@ -1,8 +1,8 @@
-import { RequesterBookingsScreen } from '@/components/screens/RequesterBookingsScreen';
+import { RequesterBookingsScreenEnhanced } from '@/components/screens/RequesterBookingsScreenEnhanced';
 import { requireUserType } from '@/lib/server-auth';
 
 export default async function StudentBookingsPage() {
   await requireUserType(['STUDENT']);
 
-  return <RequesterBookingsScreen workspaceLabel="Student Workspace" />;
+  return <RequesterBookingsScreenEnhanced workspaceLabel="Student Workspace" />;
 }
