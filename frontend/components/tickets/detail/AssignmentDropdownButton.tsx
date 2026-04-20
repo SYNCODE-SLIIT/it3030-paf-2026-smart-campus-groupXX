@@ -91,7 +91,7 @@ export function AssignmentDropdownButton({
       onClick: () => handleSelect(m.id),
     })),
     {
-      label: appUserName ? `Assign to myself (${appUserName})` : 'Assign to myself',
+      label: appUserName ? `Myself` : 'Assign to myself',
       icon: UserCheck,
       dividerBefore: true,
       onClick: () => handleSelect(appUserId),

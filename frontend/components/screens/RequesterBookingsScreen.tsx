@@ -4,15 +4,10 @@ import React from 'react';
 import { CalendarPlus } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from '@/components/ui';
 import { cancelMyBooking, createBooking, getErrorMessage, listMyBookings, listResources } from '@/lib/api-client';
 import type { BookingResponse, BookingStatus, ResourceResponse } from '@/lib/api-types';
-
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 const NEW_BOOKING_INITIAL = {
   resourceId: '',
@@ -46,6 +41,8 @@ function statusChipColor(status: BookingStatus): 'yellow' | 'green' | 'red' | 'n
       return 'red';
     case 'CANCELLED':
       return 'neutral';
+    default:
+      return 'neutral';
   }
 }
 
@@ -76,6 +73,7 @@ export function RequesterBookingsScreen({
   workspaceLabel: 'Student Workspace' | 'Faculty Workspace';
 }) {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
   const [resources, setResources] = React.useState<ResourceResponse[]>([]);
@@ -85,7 +83,6 @@ export function RequesterBookingsScreen({
   const [submitting, setSubmitting] = React.useState(false);
   const [activeBookingId, setActiveBookingId] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
 
   const reload = React.useCallback(async () => {
     if (!accessToken) {
@@ -121,12 +118,12 @@ export function RequesterBookingsScreen({
     event.preventDefault();
 
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
     if (!form.resourceId) {
-      setNotice({ variant: 'warning', title: 'Resource required', message: 'Select a resource before submitting.' });
+      showToast('warning', 'Resource required', 'Select a resource before submitting.');
       return;
     }
 
@@ -134,17 +131,17 @@ export function RequesterBookingsScreen({
     const endTimeIso = localDateTimeToIso(form.endTime);
 
     if (!startTimeIso || !endTimeIso) {
-      setNotice({ variant: 'warning', title: 'Invalid date/time', message: 'Enter valid start and end times.' });
+      showToast('warning', 'Invalid date/time', 'Enter valid start and end times.');
       return;
     }
 
     if (new Date(startTimeIso).getTime() >= new Date(endTimeIso).getTime()) {
-      setNotice({ variant: 'warning', title: 'Invalid range', message: 'Start time must be earlier than end time.' });
+      showToast('warning', 'Invalid range', 'Start time must be earlier than end time.');
       return;
     }
 
     if (new Date(startTimeIso).getTime() <= Date.now()) {
-      setNotice({ variant: 'warning', title: 'Future start required', message: 'Start time must be in the future.' });
+      showToast('warning', 'Future start required', 'Start time must be in the future.');
       return;
     }
 
@@ -158,9 +155,9 @@ export function RequesterBookingsScreen({
       });
       setForm(NEW_BOOKING_INITIAL);
       await reload();
-      setNotice({ variant: 'success', title: 'Booking requested', message: 'Your booking has been submitted for review.' });
+      showToast('success', 'Booking requested', 'Your booking has been submitted for review.');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Booking failed', message: getErrorMessage(error, 'Could not create this booking.') });
+      showToast('error', 'Booking failed', getErrorMessage(error, 'Could not create this booking.'));
     } finally {
       setSubmitting(false);
     }
@@ -168,7 +165,7 @@ export function RequesterBookingsScreen({
 
   async function handleCancelBooking(booking: BookingResponse) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
@@ -183,9 +180,9 @@ export function RequesterBookingsScreen({
     try {
       await cancelMyBooking(accessToken, booking.id, reason ? { reason } : undefined);
       await reload();
-      setNotice({ variant: 'success', title: 'Booking cancelled', message: 'The booking was cancelled successfully.' });
+      showToast('success', 'Booking cancelled', 'The booking was cancelled successfully.');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Cancellation failed', message: getErrorMessage(error, 'Could not cancel this booking.') });
+      showToast('error', 'Cancellation failed', getErrorMessage(error, 'Could not cancel this booking.'));
     } finally {
       setActiveBookingId(null);
     }
@@ -226,12 +223,6 @@ export function RequesterBookingsScreen({
           Submit requests for campus resources and track booking decisions.
         </p>
       </div>
-
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)}>
-          {notice.message}
-        </Alert>
-      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
         <Card>

@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Input, Select, Skeleton } from '@/components/ui';
 import {
   addTicketComment,
   deleteTicketAttachment,
+  deleteTicketComment,
   getErrorMessage,
   getTicket,
   getTicketHistory,
@@ -34,14 +36,9 @@ import {
 } from '@/components/tickets/detail';
 import { PRIORITY_LABELS, SEC_HD_LABEL } from '@/components/tickets/detail/ticketDetailHelpers';
 
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
-
 export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
   const { session, appUser } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
@@ -52,7 +49,6 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
 
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
 
   const [editForm, setEditForm] = React.useState<{ priority: TicketPriority | ''; contactNote: string }>({
     priority: '',
@@ -62,6 +58,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
 
   const [commentText, setCommentText] = React.useState('');
   const [commentSubmitting, setCommentSubmitting] = React.useState(false);
+  const [commentDeleting, setCommentDeleting] = React.useState<string | null>(null);
 
   const [attachmentUploading, setAttachmentUploading] = React.useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = React.useState<string | null>(null);
@@ -105,9 +102,9 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
         contactNote: editForm.contactNote.trim() || undefined,
       });
       setTicket(updated);
-      setNotice({ variant: 'success', title: 'Updated', message: 'Ticket updated successfully.' });
+      showToast('success', 'Updated', 'Ticket updated successfully.');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Update failed', message: getErrorMessage(error, 'Could not update the ticket.') });
+      showToast('error', 'Update failed', getErrorMessage(error, 'Could not update the ticket.'));
     } finally {
       setEditSubmitting(false);
     }
@@ -122,9 +119,22 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
       setComments((prev) => [...prev, newComment]);
       setCommentText('');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Comment failed', message: getErrorMessage(error, 'Could not post the comment.') });
+      showToast('error', 'Comment failed', getErrorMessage(error, 'Could not post the comment.'));
     } finally {
       setCommentSubmitting(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    if (!accessToken) return;
+    setCommentDeleting(commentId);
+    try {
+      await deleteTicketComment(accessToken, ticketRef, commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the comment.'));
+    } finally {
+      setCommentDeleting(null);
     }
   }
 
@@ -136,9 +146,9 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
     try {
       const newAttachment = await uploadTicketAttachment(accessToken, ticketRef, file);
       setAttachments((prev) => [...prev, newAttachment]);
-      setNotice({ variant: 'success', title: 'Uploaded', message: `${file.name} uploaded successfully.` });
+      showToast('success', 'Uploaded', `${file.name} uploaded successfully.`);
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Upload failed', message: getErrorMessage(error, 'Could not upload the file.') });
+      showToast('error', 'Upload failed', getErrorMessage(error, 'Could not upload the file.'));
     } finally {
       setAttachmentUploading(false);
     }
@@ -152,7 +162,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
       await deleteTicketAttachment(accessToken, ticketRef, attachmentId);
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete the attachment.') });
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the attachment.'));
     } finally {
       setDeletingAttachmentId(null);
     }
@@ -198,11 +208,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
         Back to Tickets
       </Button>
 
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)} style={{ marginBottom: 20 }}>
-          {notice.message}
-        </Alert>
-      )}
+
 
       {/* Hero — full width */}
       <div style={{ marginBottom: 20 }}>
@@ -236,6 +242,9 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             onCommentChange={setCommentText}
             onCommentSubmit={handleAddComment}
             formIdPrefix="student"
+            currentUserId={appUser?.id}
+            onDeleteComment={handleDeleteComment}
+            commentDeleting={commentDeleting}
           />
           <TicketAttachmentsCard
             attachments={attachments}

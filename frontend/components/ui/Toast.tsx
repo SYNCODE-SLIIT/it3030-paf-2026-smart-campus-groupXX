@@ -64,11 +64,10 @@ export function ToastStack({ children }: ToastStackProps) {
       <style>{`
         .smart-toast-stack {
           position: fixed;
-          top: 22px;
-          left: 50%;
+          bottom: 24px;
+          right: 24px;
           z-index: 120;
-          width: min(920px, calc(100vw - 32px));
-          transform: translateX(-50%);
+          width: min(420px, calc(100vw - 48px));
           display: grid;
           gap: 10px;
           pointer-events: none;
@@ -79,7 +78,7 @@ export function ToastStack({ children }: ToastStackProps) {
         @keyframes smart-toast-in {
           from {
             opacity: 0;
-            transform: translateY(-10px) scale(.985);
+            transform: translateY(10px) scale(.985);
           }
           to {
             opacity: 1;
@@ -88,7 +87,8 @@ export function ToastStack({ children }: ToastStackProps) {
         }
         @media (max-width: 640px) {
           .smart-toast-stack {
-            top: 12px;
+            bottom: 16px;
+            right: 10px;
             width: calc(100vw - 20px);
           }
         }

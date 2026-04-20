@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Dialog, Skeleton, Textarea } from '@/components/ui';
 import {
   addTicketComment,
+  deleteTicketComment,
   getErrorMessage,
   getTicket,
   getTicketHistory,
@@ -32,14 +34,9 @@ import {
   TicketHistoryCard,
 } from '@/components/tickets/detail';
 
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
-
 export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
-  const { session } = useAuth();
+  const { session, appUser } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
@@ -50,7 +47,6 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
 
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
 
   const [resolveModalOpen, setResolveModalOpen] = React.useState(false);
   const [rejectModalOpen, setRejectModalOpen] = React.useState(false);
@@ -61,6 +57,7 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
 
   const [commentText, setCommentText] = React.useState('');
   const [commentSubmitting, setCommentSubmitting] = React.useState(false);
+  const [commentDeleting, setCommentDeleting] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     if (!accessToken) { setLoading(false); setLoadError('Your session is unavailable.'); return; }
@@ -104,9 +101,9 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
       setRejectionReason('');
       setResolveModalOpen(false);
       setRejectModalOpen(false);
-      setNotice({ variant: 'success', title: 'Status updated', message: `Ticket is now ${newStatus.replace('_', ' ').toLowerCase()}.` });
+      showToast('success', 'Status updated', `Ticket is now ${newStatus.replace('_', ' ').toLowerCase()}.`);
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Update failed', message: getErrorMessage(error, 'Could not update status.') });
+      showToast('error', 'Update failed', getErrorMessage(error, 'Could not update status.'));
     } finally {
       setStatusSubmitting(false);
     }
@@ -121,9 +118,22 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
       setComments((prev) => [...prev, newComment]);
       setCommentText('');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Comment failed', message: getErrorMessage(error, 'Could not post the comment.') });
+      showToast('error', 'Comment failed', getErrorMessage(error, 'Could not post the comment.'));
     } finally {
       setCommentSubmitting(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    if (!accessToken) return;
+    setCommentDeleting(commentId);
+    try {
+      await deleteTicketComment(accessToken, ticketRef, commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the comment.'));
+    } finally {
+      setCommentDeleting(null);
     }
   }
 
@@ -169,12 +179,6 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
         Back to My Tickets
       </Button>
 
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)} style={{ marginBottom: 20 }}>
-          {notice.message}
-        </Alert>
-      )}
-
       {/* Hero — full width */}
       <div style={{ marginBottom: 20 }}>
         <TicketHeaderCard ticket={ticket} />
@@ -207,6 +211,9 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             onCommentChange={setCommentText}
             onCommentSubmit={handleAddComment}
             formIdPrefix="mgr"
+            currentUserId={appUser?.id}
+            onDeleteComment={handleDeleteComment}
+            commentDeleting={commentDeleting}
           />
           <TicketAttachmentsCard attachments={attachments} />
         </div>
