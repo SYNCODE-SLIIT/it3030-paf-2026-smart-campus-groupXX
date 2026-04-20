@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Input, Select } from '@/components/ui';
+import { Alert, Button, Input, Select, Skeleton } from '@/components/ui';
 import {
   addTicketComment,
   deleteTicketAttachment,
@@ -161,8 +161,17 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <div style={{ height: 40, background: 'var(--surface-2)', borderRadius: 8, width: 200 }} />
-        <div style={{ height: 120, background: 'var(--surface-2)', borderRadius: 8 }} />
+        <Skeleton variant="line" width={120} height={28} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--surface-1)', borderRadius: 'var(--radius-md)', padding: 20 }}>
+          <Skeleton variant="line" width="60%" height={20} />
+          <Skeleton variant="line" width="40%" height={14} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <Skeleton variant="line" width={70} height={12} />
+            <Skeleton variant="line" width={90} height={12} />
+          </div>
+        </div>
+        <Skeleton variant="rect" height={160} />
+        <Skeleton variant="rect" height={120} />
       </div>
     );
   }
