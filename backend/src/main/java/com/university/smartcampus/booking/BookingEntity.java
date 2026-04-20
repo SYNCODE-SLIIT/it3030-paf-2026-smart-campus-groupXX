@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.university.smartcampus.AppEnums.BookingStatus;
+import com.university.smartcampus.AppEnums.CheckInStatus;
 import com.university.smartcampus.common.entity.TimestampedEntity;
 import com.university.smartcampus.resource.ResourceEntity;
 import com.university.smartcampus.user.entity.UserEntity;
@@ -61,6 +62,17 @@ public class BookingEntity extends TimestampedEntity {
 
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurring_booking_id")
+    private RecurringBookingEntity recurringBooking;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "check_in_status", length = 20)
+    private CheckInStatus checkInStatus;
+
+    @Column(name = "checked_in_at")
+    private Instant checkedInAt;
 
     public UUID getId() {
         return id;
@@ -156,5 +168,29 @@ public class BookingEntity extends TimestampedEntity {
 
     public void setCancelledAt(Instant cancelledAt) {
         this.cancelledAt = cancelledAt;
+    }
+
+    public RecurringBookingEntity getRecurringBooking() {
+        return recurringBooking;
+    }
+
+    public void setRecurringBooking(RecurringBookingEntity recurringBooking) {
+        this.recurringBooking = recurringBooking;
+    }
+
+    public CheckInStatus getCheckInStatus() {
+        return checkInStatus;
+    }
+
+    public void setCheckInStatus(CheckInStatus checkInStatus) {
+        this.checkInStatus = checkInStatus;
+    }
+
+    public Instant getCheckedInAt() {
+        return checkedInAt;
+    }
+
+    public void setCheckedInAt(Instant checkedInAt) {
+        this.checkedInAt = checkedInAt;
     }
 }

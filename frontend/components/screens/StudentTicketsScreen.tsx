@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { TicketPlus } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card } from '@/components/ui';
+import { Alert, Button, Card, Skeleton } from '@/components/ui';
 import { SubmitTicketModal, TicketCard } from '@/components/tickets';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
@@ -214,9 +214,21 @@ export function StudentTicketsScreen() {
       )}
 
       {loading && (
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 48 }}>
-          Loading tickets…
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ background: 'var(--surface-1)', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Skeleton variant="line" width={180} height={14} />
+                <Skeleton variant="line" width={60} height={14} />
+              </div>
+              <Skeleton variant="line" width="85%" height={12} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Skeleton variant="line" width={70} height={10} />
+                <Skeleton variant="line" width={90} height={10} />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {!loading && tickets.length === 0 && !loadError && (

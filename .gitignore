@@ -46,3 +46,7 @@ yarn-error.log*
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Repository documentation drafts / generated notes
+BOOKING_SYSTEM_AUDIT.md
+BOOKING_SYSTEM_IMPLEMENTATION_GUIDE.md

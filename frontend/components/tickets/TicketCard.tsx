@@ -98,7 +98,6 @@ function formatDate(iso: string) {
 }
 
 export function TicketCard({ ticket, onView, showReporter = false, assignOptions, onAssign }: TicketCardProps) {
-  const [hovered, setHovered] = React.useState(false);
   const [assignOpen, setAssignOpen] = React.useState(false);
   const [assignMenuPosition, setAssignMenuPosition] = React.useState<AssignMenuPosition | null>(null);
   const assignRef = React.useRef<HTMLDivElement>(null);
@@ -175,15 +174,12 @@ export function TicketCard({ ticket, onView, showReporter = false, assignOptions
 
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-md)',
-        boxShadow: hovered ? 'var(--card-shadow-hover)' : 'var(--card-shadow)',
-        transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
-        transition: 'transform .22s ease, box-shadow .22s ease',
+        boxShadow: 'var(--card-shadow)',
+        transition: 'box-shadow .22s ease',
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',

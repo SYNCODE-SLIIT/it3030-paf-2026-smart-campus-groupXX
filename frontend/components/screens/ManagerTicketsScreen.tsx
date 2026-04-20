@@ -5,12 +5,12 @@ import { Search } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Chip, Input, Select, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs } from '@/components/ui';
+import { Alert, Input, Select, Skeleton, Tabs } from '@/components/ui';
+import { TicketCard } from '@/components/tickets';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketCategory, TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
 
 type StatusFilter = TicketStatus | 'ALL';
-type PriorityFilter = TicketPriority | 'ALL';
 type CategoryFilter = TicketCategory | 'ALL';
 
 const STATUS_TABS: { label: string; value: StatusFilter }[] = [
@@ -20,14 +20,6 @@ const STATUS_TABS: { label: string; value: StatusFilter }[] = [
   { label: 'Resolved', value: 'RESOLVED' },
   { label: 'Closed', value: 'CLOSED' },
   { label: 'Rejected', value: 'REJECTED' },
-];
-
-const PRIORITY_OPTIONS: { value: PriorityFilter; label: string }[] = [
-  { value: 'ALL', label: 'All Priorities' },
-  { value: 'URGENT', label: 'Urgent' },
-  { value: 'HIGH', label: 'High' },
-  { value: 'MEDIUM', label: 'Medium' },
-  { value: 'LOW', label: 'Low' },
 ];
 
 const CATEGORY_OPTIONS: { value: CategoryFilter; label: string }[] = [
@@ -42,31 +34,71 @@ const CATEGORY_OPTIONS: { value: CategoryFilter; label: string }[] = [
   { value: 'OTHER', label: 'Other' },
 ];
 
-const CATEGORY_LABELS: Record<TicketCategory, string> = {
-  ELECTRICAL: 'Electrical', NETWORK: 'Network', EQUIPMENT: 'Equipment',
-  FURNITURE: 'Furniture', CLEANLINESS: 'Cleanliness', FACILITY_DAMAGE: 'Facility Damage',
-  ACCESS_SECURITY: 'Access / Security', OTHER: 'Other',
-};
+const PRIORITY_ORDER: TicketPriority[] = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   URGENT: 'Urgent', HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low',
 };
 
-const PRIORITY_CHIP_COLOR: Record<TicketPriority, 'red' | 'orange' | 'blue' | 'neutral'> = {
-  URGENT: 'red', HIGH: 'orange', MEDIUM: 'blue', LOW: 'neutral',
+const PRIORITY_COLOR: Record<TicketPriority, string> = {
+  URGENT: 'var(--red-400)',
+  HIGH: 'var(--orange-400)',
+  MEDIUM: 'var(--blue-400)',
+  LOW: 'var(--neutral-400)',
 };
 
-const STATUS_CHIP_COLOR: Record<TicketStatus, 'green' | 'neutral' | 'red' | 'blue' | 'yellow'> = {
-  OPEN: 'blue', IN_PROGRESS: 'yellow', RESOLVED: 'green', CLOSED: 'neutral', REJECTED: 'red',
-};
+interface SectionProps {
+  label: string;
+  color: string;
+  tickets: TicketSummaryResponse[];
+  onView: (code: string) => void;
+}
 
-const STATUS_DISPLAY: Record<TicketStatus, string> = {
-  OPEN: 'Open', IN_PROGRESS: 'In Progress', RESOLVED: 'Resolved', CLOSED: 'Closed', REJECTED: 'Rejected',
-};
-
-const DATE_FMT = new Intl.DateTimeFormat('en-LK', { year: 'numeric', month: 'short', day: 'numeric' });
-function formatDate(iso: string) {
-  return DATE_FMT.format(new Date(iso));
+function TicketSection({ label, color, tickets, onView }: SectionProps) {
+  if (tickets.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+        <div style={{ width: 3, height: 16, borderRadius: 2, background: color, flexShrink: 0 }} />
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '.18em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+          }}
+        >
+          {label}
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', opacity: 0.55 }}>
+          {tickets.length}
+        </span>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          gap: 16,
+          overflowX: 'auto',
+          padding: '18px 24px 36px',
+          margin: '-18px -24px -24px',
+          scrollPaddingInline: 24,
+          scrollbarWidth: 'thin',
+        }}
+      >
+        {tickets.map((ticket) => (
+          <div key={ticket.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
+            <TicketCard
+              ticket={ticket}
+              showReporter
+              onView={() => onView(ticket.ticketCode)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function ManagerTicketsScreenInner() {
@@ -79,7 +111,6 @@ function ManagerTicketsScreenInner() {
 
   const [tickets, setTickets] = React.useState<TicketSummaryResponse[]>([]);
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(initialStatus);
-  const [priorityFilter, setPriorityFilter] = React.useState<PriorityFilter>('ALL');
   const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [loading, setLoading] = React.useState(true);
@@ -114,7 +145,6 @@ function ManagerTicketsScreenInner() {
   const filtered = React.useMemo(() => {
     return tickets.filter((t) => {
       if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
-      if (priorityFilter !== 'ALL' && t.priority !== priorityFilter) return false;
       if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -126,7 +156,21 @@ function ManagerTicketsScreenInner() {
       }
       return true;
     });
-  }, [tickets, statusFilter, priorityFilter, categoryFilter, searchQuery]);
+  }, [tickets, statusFilter, categoryFilter, searchQuery]);
+
+  const priorityGroups = React.useMemo(() =>
+    PRIORITY_ORDER
+      .map((priority) => ({
+        priority,
+        tickets: filtered.filter((t) => t.priority === priority),
+      }))
+      .filter((g) => g.tickets.length > 0),
+  [filtered]);
+
+  const handleView = React.useCallback(
+    (code: string) => { router.push(`/ticket-managers/tickets/${code}`); },
+    [router],
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -151,14 +195,6 @@ function ManagerTicketsScreenInner() {
         />
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: '0 0 160px', minWidth: 0 }}>
-            <Select
-              id="priority-filter"
-              value={priorityFilter}
-              options={PRIORITY_OPTIONS}
-              onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
-            />
-          </div>
           <div style={{ flex: '0 0 180px', minWidth: 0 }}>
             <Select
               id="category-filter"
@@ -182,77 +218,22 @@ function ManagerTicketsScreenInner() {
 
         {loading ? (
           <Skeleton variant="rect" height={320} />
+        ) : priorityGroups.length === 0 ? (
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 48 }}>
+            {tickets.length === 0 ? 'No tickets assigned to you yet.' : 'No tickets match your filters.'}
+          </p>
         ) : (
-          <Card style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeader>Code</TableHeader>
-                    <TableHeader>Title</TableHeader>
-                    <TableHeader>Category</TableHeader>
-                    <TableHeader>Priority</TableHeader>
-                    <TableHeader>Status</TableHeader>
-                    <TableHeader>Created</TableHeader>
-                    <TableHeader />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filtered.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7}>
-                        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', margin: 0, fontSize: 13 }}>
-                          {tickets.length === 0 ? 'No tickets assigned to you yet.' : 'No tickets match your filters.'}
-                        </p>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filtered.map((ticket) => (
-                      <TableRow key={ticket.id}>
-                        <TableCell>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
-                            {ticket.ticketCode}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span style={{ fontWeight: 600, color: 'var(--text-h)', fontSize: 13 }}>
-                            {ticket.title}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Chip color="neutral" size="sm">{CATEGORY_LABELS[ticket.category]}</Chip>
-                        </TableCell>
-                        <TableCell>
-                          <Chip color={PRIORITY_CHIP_COLOR[ticket.priority]} size="sm" dot>
-                            {PRIORITY_LABELS[ticket.priority]}
-                          </Chip>
-                        </TableCell>
-                        <TableCell>
-                          <Chip color={STATUS_CHIP_COLOR[ticket.status]} size="sm" dot>
-                            {STATUS_DISPLAY[ticket.status]}
-                          </Chip>
-                        </TableCell>
-                        <TableCell>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
-                            {formatDate(ticket.createdAt)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => { router.push(`/ticket-managers/tickets/${ticket.ticketCode}`); }}
-                          >
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+            {priorityGroups.map(({ priority, tickets: t }) => (
+              <TicketSection
+                key={priority}
+                label={PRIORITY_LABELS[priority]}
+                color={PRIORITY_COLOR[priority]}
+                tickets={t}
+                onView={handleView}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>
