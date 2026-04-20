@@ -19,26 +19,12 @@ export function TicketHeaderCard({ ticket, assignmentSlot }: TicketHeaderCardPro
   return (
     <div
       style={{
-        position: 'relative',
         background: 'var(--surface)',
         border: '1px solid var(--border-strong)',
         borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--card-shadow)',
-        overflow: 'hidden',
+        boxShadow: `inset 4px 0 0 ${PRIORITY_STRIPE[ticket.priority]}, var(--card-shadow)`,
       }}
     >
-      {/* Left priority stripe */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: 4,
-          bottom: 0,
-          background: PRIORITY_STRIPE[ticket.priority],
-        }}
-      />
-
       {/* Inner content */}
       <div style={{ padding: '20px 24px 20px 28px' }}>
         <div
