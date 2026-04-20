@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Dialog, Skeleton, Textarea } from '@/components/ui';
 import {
   addTicketComment,
@@ -38,14 +39,9 @@ import {
   TicketHistoryCard,
 } from '@/components/tickets/detail';
 
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
-
 export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
   const { session, appUser } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
@@ -57,7 +53,6 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
 
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
 
   const [assigning, setAssigning] = React.useState(false);
 
@@ -107,9 +102,9 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
     try {
       const updated = await assignTicket(accessToken, ticketRef, { assignedTo: userId });
       setTicket(updated);
-      setNotice({ variant: 'success', title: 'Assigned', message: 'Ticket assigned successfully.' });
+      showToast('success', 'Assigned', 'Ticket assigned successfully.');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Assignment failed', message: getErrorMessage(error, 'Could not assign the ticket.') });
+      showToast('error', 'Assignment failed', getErrorMessage(error, 'Could not assign the ticket.'));
     } finally {
       setAssigning(false);
     }
@@ -133,9 +128,9 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
       setRejectionReason('');
       setResolveModalOpen(false);
       setRejectModalOpen(false);
-      setNotice({ variant: 'success', title: 'Status updated', message: `Ticket is now ${newStatus.replace('_', ' ').toLowerCase()}.` });
+      showToast('success', 'Status updated', `Ticket is now ${newStatus.replace('_', ' ').toLowerCase()}.`);
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Update failed', message: getErrorMessage(error, 'Could not update status.') });
+      showToast('error', 'Update failed', getErrorMessage(error, 'Could not update status.'));
     } finally {
       setStatusSubmitting(false);
     }
@@ -150,7 +145,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
       setComments((prev) => [...prev, newComment]);
       setCommentText('');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Comment failed', message: getErrorMessage(error, 'Could not post the comment.') });
+      showToast('error', 'Comment failed', getErrorMessage(error, 'Could not post the comment.'));
     } finally {
       setCommentSubmitting(false);
     }
@@ -163,7 +158,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
       await deleteTicketComment(accessToken, ticketRef, commentId);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete the comment.') });
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the comment.'));
     } finally {
       setCommentDeleting(null);
     }
@@ -176,7 +171,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
       await deleteTicket(accessToken, ticketRef);
       router.push('/admin/tickets');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete the ticket.') });
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the ticket.'));
       setDeleting(false);
       setDeleteModalOpen(false);
     }
@@ -229,11 +224,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
         Back to Tickets
       </Button>
 
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)} style={{ marginBottom: 20 }}>
-          {notice.message}
-        </Alert>
-      )}
+
 
       {/* Hero — full width */}
       <div style={{ marginBottom: 20 }}>

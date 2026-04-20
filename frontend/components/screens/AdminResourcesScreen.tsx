@@ -4,26 +4,21 @@ import React from 'react';
 import { FolderOpen, Plus, Search } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import { createResource, deleteResource, getErrorMessage, listResources, updateResource } from '@/lib/api-client';
 import type { CreateResourceRequest, ResourceResponse, UpdateResourceRequest } from '@/lib/api-types';
 import { getResourceCategoryChipColor, getResourceCategoryLabel, getResourceStatusChipColor, getResourceStatusLabel, resourceAvailabilityLabel, resourceCategoryOptions, resourceStatusOptions } from '@/lib/resource-display';
 import { ResourceFormModal } from '@/components/screens/admin/resources/ResourceFormModal';
 
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
-
 export function AdminResourcesScreen() {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
   const [resources, setResources] = React.useState<ResourceResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [searchText, setSearchText] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('');
@@ -77,7 +72,7 @@ export function AdminResourcesScreen() {
 
   async function handleSave(payload: CreateResourceRequest | UpdateResourceRequest) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
@@ -85,16 +80,16 @@ export function AdminResourcesScreen() {
     try {
       if (editingResource) {
         await updateResource(accessToken, editingResource.id, payload as UpdateResourceRequest);
-        setNotice({ variant: 'success', title: 'Resource updated', message: `${editingResource.code} was updated.` });
+        showToast('success', 'Resource updated', `${editingResource.code} was updated.`);
       } else {
         await createResource(accessToken, payload as CreateResourceRequest);
-        setNotice({ variant: 'success', title: 'Resource created', message: 'Resource added to the catalogue.' });
+        showToast('success', 'Resource created', 'Resource added to the catalogue.');
       }
       setFormOpen(false);
       setEditingResource(null);
       await reload();
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Save failed', message: getErrorMessage(error, 'We could not save the resource.') });
+      showToast('error', 'Save failed', getErrorMessage(error, 'We could not save the resource.'));
     } finally {
       setSaving(false);
     }
@@ -102,7 +97,7 @@ export function AdminResourcesScreen() {
 
   async function handleDelete(resource: ResourceResponse) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
@@ -112,10 +107,10 @@ export function AdminResourcesScreen() {
     setDeletingId(resource.id);
     try {
       await deleteResource(accessToken, resource.id);
-      setNotice({ variant: 'success', title: 'Resource removed', message: `${resource.code} is now inactive.` });
+      showToast('success', 'Resource removed', `${resource.code} is now inactive.`);
       await reload();
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'We could not remove the resource.') });
+      showToast('error', 'Delete failed', getErrorMessage(error, 'We could not remove the resource.'));
     } finally {
       setDeletingId(null);
     }
@@ -134,12 +129,6 @@ export function AdminResourcesScreen() {
           Manage spaces, equipment, and transport entries used across bookings.
         </p>
       </div>
-
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title}>
-          {notice.message}
-        </Alert>
-      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
         <Card hoverable>

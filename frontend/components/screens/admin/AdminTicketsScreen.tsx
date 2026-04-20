@@ -4,16 +4,11 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Dialog, Skeleton, Tabs } from '@/components/ui';
 import { TicketCard } from '@/components/tickets';
 import { assignTicket, deleteTicket, getErrorMessage, listMyTickets, listUsers } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse, UserResponse } from '@/lib/api-types';
-
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 type MainTab = 'unassigned' | 'assigned' | 'in_progress' | 'done';
 type QueueFilter = 'all' | 'mine';
@@ -140,6 +135,7 @@ function TicketSection({ label, color, tickets, onView, assignOptions, onAssign,
 
 export function AdminTicketsScreen() {
   const { session, appUser } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
@@ -150,7 +146,6 @@ export function AdminTicketsScreen() {
   const [sortOrder, setSortOrder] = React.useState<SortOrder>('oldest');
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [deleteConfirmCode, setDeleteConfirmCode] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
 
@@ -201,9 +196,9 @@ export function AdminTicketsScreen() {
       try {
         const updated = await assignTicket(accessToken, ticketCode, { assignedTo: userId });
         setTickets((prev) => prev.map((t) => (t.ticketCode === ticketCode ? updated : t)));
-        setNotice({ variant: 'success', title: 'Assigned', message: `Ticket ${ticketCode} has been assigned.` });
+        showToast('success', 'Assigned', `Ticket ${ticketCode} has been assigned.`);
       } catch (err) {
-        setNotice({ variant: 'error', title: 'Assignment failed', message: getErrorMessage(err, 'Could not assign ticket.') });
+        showToast('error', 'Assignment failed', getErrorMessage(err, 'Could not assign ticket.'));
       }
     },
     [accessToken],
@@ -250,10 +245,10 @@ export function AdminTicketsScreen() {
     try {
       await deleteTicket(accessToken, deleteConfirmCode);
       setTickets((prev) => prev.filter((t) => t.ticketCode !== deleteConfirmCode));
-      setNotice({ variant: 'success', title: 'Deleted', message: `Ticket ${deleteConfirmCode} has been permanently deleted.` });
+      showToast('success', 'Deleted', `Ticket ${deleteConfirmCode} has been permanently deleted.`);
       setDeleteConfirmCode(null);
     } catch (err) {
-      setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(err, 'Could not delete the ticket.') });
+      showToast('error', 'Delete failed', getErrorMessage(err, 'Could not delete the ticket.'));
     } finally {
       setDeleting(false);
     }
@@ -461,12 +456,6 @@ export function AdminTicketsScreen() {
           View all campus support tickets and assign them to ticket managers.
         </p>
       </div>
-
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)}>
-          {notice.message}
-        </Alert>
-      )}
 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>

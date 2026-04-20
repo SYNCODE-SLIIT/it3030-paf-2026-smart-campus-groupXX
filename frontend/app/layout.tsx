@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Open_Sans, Poppins, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { ToastProvider } from '@/components/providers/ToastProvider';
 import { getInitialServerAppUser } from '@/lib/server-auth';
 
 const openSans = Open_Sans({
@@ -40,7 +41,9 @@ export default async function RootLayout({
         suppressHydrationWarning
         className={`${openSans.variable} ${poppins.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <AuthProvider initialAppUser={initialAppUser}>{children}</AuthProvider>
+        <AuthProvider initialAppUser={initialAppUser}>
+          <ToastProvider>{children}</ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

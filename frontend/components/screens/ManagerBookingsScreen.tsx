@@ -4,15 +4,10 @@ import React from 'react';
 import { Check, Search, X } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import { approveBooking, cancelApprovedBookingAsManager, getErrorMessage, listAllBookings, listResources, rejectBooking } from '@/lib/api-client';
 import type { BookingResponse, BookingStatus, ResourceResponse } from '@/lib/api-types';
-
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -38,6 +33,8 @@ function statusChipColor(status: BookingStatus): 'yellow' | 'green' | 'red' | 'n
       return 'red';
     case 'CANCELLED':
       return 'neutral';
+    default:
+      return 'neutral';
   }
 }
 
@@ -47,13 +44,13 @@ function shortId(value: string) {
 
 export function ManagerBookingsScreen() {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
   const [bookings, setBookings] = React.useState<BookingResponse[]>([]);
   const [resources, setResources] = React.useState<ResourceResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [activeBookingId, setActiveBookingId] = React.useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = React.useState<BookingStatus | ''>('');
@@ -122,7 +119,7 @@ export function ManagerBookingsScreen() {
 
   async function handleApprove(booking: BookingResponse) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
@@ -130,9 +127,9 @@ export function ManagerBookingsScreen() {
     try {
       await approveBooking(accessToken, booking.id);
       await reload();
-      setNotice({ variant: 'success', title: 'Booking approved', message: `${booking.resource.code} has been approved.` });
+      showToast('success', 'Booking approved', `${booking.resource.code} has been approved.`);
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Approval failed', message: getErrorMessage(error, 'Could not approve this booking.') });
+      showToast('error', 'Approval failed', getErrorMessage(error, 'Could not approve this booking.'));
     } finally {
       setActiveBookingId(null);
     }
@@ -140,13 +137,13 @@ export function ManagerBookingsScreen() {
 
   async function handleReject(booking: BookingResponse) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
     const reason = window.prompt('Provide a rejection reason:');
     if (!reason?.trim()) {
-      setNotice({ variant: 'warning', title: 'Reason required', message: 'A rejection reason is required.' });
+      showToast('warning', 'Reason required', 'A rejection reason is required.');
       return;
     }
 
@@ -154,9 +151,9 @@ export function ManagerBookingsScreen() {
     try {
       await rejectBooking(accessToken, booking.id, { reason: reason.trim() });
       await reload();
-      setNotice({ variant: 'success', title: 'Booking rejected', message: `${booking.resource.code} was rejected.` });
+      showToast('success', 'Booking rejected', `${booking.resource.code} was rejected.`);
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Rejection failed', message: getErrorMessage(error, 'Could not reject this booking.') });
+      showToast('error', 'Rejection failed', getErrorMessage(error, 'Could not reject this booking.'));
     } finally {
       setActiveBookingId(null);
     }
@@ -164,7 +161,7 @@ export function ManagerBookingsScreen() {
 
   async function handleCancelApproved(booking: BookingResponse) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
@@ -179,9 +176,9 @@ export function ManagerBookingsScreen() {
     try {
       await cancelApprovedBookingAsManager(accessToken, booking.id, reason ? { reason } : undefined);
       await reload();
-      setNotice({ variant: 'success', title: 'Booking cancelled', message: `${booking.resource.code} was cancelled.` });
+      showToast('success', 'Booking cancelled', `${booking.resource.code} was cancelled.`);
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Cancellation failed', message: getErrorMessage(error, 'Could not cancel this booking.') });
+      showToast('error', 'Cancellation failed', getErrorMessage(error, 'Could not cancel this booking.'));
     } finally {
       setActiveBookingId(null);
     }
@@ -219,12 +216,6 @@ export function ManagerBookingsScreen() {
           Review booking requests, manage approvals, and keep resource schedules conflict-free.
         </p>
       </div>
-
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)}>
-          {notice.message}
-        </Alert>
-      )}
 
       <div
         style={{
