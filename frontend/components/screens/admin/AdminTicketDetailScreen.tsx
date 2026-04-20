@@ -261,7 +261,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
             onCommentChange={setCommentText}
             onCommentSubmit={handleAddComment}
             formIdPrefix="admin"
-            currentUserId={appUser?.id}
+            canDeleteAny
             onDeleteComment={handleDeleteComment}
             commentDeleting={commentDeleting}
           />

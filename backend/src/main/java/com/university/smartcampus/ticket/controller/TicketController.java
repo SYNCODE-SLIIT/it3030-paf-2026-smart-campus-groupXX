@@ -77,6 +77,13 @@ public class TicketController {
         return ticketService.getTicket(user, ticketRef);
     }
 
+    @DeleteMapping("/{ticketRef}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTicket(@PathVariable String ticketRef, Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        ticketService.deleteTicket(user, ticketRef);
+    }
+
     @PatchMapping("/{ticketRef}")
     public TicketResponse updateTicket(
             @PathVariable String ticketRef,

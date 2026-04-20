@@ -553,6 +553,115 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void reporterCanDeleteOwnOpenTicket() throws Exception {
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.OPEN));
+
+        mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isNoContent());
+
+        assertThat(ticketRepository.findById(ticket.getId())).isEmpty();
+
+        mockMvc.perform(get("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void reporterCannotDeleteOwnNonOpenTicket() throws Exception {
+        for (TicketStatus status : new TicketStatus[] {
+                TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REJECTED }) {
+            TicketEntity ticket = seedTicket("student@campus.test", status);
+
+            mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
+                            .with(jwtFor("student@campus.test")))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Tickets can only be deleted by the reporter while open."));
+
+            assertThat(ticketRepository.findById(ticket.getId())).isPresent();
+        }
+    }
+
+    @Test
+    void reporterCannotDeleteAnotherReportersTicket() throws Exception {
+        seedStudent("other5@campus.test");
+        TicketEntity ticket = seedTicket("other5@campus.test", TicketStatus.OPEN);
+
+        mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Only the ticket reporter or admin can delete tickets."));
+
+        assertThat(ticketRepository.findById(ticket.getId())).isPresent();
+    }
+
+    @Test
+    void assignedTicketManagerCannotDeleteAssignedTicket() throws Exception {
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.OPEN));
+
+        mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("ticketmgr@campus.test")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Only the ticket reporter or admin can delete tickets."));
+
+        assertThat(ticketRepository.findById(ticket.getId())).isPresent();
+    }
+
+    @Test
+    void adminCanDeleteTerminalTickets() throws Exception {
+        for (TicketStatus status : new TicketStatus[] { TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REJECTED }) {
+            TicketEntity ticket = seedTicket("student@campus.test", status);
+
+            mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
+                            .with(jwtFor("admin@campus.test")))
+                    .andExpect(status().isNoContent());
+
+            assertThat(ticketRepository.findById(ticket.getId())).isEmpty();
+        }
+    }
+
+    @Test
+    void adminCannotDeleteOpenOrInProgressTickets() throws Exception {
+        for (TicketStatus status : new TicketStatus[] { TicketStatus.OPEN, TicketStatus.IN_PROGRESS }) {
+            TicketEntity ticket = seedTicket("student@campus.test", status);
+
+            mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
+                            .with(jwtFor("admin@campus.test")))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            "Admins can only delete resolved, closed, or rejected tickets."));
+
+            assertThat(ticketRepository.findById(ticket.getId())).isPresent();
+        }
+    }
+
+    @Test
+    void deleteTicketRemovesChildRowsAndAttachmentFiles() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
+        TicketCommentEntity comment = seedComment(
+                ticket, "student@campus.test", "Delete with ticket.", Instant.parse("2026-04-20T08:00:00Z"));
+        TicketAttachmentEntity firstAttachment = seedAttachment(ticket, "https://files.campus.test/first.pdf");
+        TicketAttachmentEntity secondAttachment = seedAttachment(ticket, "https://files.campus.test/second.pdf");
+
+        assertThat(ticketStatusHistoryRepository.findByTicketIdOrderByChangedAtAsc(ticket.getId())).hasSize(1);
+
+        mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isNoContent());
+
+        assertThat(ticketRepository.findById(ticket.getId())).isEmpty();
+        assertThat(ticketCommentRepository.findById(comment.getId())).isEmpty();
+        assertThat(ticketAttachmentRepository.findById(firstAttachment.getId())).isEmpty();
+        assertThat(ticketAttachmentRepository.findById(secondAttachment.getId())).isEmpty();
+        assertThat(ticketStatusHistoryRepository.findByTicketIdOrderByChangedAtAsc(ticket.getId())).isEmpty();
+        assertThat(ticketAttachmentStorageClient.deletedUrls()).containsExactlyInAnyOrder(
+                "https://files.campus.test/first.pdf",
+                "https://files.campus.test/second.pdf");
+    }
+
+    @Test
     void reporterCanAddComment() throws Exception {
         TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
         AddCommentRequest request = new AddCommentRequest("Please prioritise this, it's causing issues.");
@@ -1079,11 +1188,15 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     private TicketAttachmentEntity seedAttachment(TicketEntity ticket) {
+        return seedAttachment(ticket, "https://files.campus.test/existing-file.pdf");
+    }
+
+    private TicketAttachmentEntity seedAttachment(TicketEntity ticket, String fileUrl) {
         TicketAttachmentEntity attachment = new TicketAttachmentEntity();
         attachment.setId(UUID.randomUUID());
         attachment.setTicket(ticket);
         attachment.setFileName("existing-file.pdf");
-        attachment.setFileUrl("https://files.campus.test/existing-file.pdf");
+        attachment.setFileUrl(fileUrl);
         attachment.setFileType("application/pdf");
         attachment.setUploadedAt(Instant.now());
         return ticketAttachmentRepository.save(attachment);

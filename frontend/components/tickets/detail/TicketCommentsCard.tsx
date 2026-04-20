@@ -14,6 +14,7 @@ interface TicketCommentsCardProps {
   onCommentSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   formIdPrefix: string;
   currentUserId?: string;
+  canDeleteAny?: boolean;
   onDeleteComment?: (commentId: string) => void;
   commentDeleting?: string | null;
 }
@@ -47,6 +48,7 @@ export function TicketCommentsCard({
   onCommentSubmit,
   formIdPrefix,
   currentUserId,
+  canDeleteAny,
   onDeleteComment,
   commentDeleting,
 }: TicketCommentsCardProps) {
@@ -103,7 +105,7 @@ export function TicketCommentsCard({
               {comment.isEdited && (
                 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>(edited)</span>
               )}
-              {comment.id === lastCommentId && comment.userId === currentUserId && onDeleteComment && (
+              {comment.id === lastCommentId && (canDeleteAny || comment.userId === currentUserId) && onDeleteComment && (
                 <button
                   type="button"
                   onClick={() => onDeleteComment(comment.id)}
