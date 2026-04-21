@@ -70,6 +70,23 @@ public final class TicketDtos {
         MONTH
     }
 
+    public record TicketAnalyticsSlaRow(
+        TicketPriority priority,
+        long total,
+        long compliant,
+        Double complianceRate,
+        long targetMinutes
+    ) {
+    }
+
+    public record TicketAnalyticsSla(
+        java.util.List<TicketAnalyticsSlaRow> ttfrCompliance,
+        java.util.List<TicketAnalyticsSlaRow> ttrCompliance,
+        Double overallTtfrComplianceRate,
+        Double overallTtrComplianceRate
+    ) {
+    }
+
     public record TicketAnalyticsResponse(
         Instant from,
         Instant to,
@@ -84,7 +101,8 @@ public final class TicketDtos {
         java.util.List<TicketAnalyticsTrendPoint> trends,
         java.util.List<TicketAnalyticsAttentionTicket> attentionTickets,
         java.util.List<TicketAnalyticsStatusEvent> recentStatusEvents,
-        java.util.List<TicketAnalyticsManagerPerformance> managerPerformance
+        java.util.List<TicketAnalyticsManagerPerformance> managerPerformance,
+        TicketAnalyticsSla sla
     ) {
     }
 

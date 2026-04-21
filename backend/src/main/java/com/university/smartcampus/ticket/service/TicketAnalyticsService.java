@@ -38,6 +38,8 @@ import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsBucket;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsCommunication;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsManagerPerformance;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsResponse;
+import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsSla;
+import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsSlaRow;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsStatusEvent;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsSummary;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsTiming;
@@ -138,7 +140,8 @@ public class TicketAnalyticsService {
                 buildTrends(tickets, statusHistoryByTicket, from, to, bucket),
                 buildAttentionTickets(tickets, statusHistoryByTicket, now),
                 buildRecentEvents(statusHistory, ticketsById, from, to),
-                isAdmin(user) ? buildManagerPerformance(tickets, statusHistoryByTicket, assignmentHistory, from, to) : List.of());
+                isAdmin(user) ? buildManagerPerformance(tickets, statusHistoryByTicket, assignmentHistory, from, to) : List.of(),
+                buildSla(tickets, statusHistoryByTicket));
     }
 
     private Specification<TicketEntity> analyticsSpec(
@@ -504,6 +507,75 @@ public class TicketAnalyticsService {
                 average(resolveTimes),
                 assignmentEvents,
                 reassignmentEvents);
+    }
+
+    private TicketAnalyticsSla buildSla(
+            List<TicketEntity> tickets,
+            Map<UUID, List<TicketStatusHistoryEntity>> statusHistoryByTicket) {
+        List<TicketAnalyticsSlaRow> ttfrRows = new ArrayList<>();
+        List<TicketAnalyticsSlaRow> ttrRows = new ArrayList<>();
+        long ttfrTotal = 0;
+        long ttfrCompliant = 0;
+        long ttrTotal = 0;
+        long ttrCompliant = 0;
+
+        for (TicketPriority priority : TicketPriority.values()) {
+            List<TicketEntity> byPriority = tickets.stream()
+                    .filter(t -> t.getPriority() == priority)
+                    .toList();
+
+            long ttfrTargetMinutes = SlaTargets.TTFR.get(priority).toMinutes();
+            long ttrTargetMinutes = SlaTargets.TTR.get(priority).toMinutes();
+
+            long ttfrMeasured = 0;
+            long ttfrMet = 0;
+            long ttrMeasured = 0;
+            long ttrMet = 0;
+
+            for (TicketEntity ticket : byPriority) {
+                List<TicketStatusHistoryEntity> history = statusHistoryByTicket.getOrDefault(ticket.getId(), List.of());
+
+                Optional<Instant> acceptedAt = firstStatusAt(history, TicketStatus.IN_PROGRESS);
+                if (acceptedAt.isPresent()) {
+                    ttfrMeasured++;
+                    if (minutesBetween(ticket.getCreatedAt(), acceptedAt.get()) <= ttfrTargetMinutes) {
+                        ttfrMet++;
+                    }
+                }
+
+                if (ticket.getResolvedAt() != null) {
+                    ttrMeasured++;
+                    if (minutesBetween(ticket.getCreatedAt(), ticket.getResolvedAt()) <= ttrTargetMinutes) {
+                        ttrMet++;
+                    }
+                }
+            }
+
+            ttfrRows.add(new TicketAnalyticsSlaRow(
+                    priority,
+                    ttfrMeasured,
+                    ttfrMet,
+                    ttfrMeasured == 0 ? null : roundPercent(ttfrMet, ttfrMeasured),
+                    ttfrTargetMinutes));
+
+            ttrRows.add(new TicketAnalyticsSlaRow(
+                    priority,
+                    ttrMeasured,
+                    ttrMet,
+                    ttrMeasured == 0 ? null : roundPercent(ttrMet, ttrMeasured),
+                    ttrTargetMinutes));
+
+            ttfrTotal += ttfrMeasured;
+            ttfrCompliant += ttfrMet;
+            ttrTotal += ttrMeasured;
+            ttrCompliant += ttrMet;
+        }
+
+        return new TicketAnalyticsSla(
+                ttfrRows,
+                ttrRows,
+                ttfrTotal == 0 ? null : roundPercent(ttfrCompliant, ttfrTotal),
+                ttrTotal == 0 ? null : roundPercent(ttrCompliant, ttrTotal));
     }
 
     private List<BucketWindow> bucketWindows(Instant from, Instant to, TicketAnalyticsBucket bucket) {

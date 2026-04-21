@@ -520,6 +520,21 @@ export interface TicketAnalyticsManagerPerformance {
   reassignmentEvents: number;
 }
 
+export interface TicketAnalyticsSlaRow {
+  priority: TicketPriority;
+  total: number;
+  compliant: number;
+  complianceRate: number | null;
+  targetMinutes: number;
+}
+
+export interface TicketAnalyticsSla {
+  ttfrCompliance: TicketAnalyticsSlaRow[];
+  ttrCompliance: TicketAnalyticsSlaRow[];
+  overallTtfrComplianceRate: number | null;
+  overallTtrComplianceRate: number | null;
+}
+
 export interface TicketAnalyticsResponse {
   from: string;
   to: string;
@@ -535,6 +550,7 @@ export interface TicketAnalyticsResponse {
   attentionTickets: TicketAnalyticsAttentionTicket[];
   recentStatusEvents: TicketAnalyticsStatusEvent[];
   managerPerformance: TicketAnalyticsManagerPerformance[];
+  sla: TicketAnalyticsSla;
 }
 
 export interface TicketSummaryResponse {

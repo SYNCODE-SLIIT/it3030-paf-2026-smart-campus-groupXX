@@ -38,6 +38,7 @@ import {
   TicketDetailsCard,
   TicketHeaderCard,
   TicketHistoryCard,
+  TicketLifecycleCard,
 } from '@/components/tickets/detail';
 
 export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
@@ -321,6 +322,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
             </div>
           )}
           <TicketDetailsCard ticket={ticket} />
+          <TicketLifecycleCard ticket={ticket} history={history} />
           <TicketHistoryCard history={history} />
         </div>
       </div>

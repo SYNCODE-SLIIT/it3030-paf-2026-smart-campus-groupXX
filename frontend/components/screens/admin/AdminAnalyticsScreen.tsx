@@ -28,12 +28,14 @@ import type {
   TicketAnalyticsManagerPerformance,
   TicketAnalyticsQuery,
   TicketAnalyticsResponse,
+  TicketAnalyticsSla,
   TicketAnalyticsStatusEvent,
   TicketCategory,
   TicketPriority,
   UserResponse,
   UserType,
 } from '@/lib/api-types';
+import { formatSlaMinutes } from '@/lib/sla';
 import { getAccountStatusLabel, getUserDisplayName, getUserTypeLabel } from '@/lib/user-display';
 
 type AnalyticsTab = 'tickets' | 'users';
@@ -437,6 +439,85 @@ function ManagerPerformanceCard({ rows }: { rows: TicketAnalyticsManagerPerforma
   );
 }
 
+const PRIORITY_ORDER: TicketPriority[] = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
+const PRIORITY_LABEL: Record<TicketPriority, string> = { URGENT: 'Urgent', HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' };
+const PRIORITY_COLOR: Record<TicketPriority, string> = { URGENT: 'var(--red-500)', HIGH: 'var(--orange-500)', MEDIUM: 'var(--blue-500)', LOW: 'var(--neutral-500)' };
+
+function SlaComplianceCard({ sla }: { sla: TicketAnalyticsSla }) {
+  return (
+    <Card>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+        <Clock size={18} color="var(--yellow-600)" />
+        <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
+          SLA Compliance
+        </p>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div>
+          <p style={{ margin: '0 0 12px', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+            Time to First Response
+          </p>
+          <p style={{ margin: '0 0 14px', fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 900, color: 'var(--text-h)' }}>
+            {sla.overallTtfrComplianceRate != null ? `${sla.overallTtfrComplianceRate.toFixed(1)}%` : 'n/a'}
+          </p>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {PRIORITY_ORDER.map((p) => {
+              const row = sla.ttfrCompliance.find((r) => r.priority === p);
+              if (!row) return null;
+              return (
+                <div key={p} style={{ display: 'grid', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5 }}>
+                    <span style={{ fontWeight: 700, color: PRIORITY_COLOR[p] }}>{PRIORITY_LABEL[p]}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {row.total === 0 ? 'n/a' : `${row.complianceRate?.toFixed(1)}%`}
+                      {row.total > 0 && <span style={{ fontSize: 10, marginLeft: 4 }}>target {formatSlaMinutes(row.targetMinutes)}</span>}
+                    </span>
+                  </div>
+                  {row.total > 0 && (
+                    <div style={{ height: 5, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, row.complianceRate ?? 0)}%`, height: '100%', borderRadius: 999, background: PRIORITY_COLOR[p] }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <p style={{ margin: '0 0 12px', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+            Time to Resolution
+          </p>
+          <p style={{ margin: '0 0 14px', fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 900, color: 'var(--text-h)' }}>
+            {sla.overallTtrComplianceRate != null ? `${sla.overallTtrComplianceRate.toFixed(1)}%` : 'n/a'}
+          </p>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {PRIORITY_ORDER.map((p) => {
+              const row = sla.ttrCompliance.find((r) => r.priority === p);
+              if (!row) return null;
+              return (
+                <div key={p} style={{ display: 'grid', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5 }}>
+                    <span style={{ fontWeight: 700, color: PRIORITY_COLOR[p] }}>{PRIORITY_LABEL[p]}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {row.total === 0 ? 'n/a' : `${row.complianceRate?.toFixed(1)}%`}
+                      {row.total > 0 && <span style={{ fontSize: 10, marginLeft: 4 }}>target {formatSlaMinutes(row.targetMinutes)}</span>}
+                    </span>
+                  </div>
+                  {row.total > 0 && (
+                    <div style={{ height: 5, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, row.complianceRate ?? 0)}%`, height: '100%', borderRadius: 999, background: PRIORITY_COLOR[p] }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function TicketAnalyticsControls({
   filters,
   loading,
@@ -544,6 +625,8 @@ function TicketAnalyticsContent({ analytics }: { analytics: TicketAnalyticsRespo
         <TicketBreakdownCard title="By Priority" rows={analytics.priorityBreakdown} />
         <TicketBreakdownCard title="By Category" rows={analytics.categoryBreakdown} />
       </div>
+
+      <SlaComplianceCard sla={analytics.sla} />
 
       <ManagerPerformanceCard rows={analytics.managerPerformance} />
 
