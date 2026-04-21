@@ -73,6 +73,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: Us
               href: '/admin/users',
               allowedUserTypes: ['ADMIN'],
             },
+            {
+              label: 'Catalogue Management',
+              icon: BookOpen,
+              href: '/admin/resources',
+              allowedUserTypes: ['ADMIN'],
+            },
           ],
         },
         {
@@ -152,9 +158,9 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: Us
               allowedUserTypes: ['MANAGER'],
             },
             {
-              label: 'Catalog',
+              label: 'Catalogue Management',
               icon: BookOpen,
-              href: '/catalog-managers/catalog',
+              href: '/managers/catalog',
               allowedUserTypes: ['MANAGER'],
               allowedManagerRoles: ['CATALOG_MANAGER'],
             },

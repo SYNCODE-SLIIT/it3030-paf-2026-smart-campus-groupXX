@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { CatalogueManagementDashboardScreen } from '@/components/screens/CatalogueManagementDashboardScreen';
 
 export default function AdminResourcesPage() {
-  redirect('/catalog-managers/catalog');
+  return <CatalogueManagementDashboardScreen workspaceLabel="Admin Console" roleLabel="Admin Access" />;
 }
