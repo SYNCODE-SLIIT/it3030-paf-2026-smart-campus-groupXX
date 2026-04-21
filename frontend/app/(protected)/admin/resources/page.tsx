@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function AdminResourcesPage() {
-  redirect('/managers/catalog');
+  redirect('/catalog-managers/catalog');
 }

@@ -50,7 +50,40 @@ public final class AppEnums {
         PENDING,
         APPROVED,
         REJECTED,
-        CANCELLED
+        CANCELLED,
+        CHECKED_IN,
+        COMPLETED,
+        NO_SHOW
+    }
+
+    public enum RecurrencePattern {
+        NONE,
+        DAILY,
+        WEEKLY,
+        BIWEEKLY,
+        MONTHLY
+    }
+
+    public enum CheckInStatus {
+        PENDING,
+        CHECKED_IN,
+        NO_SHOW
+    }
+
+    public enum ModificationStatus {
+        PENDING,
+        APPROVED,
+        REJECTED
+    }
+
+    public enum NotificationType {
+        BOOKING_APPROVED,
+        BOOKING_REJECTED,
+        BOOKING_CANCELLED,
+        BOOKING_REMINDER_24H,
+        BOOKING_REMINDER_1H,
+        MODIFICATION_APPROVED,
+        MODIFICATION_REJECTED
     }
 
    

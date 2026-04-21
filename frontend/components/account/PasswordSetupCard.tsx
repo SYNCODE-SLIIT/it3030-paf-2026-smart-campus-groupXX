@@ -5,16 +5,9 @@ import { createPortal } from 'react-dom';
 import { CheckCircle2, Circle, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Input } from '@/components/ui';
+import { useToast } from '@/components/providers/ToastProvider';
+import { Button, Card, Input } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api-client';
-
-type NoticeState =
-  | {
-      variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-      title: string;
-      message: string;
-    }
-  | null;
 
 interface PasswordPolicyRule {
   id: 'length' | 'uppercase' | 'lowercase' | 'number' | 'special';
@@ -70,7 +63,7 @@ function policyErrorMessage(password: string) {
 
 export function PasswordSetupCard({
   title = 'Password',
-  description = 'Set a password for future email sign-in. Google sign-in still works.',
+  description = 'Set a password for future email sign-in. Google and Microsoft sign-in still work.',
   compact = false,
   onPasswordSaved,
   policyPortalTargetId,
@@ -84,11 +77,11 @@ export function PasswordSetupCard({
   policyVisualStyle?: 'default' | 'overlay';
 }) {
   const { updatePassword } = useAuth();
+  const { showToast } = useToast();
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [isSaving, startSaving] = React.useTransition();
   const policyState = React.useMemo(() => evaluatePasswordPolicy(password), [password]);
   const [policyPortalElement, setPolicyPortalElement] = React.useState<HTMLElement | null>(null);
@@ -200,11 +193,6 @@ export function PasswordSetupCard({
         <p style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-body)' }}>{description}</p>
       </div>
 
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title}>
-          {notice.message}
-        </Alert>
-      )}
 
       <div
         style={{
@@ -219,9 +207,6 @@ export function PasswordSetupCard({
           value={password}
           onChange={(event) => {
             setPassword(event.target.value);
-            if (notice?.variant === 'error') {
-              setNotice(null);
-            }
           }}
           iconLeft={<LockKeyhole size={16} />}
           iconRight={
@@ -249,9 +234,6 @@ export function PasswordSetupCard({
           value={confirmPassword}
           onChange={(event) => {
             setConfirmPassword(event.target.value);
-            if (notice?.variant === 'error') {
-              setNotice(null);
-            }
           }}
           iconLeft={<LockKeyhole size={16} />}
           iconRight={
@@ -288,20 +270,12 @@ export function PasswordSetupCard({
           onClick={() => {
             const policyMessage = policyErrorMessage(password);
             if (policyMessage) {
-              setNotice({
-                variant: 'error',
-                title: 'Password policy not met',
-                message: policyMessage,
-              });
+              showToast('error', 'Password policy not met', policyMessage,);
               return;
             }
 
             if (password !== confirmPassword) {
-              setNotice({
-                variant: 'error',
-                title: 'Passwords do not match',
-                message: 'Enter the same password twice.',
-              });
+              showToast('error', 'Passwords do not match', 'Enter the same password twice.',);
               return;
             }
 
@@ -315,17 +289,9 @@ export function PasswordSetupCard({
                 setConfirmPassword('');
                 setShowPassword(false);
                 setShowConfirmPassword(false);
-                setNotice({
-                  variant: 'success',
-                  title: 'Password updated',
-                  message: 'Email and password sign-in is ready for this account.',
-                });
+                showToast('success', 'Password updated', 'Email and password sign-in is ready for this account.',);
               } catch (error) {
-                setNotice({
-                  variant: 'error',
-                  title: 'Password update failed',
-                  message: getErrorMessage(error, 'We could not update your password.'),
-                });
+                showToast('error', 'Password update failed', getErrorMessage(error, 'We could not update your password.'),);
               }
             });
           }}

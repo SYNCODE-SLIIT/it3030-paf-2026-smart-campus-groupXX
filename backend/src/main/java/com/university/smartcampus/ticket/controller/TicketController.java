@@ -26,6 +26,7 @@ import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
 import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
 import com.university.smartcampus.ticket.dto.TicketDtos.AddCommentRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.AddTicketAttachmentRequest;
+import com.university.smartcampus.ticket.dto.TicketDtos.AssignTicketRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.CreateTicketRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAttachmentResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketCommentResponse;
@@ -56,7 +57,7 @@ public class TicketController {
     public TicketResponse createTicket(
             @Valid @RequestBody CreateTicketRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.createTicket(user, request);
     }
 
@@ -66,91 +67,117 @@ public class TicketController {
             @RequestParam(required = false) TicketCategory category,
             @RequestParam(required = false) TicketPriority priority,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.listTickets(user, status, category, priority);
     }
 
-    @GetMapping("/{id}")
-    public TicketResponse getTicket(@PathVariable UUID id, Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        return ticketService.getTicket(user, id);
+    @GetMapping("/{ticketRef}")
+    public TicketResponse getTicket(@PathVariable String ticketRef, Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.getTicket(user, ticketRef);
     }
 
-    @PatchMapping("/{id}")
+    @DeleteMapping("/{ticketRef}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTicket(@PathVariable String ticketRef, Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        ticketService.deleteTicket(user, ticketRef);
+    }
+
+    @PatchMapping("/{ticketRef}")
     public TicketResponse updateTicket(
-            @PathVariable UUID id,
+            @PathVariable String ticketRef,
             @Valid @RequestBody UpdateTicketRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        return ticketService.updateTicket(user, id, request);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.updateTicket(user, ticketRef, request);
     }
 
-    @PutMapping("/{id}/status")
+    @PutMapping("/{ticketRef}/status")
     public TicketResponse updateStatus(
-            @PathVariable UUID id,
+            @PathVariable String ticketRef,
             @Valid @RequestBody TicketStatusUpdateRequest request,
             Authentication authentication) {
-        UserEntity manager = currentUserService.requireTicketManager(authentication);
-        return ticketService.updateStatus(manager, id, request);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.updateStatus(user, ticketRef, request);
     }
 
-    @GetMapping("/{id}/comments")
-    public List<TicketCommentResponse> listComments(@PathVariable UUID id, Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        return ticketService.listComments(user, id);
+    @PutMapping("/{ticketRef}/assign")
+    public TicketResponse assignTicket(
+            @PathVariable String ticketRef,
+            @Valid @RequestBody AssignTicketRequest request,
+            Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.assignTicket(user, ticketRef, request.assignedTo());
     }
 
-    @PostMapping("/{id}/comments")
+    @GetMapping("/{ticketRef}/comments")
+    public List<TicketCommentResponse> listComments(@PathVariable String ticketRef, Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.listComments(user, ticketRef);
+    }
+
+    @PostMapping("/{ticketRef}/comments")
     @ResponseStatus(HttpStatus.CREATED)
     public TicketCommentResponse addComment(
-            @PathVariable UUID id,
+            @PathVariable String ticketRef,
             @Valid @RequestBody AddCommentRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        return ticketService.addComment(user, id, request);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.addComment(user, ticketRef, request);
     }
 
-    @GetMapping("/{id}/attachments")
-    public List<TicketAttachmentResponse> listAttachments(@PathVariable UUID id, Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        return ticketService.listAttachments(user, id);
+    @DeleteMapping("/{ticketRef}/comments/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteComment(
+            @PathVariable String ticketRef,
+            @PathVariable UUID commentId,
+            Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        ticketService.deleteComment(user, ticketRef, commentId);
     }
 
-    @PostMapping(value = "/{id}/attachments", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping("/{ticketRef}/attachments")
+    public List<TicketAttachmentResponse> listAttachments(@PathVariable String ticketRef, Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.listAttachments(user, ticketRef);
+    }
+
+    @PostMapping(value = "/{ticketRef}/attachments", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public TicketAttachmentResponse addAttachment(
-            @PathVariable UUID id,
+            @PathVariable String ticketRef,
             @Valid @RequestBody AddTicketAttachmentRequest request,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        return ticketService.addAttachment(user, id, request);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.addAttachment(user, ticketRef, request);
     }
 
-    @PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/{ticketRef}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public TicketAttachmentResponse uploadAttachment(
-            @PathVariable UUID id,
+            @PathVariable String ticketRef,
             @RequestPart("file") MultipartFile file,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        return ticketService.uploadAttachment(user, id, file);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.uploadAttachment(user, ticketRef, file);
     }
 
-    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    @DeleteMapping("/{ticketRef}/attachments/{attachmentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAttachment(
-            @PathVariable UUID id,
+            @PathVariable String ticketRef,
             @PathVariable UUID attachmentId,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        ticketService.deleteAttachment(user, id, attachmentId);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        ticketService.deleteAttachment(user, ticketRef, attachmentId);
     }
 
-    @GetMapping("/{id}/history")
+    @GetMapping("/{ticketRef}/history")
     public List<TicketStatusHistoryResponse> getStatusHistory(
-            @PathVariable UUID id,
+            @PathVariable String ticketRef,
             Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
-        return ticketService.getStatusHistory(user, id);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return ticketService.getStatusHistory(user, ticketRef);
     }
 }

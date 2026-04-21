@@ -20,15 +20,18 @@ public class BookingDecisionService {
     private final BookingRepository bookingRepository;
     private final BookingValidator bookingValidator;
     private final BookingService bookingService;
+    private final BookingNotificationService notificationService;
 
     public BookingDecisionService(
         BookingRepository bookingRepository,
         BookingValidator bookingValidator,
-        BookingService bookingService
+        BookingService bookingService,
+        BookingNotificationService notificationService
     ) {
         this.bookingRepository = bookingRepository;
         this.bookingValidator = bookingValidator;
         this.bookingService = bookingService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -47,6 +50,7 @@ public class BookingDecisionService {
         booking.setDecidedAt(bookingValidator.currentInstant());
         booking.setRejectionReason(null);
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingApproved(saved);
         return bookingService.toResponse(saved);
     }
 
@@ -64,6 +68,7 @@ public class BookingDecisionService {
         booking.setDecidedAt(bookingValidator.currentInstant());
         booking.setRejectionReason(reason);
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingRejected(saved);
         return bookingService.toResponse(saved);
     }
 
@@ -77,6 +82,7 @@ public class BookingDecisionService {
         booking.setCancellationReason(normalizeReason(request == null ? null : request.reason()));
         booking.setCancelledAt(bookingValidator.currentInstant());
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingCancelled(saved);
         return bookingService.toResponse(saved);
     }
 

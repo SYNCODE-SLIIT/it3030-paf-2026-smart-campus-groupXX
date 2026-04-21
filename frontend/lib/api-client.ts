@@ -1,10 +1,15 @@
 import {
   type AccountStatus,
   type AddCommentRequest,
+  type AssignTicketRequest,
   type BookingDecisionRequest,
+  type BookingModificationResponse,
+  type BookingNotificationResponse,
   type BookingResponse,
   type CancelBookingRequest,
+  type CheckInResponse,
   type CreateBookingRequest,
+  type CreateRecurringBookingRequest,
   type CreateResourceRequest,
   type CreateTicketRequest,
   type CreateUserRequest,
@@ -12,6 +17,9 @@ import {
   type ManagerRole,
   type ManagerRoleUpdateRequest,
   type MessageResponse,
+  type ModificationDecisionRequest,
+  type RecurringBookingResponse,
+  type RequestModificationRequest,
   type ResourceResponse,
   type SessionSyncResponse,
   type StudentOnboardingRequest,
@@ -23,6 +31,7 @@ import {
   type TicketResponse,
   type TicketStatus,
   type TicketStatusHistoryResponse,
+  type TicketStatusUpdateRequest,
   type TicketSummaryResponse,
   type UpdateResourceRequest,
   type UpdateTicketRequest,
@@ -67,6 +76,8 @@ interface RequestOptions {
 }
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
+const ONBOARDING_REQUIRED_ERROR_CODE = 'ONBOARDING_REQUIRED';
+const STUDENT_ONBOARDING_PATH = '/students/onboarding';
 
 const STATUS_MESSAGES: Partial<Record<number, string>> = {
   0: 'Cannot reach the backend service. Please check that the backend is running and try again.',
@@ -134,6 +145,32 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function isOnboardingRequiredError(status: number, details: ErrorResponse | null) {
+  if (status !== 403 || !details) {
+    return false;
+  }
+
+  if (details.code === ONBOARDING_REQUIRED_ERROR_CODE) {
+    return true;
+  }
+
+  return details.message.toLowerCase().includes('complete onboarding');
+}
+
+function redirectToOnboardingIfRequired(status: number, details: ErrorResponse | null) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (!isOnboardingRequiredError(status, details)) {
+    return;
+  }
+
+  if (window.location.pathname !== STUDENT_ONBOARDING_PATH) {
+    window.location.assign(STUDENT_ONBOARDING_PATH);
+  }
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers({
     Accept: 'application/json',
@@ -192,6 +229,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     } catch {
       details = null;
     }
+
+    redirectToOnboardingIfRequired(response.status, details);
 
     throw new ApiError(
       response.status,
@@ -419,6 +458,126 @@ export async function cancelApprovedBookingAsManager(
   });
 }
 
+// Recurring Bookings
+export async function createRecurringBooking(accessToken: string, payload: CreateRecurringBookingRequest) {
+  return request<RecurringBookingResponse>('/api/recurring-bookings', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function listMyRecurringBookings(accessToken: string) {
+  return request<RecurringBookingResponse[]>('/api/recurring-bookings', {
+    accessToken,
+  });
+}
+
+export async function getRecurringBooking(accessToken: string, bookingId: string) {
+  return request<RecurringBookingResponse>(`/api/recurring-bookings/${bookingId}`, {
+    accessToken,
+  });
+}
+
+export async function deactivateRecurringBooking(accessToken: string, bookingId: string) {
+  return request<RecurringBookingResponse>(`/api/recurring-bookings/${bookingId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+// Booking Modifications
+export async function requestBookingModification(
+  accessToken: string,
+  bookingId: string,
+  payload: RequestModificationRequest,
+) {
+  return request<BookingModificationResponse>(`/api/bookings/${bookingId}/modifications`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function listModificationsForBooking(bookingId: string) {
+  return request<BookingModificationResponse[]>(`/api/bookings/${bookingId}/modifications`);
+}
+
+export async function listPendingModifications(accessToken: string) {
+  return request<BookingModificationResponse[]>('/api/admin/modifications/pending', {
+    accessToken,
+  });
+}
+
+export async function approveModification(
+  accessToken: string,
+  modificationId: string,
+  payload?: ModificationDecisionRequest,
+) {
+  return request<BookingModificationResponse>(`/api/admin/modifications/${modificationId}/approve`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function rejectModification(
+  accessToken: string,
+  modificationId: string,
+  payload?: ModificationDecisionRequest,
+) {
+  return request<BookingModificationResponse>(`/api/admin/modifications/${modificationId}/reject`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+// Booking Check-In
+export async function checkInBooking(accessToken: string, bookingId: string) {
+  return request<CheckInResponse>(`/api/bookings/${bookingId}/check-in`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function getCheckInStatus(bookingId: string) {
+  return request<CheckInResponse>(`/api/bookings/${bookingId}/check-in`);
+}
+
+export async function markBookingAsNoShow(accessToken: string, bookingId: string) {
+  return request<CheckInResponse>(`/api/admin/bookings/${bookingId}/mark-no-show`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function completeBooking(accessToken: string, bookingId: string) {
+  return request<CheckInResponse>(`/api/admin/bookings/${bookingId}/complete`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+// Booking Notifications
+export async function listBookingNotifications(accessToken: string) {
+  return request<BookingNotificationResponse[]>('/api/notifications/bookings', {
+    accessToken,
+  });
+}
+
+export async function listUnreadNotifications(accessToken: string) {
+  return request<BookingNotificationResponse[]>('/api/notifications/bookings/unread', {
+    accessToken,
+  });
+}
+
+export async function markNotificationAsRead(notificationId: string) {
+  return request<void>(`/api/notifications/bookings/${notificationId}/read`, {
+    method: 'POST',
+  });
+}
+
 export async function uploadStudentProfileImage(accessToken: string, file: File) {
   const path = '/api/students/me/profile-image';
   const formData = new FormData();
@@ -456,6 +615,8 @@ export async function uploadStudentProfileImage(accessToken: string, file: File)
       details = null;
     }
 
+    redirectToOnboardingIfRequired(response.status, details);
+
     throw new ApiError(
       response.status,
       details?.message ?? `Request failed with status ${response.status}.`,
@@ -484,46 +645,62 @@ export async function createTicket(accessToken: string, payload: CreateTicketReq
   return request<TicketResponse>('/api/tickets', { method: 'POST', accessToken, body: payload });
 }
 
-export async function getTicket(accessToken: string, ticketId: string): Promise<TicketResponse> {
-  return request<TicketResponse>(`/api/tickets/${ticketId}`, { accessToken });
+function ticketApiPath(ticketRef: string) {
+  return `/api/tickets/${encodeURIComponent(ticketRef)}`;
+}
+
+export async function getTicket(accessToken: string, ticketRef: string): Promise<TicketResponse> {
+  return request<TicketResponse>(ticketApiPath(ticketRef), { accessToken });
 }
 
 export async function updateTicket(
   accessToken: string,
-  ticketId: string,
+  ticketRef: string,
   payload: UpdateTicketRequest,
 ): Promise<TicketResponse> {
-  return request<TicketResponse>(`/api/tickets/${ticketId}`, { method: 'PATCH', accessToken, body: payload });
+  return request<TicketResponse>(ticketApiPath(ticketRef), { method: 'PATCH', accessToken, body: payload });
+}
+
+export async function deleteTicket(accessToken: string, ticketRef: string): Promise<void> {
+  return request<void>(ticketApiPath(ticketRef), { method: 'DELETE', accessToken });
 }
 
 export async function listTicketComments(
   accessToken: string,
-  ticketId: string,
+  ticketRef: string,
 ): Promise<TicketCommentResponse[]> {
-  return request<TicketCommentResponse[]>(`/api/tickets/${ticketId}/comments`, { accessToken });
+  return request<TicketCommentResponse[]>(`${ticketApiPath(ticketRef)}/comments`, { accessToken });
 }
 
 export async function addTicketComment(
   accessToken: string,
-  ticketId: string,
+  ticketRef: string,
   payload: AddCommentRequest,
 ): Promise<TicketCommentResponse> {
-  return request<TicketCommentResponse>(`/api/tickets/${ticketId}/comments`, { method: 'POST', accessToken, body: payload });
+  return request<TicketCommentResponse>(`${ticketApiPath(ticketRef)}/comments`, { method: 'POST', accessToken, body: payload });
+}
+
+export async function deleteTicketComment(
+  accessToken: string,
+  ticketRef: string,
+  commentId: string,
+): Promise<void> {
+  return request<void>(`${ticketApiPath(ticketRef)}/comments/${commentId}`, { method: 'DELETE', accessToken });
 }
 
 export async function listTicketAttachments(
   accessToken: string,
-  ticketId: string,
+  ticketRef: string,
 ): Promise<TicketAttachmentResponse[]> {
-  return request<TicketAttachmentResponse[]>(`/api/tickets/${ticketId}/attachments`, { accessToken });
+  return request<TicketAttachmentResponse[]>(`${ticketApiPath(ticketRef)}/attachments`, { accessToken });
 }
 
 export async function uploadTicketAttachment(
   accessToken: string,
-  ticketId: string,
+  ticketRef: string,
   file: File,
 ): Promise<TicketAttachmentResponse> {
-  const path = `/api/tickets/${ticketId}/attachments`;
+  const path = `${ticketApiPath(ticketRef)}/attachments`;
   const formData = new FormData();
   formData.set('file', file);
 
@@ -546,6 +723,9 @@ export async function uploadTicketAttachment(
   if (!response.ok) {
     let details: ErrorResponse | null = null;
     try { details = await response.json(); } catch { details = null; }
+
+    redirectToOnboardingIfRequired(response.status, details);
+
     throw new ApiError(response.status, details?.message ?? `Upload failed with status ${response.status}.`, details);
   }
 
@@ -554,15 +734,31 @@ export async function uploadTicketAttachment(
 
 export async function deleteTicketAttachment(
   accessToken: string,
-  ticketId: string,
+  ticketRef: string,
   attachmentId: string,
 ): Promise<void> {
-  return request<void>(`/api/tickets/${ticketId}/attachments/${attachmentId}`, { method: 'DELETE', accessToken });
+  return request<void>(`${ticketApiPath(ticketRef)}/attachments/${attachmentId}`, { method: 'DELETE', accessToken });
 }
 
 export async function getTicketHistory(
   accessToken: string,
-  ticketId: string,
+  ticketRef: string,
 ): Promise<TicketStatusHistoryResponse[]> {
-  return request<TicketStatusHistoryResponse[]>(`/api/tickets/${ticketId}/history`, { accessToken });
+  return request<TicketStatusHistoryResponse[]>(`${ticketApiPath(ticketRef)}/history`, { accessToken });
+}
+
+export async function updateTicketStatus(
+  accessToken: string,
+  ticketRef: string,
+  payload: TicketStatusUpdateRequest,
+): Promise<TicketResponse> {
+  return request<TicketResponse>(`${ticketApiPath(ticketRef)}/status`, { method: 'PUT', accessToken, body: payload });
+}
+
+export async function assignTicket(
+  accessToken: string,
+  ticketRef: string,
+  payload: AssignTicketRequest,
+): Promise<TicketResponse> {
+  return request<TicketResponse>(`${ticketApiPath(ticketRef)}/assign`, { method: 'PUT', accessToken, body: payload });
 }

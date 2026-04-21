@@ -37,19 +37,19 @@ public class BookingController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public BookingResponse createBooking(@Valid @RequestBody CreateBookingRequest request, Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return bookingService.createBooking(user, request);
     }
 
     @GetMapping
     public List<BookingResponse> listBookings(Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return bookingService.listBookingsForUser(user);
     }
 
     @GetMapping("/{id}")
     public BookingResponse getBooking(@PathVariable UUID id, Authentication authentication) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return bookingService.getBookingForUser(user, id);
     }
 
@@ -59,7 +59,7 @@ public class BookingController {
         @RequestBody(required = false) CancelBookingRequest request,
         Authentication authentication
     ) {
-        UserEntity user = currentUserService.requireCurrentUser(authentication);
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return bookingService.cancelBooking(user, id, request);
     }
 }

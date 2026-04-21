@@ -42,6 +42,10 @@ public class BookingService {
             Objects.requireNonNull(request.resourceId(), "Resource id is required.")
         );
 
+        if (!resource.isBookable()) {
+            throw new BadRequestException("This resource is not available for booking.");
+        }
+
         Instant startTime = Objects.requireNonNull(request.startTime(), "Start time is required.");
         Instant endTime = Objects.requireNonNull(request.endTime(), "End time is required.");
 
@@ -143,7 +147,9 @@ public class BookingService {
             booking.getRejectionReason(),
             booking.getCancellationReason(),
             booking.getDecidedAt(),
-            booking.getCancelledAt()
+            booking.getCancelledAt(),
+            booking.getCheckInStatus(),
+            booking.getCheckedInAt()
         );
     }
 

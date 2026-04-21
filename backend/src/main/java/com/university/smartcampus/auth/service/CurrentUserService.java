@@ -12,6 +12,7 @@ import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
 import com.university.smartcampus.common.exception.ForbiddenException;
+import com.university.smartcampus.common.exception.OnboardingRequiredException;
 import com.university.smartcampus.common.exception.UnauthorizedException;
 import com.university.smartcampus.user.entity.UserEntity;
 import com.university.smartcampus.user.repository.UserRepository;
@@ -35,11 +36,10 @@ public class CurrentUserService {
 
     public UserEntity requireCurrentUser(Authentication authentication) {
         Jwt jwt = requireJwt(authentication);
-        String email = normalizedEmailFromJwt(jwt);
         UUID subject = subjectFromJwt(jwt);
 
         UserEntity user = userRepository.findByAuthUserId(subject)
-                .orElseGet(() -> userRepository.findByEmailIgnoreCase(email)
+            .orElseGet(() -> userRepository.findByEmailIgnoreCase(normalizedEmailFromJwt(jwt))
                         .orElseThrow(
                                 () -> new ForbiddenException("This authenticated account has not been provisioned.")));
 
@@ -51,6 +51,12 @@ public class CurrentUserService {
             throw new ForbiddenException("This account is suspended.");
         }
 
+        return user;
+    }
+
+    public UserEntity requireCurrentUserWithCompletedOnboarding(Authentication authentication) {
+        UserEntity user = requireCurrentUser(authentication);
+        ensureStudentOnboardingCompleted(user);
         return user;
     }
 
@@ -114,12 +120,30 @@ public class CurrentUserService {
         return user;
     }
 
+    private void ensureStudentOnboardingCompleted(UserEntity user) {
+        if (user.getUserType() == UserType.STUDENT && !user.isOnboardingCompleted()) {
+            throw new OnboardingRequiredException("Complete onboarding to continue.");
+        }
+    }
+
     public String normalizedEmailFromJwt(Jwt jwt) {
-        String email = jwt.getClaimAsString("email");
+        String email = firstNonBlank(
+                jwt.getClaimAsString("email"),
+                jwt.getClaimAsString("preferred_username"),
+                jwt.getClaimAsString("upn"));
         if (!StringUtils.hasText(email)) {
             throw new UnauthorizedException("Authenticated token does not contain an email claim.");
         }
         return normalizeEmail(email);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     public UUID subjectFromJwt(Jwt jwt) {

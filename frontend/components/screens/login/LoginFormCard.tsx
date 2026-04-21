@@ -14,9 +14,11 @@ interface LoginFormCardProps {
   alert: AlertState;
   isPasswordLoading: boolean;
   isGoogleLoading: boolean;
+  isMicrosoftLoading: boolean;
   authConfigured: boolean;
   onPasswordSubmit: (email: string, password: string) => void;
   onGoogleSignIn: () => void;
+  onMicrosoftSignIn: () => void;
 }
 
 function EyeIcon() {
@@ -53,38 +55,35 @@ function EyeOffIcon() {
 
 function GoogleLogo() {
   return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: '50%',
-        background: '#fff',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 1px 2px rgba(0,0,0,.18)',
-      }}
-    >
-      <svg width="15" height="15" viewBox="0 0 18 18">
-        <path
-          fill="#4285F4"
-          d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"
-        />
-        <path
-          fill="#34A853"
-          d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.33-1.58-5.04-3.72H.96v2.33A9 9 0 0 0 9 18Z"
-        />
-        <path
-          fill="#FBBC05"
-          d="M3.96 10.7A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.16.28-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.03l3-2.33Z"
-        />
-        <path
-          fill="#EA4335"
-          d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.97l3 2.33C4.67 5.16 6.66 3.58 9 3.58Z"
-        />
-      </svg>
-    </span>
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
+function MicrosoftLogo() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="2" width="9" height="9" fill="#f25022" />
+      <rect x="13" y="2" width="9" height="9" fill="#7fba00" />
+      <rect x="2" y="13" width="9" height="9" fill="#00a4ef" />
+      <rect x="13" y="13" width="9" height="9" fill="#ffb900" />
+    </svg>
   );
 }
 
@@ -92,9 +91,11 @@ export function LoginFormCard({
   alert,
   isPasswordLoading,
   isGoogleLoading,
+  isMicrosoftLoading,
   authConfigured,
   onPasswordSubmit,
   onGoogleSignIn,
+  onMicrosoftSignIn,
 }: LoginFormCardProps) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -211,24 +212,45 @@ export function LoginFormCard({
       </form>
 
       <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Divider label="or" />
-        <Button
-          variant="info"
-          size="lg"
-          fullWidth
-          disabled={!authConfigured}
-          loading={isGoogleLoading}
-          iconLeft={<GoogleLogo />}
-          onClick={onGoogleSignIn}
-          style={{
-            background: '#1a73e8',
-            color: '#fff',
-            border: '1px solid #185abc',
-            boxShadow: '0 2px 8px rgba(26,115,232,.28), 0 1px 3px rgba(0,0,0,.16)',
-          }}
-        >
-          Sign in with Google
-        </Button>
+        <Divider label="OR SIGN IN WITH" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+          <Button
+            variant="subtle"
+            size="lg"
+            fullWidth
+            disabled={!authConfigured || isMicrosoftLoading}
+            loading={isGoogleLoading}
+            iconLeft={<GoogleLogo />}
+            onClick={onGoogleSignIn}
+            style={{
+              background: 'var(--neutral-900)',
+              color: '#f8f8f8',
+              border: '1px solid var(--neutral-700)',
+              textTransform: 'none',
+              letterSpacing: '0.01em',
+            }}
+          >
+            Google
+          </Button>
+          <Button
+            variant="subtle"
+            size="lg"
+            fullWidth
+            disabled={!authConfigured || isGoogleLoading}
+            loading={isMicrosoftLoading}
+            iconLeft={<MicrosoftLogo />}
+            onClick={onMicrosoftSignIn}
+            style={{
+              background: 'var(--neutral-900)',
+              color: '#f8f8f8',
+              border: '1px solid var(--neutral-700)',
+              textTransform: 'none',
+              letterSpacing: '0.01em',
+            }}
+          >
+            Microsoft
+          </Button>
+        </div>
       </div>
 
       {!authConfigured && (

@@ -20,7 +20,7 @@ public final class ApiDtos {
     public record MessageResponse(String message) {
     }
 
-    public record ErrorResponse(Instant timestamp, int status, String error, String message, String path) {
+    public record ErrorResponse(Instant timestamp, int status, String error, String message, String path, String code) {
     }
 
     public record StudentProfileResponse(

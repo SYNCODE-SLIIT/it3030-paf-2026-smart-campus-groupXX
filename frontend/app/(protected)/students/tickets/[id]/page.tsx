@@ -5,5 +5,5 @@ export default async function StudentTicketDetailPage({ params }: { params: Prom
   await requireUserType(['STUDENT']);
   const { id } = await params;
 
-  return <StudentTicketDetailScreen ticketId={id} />;
+  return <StudentTicketDetailScreen ticketRef={id} />;
 }

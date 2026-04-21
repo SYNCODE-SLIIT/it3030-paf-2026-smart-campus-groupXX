@@ -5,6 +5,7 @@ import { UserPlus } from 'lucide-react';
 
 import { ProfileFields } from '@/components/screens/admin/ProfileFields';
 import { RoleRadioGroup } from '@/components/screens/admin/RoleRadioGroup';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Input, Select } from '@/components/ui';
 import { createUser, getErrorMessage } from '@/lib/api-client';
 import type { CreateUserRequest, ManagerRole, UserResponse, UserType } from '@/lib/api-types';
@@ -24,18 +25,9 @@ const userTypeOptions: Array<{ value: UserType; label: string }> = [
   { value: 'MANAGER', label: 'Manager' },
 ];
 
-type NoticeState =
-  | {
-      variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-      title: string;
-      message: string;
-    }
-  | null;
-
 export function CreateUserPanel({
   accessToken,
   onCreated,
-  onNotice,
   embedded = false,
   onCancel,
   defaultUserType = 'STUDENT',
@@ -43,12 +35,12 @@ export function CreateUserPanel({
 }: {
   accessToken: string | null;
   onCreated: (user: UserResponse) => Promise<void>;
-  onNotice: (notice: NoticeState) => void;
   embedded?: boolean;
   onCancel?: () => void;
   defaultUserType?: UserType;
   fixedUserType?: UserType;
 }) {
+  const { showToast } = useToast();
   const [email, setEmail] = React.useState('');
   const [userType, setUserType] = React.useState<UserType>(fixedUserType ?? defaultUserType);
   const [managerRole, setManagerRole] = React.useState<ManagerRole | ''>('');
@@ -98,13 +90,9 @@ export function CreateUserPanel({
 
         const createdUser = await createUser(accessToken, payload);
 
-        onNotice({
-          variant: 'success',
-          title: 'User created',
-          message: createdUser.lastInviteReference
+        showToast('success', 'User created', createdUser.lastInviteReference
             ? 'User added and access link generated.'
-            : 'User added successfully.',
-        });
+            : 'User added successfully.');
 
         setEmail('');
         setUserType(fixedUserType ?? defaultUserType);
@@ -117,11 +105,7 @@ export function CreateUserPanel({
       } catch (error) {
         const message = getErrorMessage(error, 'We could not create the user.');
         setFormError(message);
-        onNotice({
-          variant: 'error',
-          title: 'User creation failed',
-          message,
-        });
+        showToast('error', 'User creation failed', message);
       }
     });
   }
