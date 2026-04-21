@@ -114,10 +114,14 @@ public class ResourceMapper {
             return null;
         }
 
+        Building building = location.getBuilding();
         return new LocationDetails(
             location.getId(),
+            building == null ? null : building.getId(),
             location.getLocationName(),
-            location.getBuildingName(),
+            building == null ? null : building.getBuildingCode(),
+            building == null ? location.getBuildingName() : building.getBuildingName(),
+            location.getWing(),
             location.getFloor(),
             location.getRoomCode(),
             location.getLocationType()

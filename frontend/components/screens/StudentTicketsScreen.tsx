@@ -94,6 +94,24 @@ function StatusSection({ label, color, tickets, onView, onDelete }: StatusSectio
 }
 
 export function StudentTicketsScreen() {
+  return (
+    <RequesterTicketsScreen
+      workspaceLabel="Student Workspace"
+      description="Report campus issues and track their resolution."
+      ticketsBasePath="/students/tickets"
+    />
+  );
+}
+
+export function RequesterTicketsScreen({
+  workspaceLabel,
+  description,
+  ticketsBasePath,
+}: {
+  workspaceLabel: string;
+  description: string;
+  ticketsBasePath: string;
+}) {
   const { session } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
@@ -152,8 +170,8 @@ export function StudentTicketsScreen() {
   }, [accessToken, deleteConfirmCode, showToast]);
 
   const handleView = React.useCallback(
-    (code: string) => { router.push(`/students/tickets/${code}`); },
-    [router],
+    (code: string) => { router.push(`${ticketsBasePath}/${code}`); },
+    [router, ticketsBasePath],
   );
 
   return (
@@ -172,7 +190,7 @@ export function StudentTicketsScreen() {
               color: 'var(--text-muted)',
             }}
           >
-            Student Workspace
+            {workspaceLabel}
           </p>
           <h1
             style={{
@@ -187,7 +205,7 @@ export function StudentTicketsScreen() {
             Support Tickets
           </h1>
           <p style={{ margin: '8px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
-            Report campus issues and track their resolution.
+            {description}
           </p>
         </div>
         <Button

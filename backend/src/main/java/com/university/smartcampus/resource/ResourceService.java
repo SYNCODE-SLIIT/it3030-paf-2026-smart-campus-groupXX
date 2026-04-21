@@ -138,8 +138,11 @@ public class ResourceService {
         return locationRepository.findAllByOrderByLocationNameAsc().stream()
             .map(location -> new LocationOption(
                 location.getId(),
+                location.getBuilding() == null ? null : location.getBuilding().getId(),
                 location.getLocationName(),
-                location.getBuildingName(),
+                location.getBuilding() == null ? null : location.getBuilding().getBuildingCode(),
+                location.getBuilding() == null ? location.getBuildingName() : location.getBuilding().getBuildingName(),
+                location.getWing(),
                 location.getFloor(),
                 location.getRoomCode(),
                 location.getLocationType()

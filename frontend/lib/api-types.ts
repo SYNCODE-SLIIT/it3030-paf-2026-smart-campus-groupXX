@@ -34,6 +34,38 @@ export type ResourceCategory =
 
 export type ResourceStatus = 'ACTIVE' | 'OUT_OF_SERVICE' | 'MAINTENANCE' | 'INACTIVE';
 
+export type ResourceManagedByRole =
+  | 'CATALOG_MANAGER'
+  | 'LIBRARY_MANAGER'
+  | 'TECHNICAL_MANAGER'
+  | 'FACILITIES_MANAGER'
+  | 'MAINTENANCE_MANAGER'
+  | 'SPORTS_MANAGER'
+  | 'EVENTS_MANAGER'
+  | 'TRANSPORT_MANAGER';
+
+export type BuildingType =
+  | 'ACADEMIC'
+  | 'LIBRARY'
+  | 'ADMINISTRATIVE'
+  | 'SPORTS'
+  | 'OUTDOOR'
+  | 'OTHER';
+
+export type LocationType =
+  | 'BUILDING'
+  | 'ROOM'
+  | 'LAB'
+  | 'HALL'
+  | 'LIBRARY_SPACE'
+  | 'EVENT_SPACE'
+  | 'SPORTS_AREA'
+  | 'OUTDOOR_AREA'
+  | 'STORAGE'
+  | 'OTHER';
+
+export type LocationWing = 'LEFT_WING' | 'RIGHT_WING' | 'NONE';
+
 export type StudentFaculty =
   | 'FACULTY_OF_COMPUTING'
   | 'FACULTY_OF_ENGINEERING'
@@ -117,44 +149,208 @@ export interface ResourceResponse {
   availableTo: string | null;
   createdAt: string;
   updatedAt: string;
+  resourceType: ResourceTypeDetails | null;
+  locationDetails: LocationDetails | null;
+  features: ResourceFeatureDetails[];
+  images: ResourceImageDetails[];
 }
 
 export interface CreateResourceRequest {
   code: string;
   name: string;
-  category: ResourceCategory;
-  subcategory?: string | null;
   description?: string | null;
-  location?: string | null;
+  resourceTypeId: string;
+  locationId: string;
   capacity?: number | null;
   quantity?: number | null;
   status: ResourceStatus;
   bookable: boolean;
   movable: boolean;
-  availableFrom?: string | null;
-  availableTo?: string | null;
+  managedByRole?: ResourceManagedByRole | null;
+  featureCodes?: string[] | null;
 }
 
 export interface UpdateResourceRequest {
-  code?: string;
   name?: string;
-  category?: ResourceCategory;
-  subcategory?: string | null;
   description?: string | null;
-  location?: string | null;
+  resourceTypeId?: string;
+  locationId?: string;
   capacity?: number | null;
   quantity?: number | null;
   status?: ResourceStatus;
   bookable?: boolean;
   movable?: boolean;
-  availableFrom?: string | null;
-  availableTo?: string | null;
+  managedByRole?: ResourceManagedByRole | null;
+  featureCodes?: string[] | null;
+}
+
+export interface ResourceTypeDetails {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+}
+
+export interface LocationDetails {
+  id: string;
+  buildingId: string | null;
+  locationName: string;
+  buildingCode: string | null;
+  buildingName: string | null;
+  wing: LocationWing | null;
+  floor: string | null;
+  roomCode: string | null;
+  locationType: LocationType;
+}
+
+export interface ResourceFeatureDetails {
+  code: string;
+  name: string;
+}
+
+export interface ResourceImageDetails {
+  imageUrl: string;
+  isPrimary: boolean;
+  displayOrder: number;
+}
+
+export interface ResourceTypeOption {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  isBookableDefault: boolean;
+  isMovableDefault: boolean;
+}
+
+export interface CatalogueResourceTypeResponse {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  description: string | null;
+  isBookableDefault: boolean;
+  isMovableDefault: boolean;
+}
+
+export interface CreateResourceTypeRequest {
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  description?: string | null;
+  isBookableDefault: boolean;
+  isMovableDefault: boolean;
+}
+
+export interface UpdateResourceTypeRequest {
+  code?: string;
+  name?: string;
+  category?: ResourceCategory;
+  description?: string | null;
+  isBookableDefault?: boolean;
+  isMovableDefault?: boolean;
+}
+
+export interface LocationOption {
+  id: string;
+  buildingId: string | null;
+  locationName: string;
+  buildingCode: string | null;
+  buildingName: string | null;
+  wing: LocationWing | null;
+  floor: string | null;
+  roomCode: string | null;
+  locationType: LocationType;
+}
+
+export interface ResourceFeatureOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface ManagedByRoleOption {
+  value: ResourceManagedByRole;
+  label: string;
 }
 
 export interface ResourceSummary {
   id: string;
   code: string;
   name: string;
+}
+
+export interface BuildingResponse {
+  id: string;
+  buildingName: string;
+  buildingCode: string;
+  buildingType: BuildingType;
+  hasWings: boolean;
+  leftWingPrefix: string | null;
+  rightWingPrefix: string | null;
+  defaultPrefix: string | null;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBuildingRequest {
+  buildingName: string;
+  buildingCode: string;
+  buildingType: BuildingType;
+  hasWings: boolean;
+  leftWingPrefix?: string | null;
+  rightWingPrefix?: string | null;
+  defaultPrefix?: string | null;
+  description?: string | null;
+  isActive?: boolean | null;
+}
+
+export interface UpdateBuildingRequest {
+  buildingName?: string;
+  buildingCode?: string;
+  buildingType?: BuildingType;
+  hasWings?: boolean;
+  leftWingPrefix?: string | null;
+  rightWingPrefix?: string | null;
+  defaultPrefix?: string | null;
+  description?: string | null;
+  isActive?: boolean | null;
+}
+
+export interface CatalogueLocationResponse {
+  id: string;
+  buildingId: string | null;
+  buildingName: string | null;
+  buildingCode: string | null;
+  buildingHasWings: boolean;
+  wing: LocationWing | null;
+  floor: string | null;
+  roomCode: string | null;
+  locationName: string;
+  locationType: LocationType;
+  description: string | null;
+}
+
+export interface CreateLocationRequest {
+  buildingId: string;
+  wing?: LocationWing | null;
+  floor?: string | null;
+  roomCode?: string | null;
+  locationName: string;
+  locationType: LocationType;
+  description?: string | null;
+}
+
+export interface UpdateLocationRequest {
+  buildingId?: string;
+  wing?: LocationWing | null;
+  floor?: string | null;
+  roomCode?: string | null;
+  locationName?: string;
+  locationType?: LocationType;
+  description?: string | null;
 }
 
 export interface CreateBookingRequest {
