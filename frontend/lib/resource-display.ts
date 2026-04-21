@@ -1,4 +1,10 @@
-import type { ResourceCategory, ResourceResponse, ResourceStatus } from '@/lib/api-types';
+import type {
+  LocationOption,
+  ResourceCategory,
+  ResourceResponse,
+  ResourceStatus,
+  ResourceTypeOption,
+} from '@/lib/api-types';
 
 export const resourceCategoryOptions: Array<{ value: ResourceCategory; label: string }> = [
   { value: 'SPACES', label: 'Spaces' },
@@ -87,4 +93,23 @@ export function resourceAvailabilityLabel(resource: Pick<ResourceResponse, 'avai
   }
 
   return `${resource.availableFrom ?? '—'} to ${resource.availableTo ?? '—'}`;
+}
+
+export function formatResourceTypeOptionLabel(option: ResourceTypeOption) {
+  return `${option.name} (${getResourceCategoryLabel(option.category)})`;
+}
+
+export function formatLocationOptionLabel(option: LocationOption) {
+  const buildingLabel = option.buildingName
+    ? `${option.buildingName}${option.buildingCode ? ` (${option.buildingCode})` : ''}`
+    : null;
+  const details = [buildingLabel, option.wing, option.floor, option.roomCode, option.locationType]
+    .filter(Boolean)
+    .join(' · ');
+
+  if (!details) {
+    return option.locationName;
+  }
+
+  return `${option.locationName} · ${details}`;
 }

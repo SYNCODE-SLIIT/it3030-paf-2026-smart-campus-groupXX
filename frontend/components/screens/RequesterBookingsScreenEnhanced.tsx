@@ -4,6 +4,7 @@ import React from 'react';
 import { Bell, CalendarPlus, RotateCw, Plus } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import {
   Alert,
   Button,
@@ -48,12 +49,6 @@ import { BookingModificationModal } from '@/components/booking/BookingModificati
 import { BookingCheckInPanel } from '@/components/booking/BookingCheckInPanel';
 import { NotificationCenter } from '@/components/booking/NotificationCenter';
 import { BookingCalendar } from '@/components/booking/BookingCalendar';
-
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 type TabType = 'bookings' | 'recurring' | 'calendar' | 'notifications';
 
@@ -150,6 +145,7 @@ export function RequesterBookingsScreenEnhanced({
   workspaceLabel: 'Student Workspace' | 'Faculty Workspace';
 }) {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
   // State
@@ -162,10 +158,11 @@ export function RequesterBookingsScreenEnhanced({
   const [submitting, setSubmitting] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<TabType>('bookings');
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [remainingRanges, setRemainingRanges] = React.useState<ResourceRemainingRangesResponse | null>(null);
   const [availabilityLoading, setAvailabilityLoading] = React.useState(false);
   const [availabilityError, setAvailabilityError] = React.useState<string | null>(null);
+
+
 
   // Modals
   const [showRecurringForm, setShowRecurringForm] = React.useState(false);
@@ -238,12 +235,12 @@ export function RequesterBookingsScreenEnhanced({
     event.preventDefault();
 
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
     if (!form.resourceId) {
-      setNotice({ variant: 'warning', title: 'Resource required', message: 'Select a resource.' });
+      showToast('warning', 'Resource required', 'Select a resource.');
       return;
     }
 
@@ -251,12 +248,12 @@ export function RequesterBookingsScreenEnhanced({
     const endTimeIso = localDateTimeToIso(form.endTime);
 
     if (!startTimeIso || !endTimeIso) {
-      setNotice({ variant: 'warning', title: 'Invalid time', message: 'Enter valid times.' });
+      showToast('warning', 'Invalid time', 'Enter valid times.');
       return;
     }
 
     if (new Date(startTimeIso).getTime() >= new Date(endTimeIso).getTime()) {
-      setNotice({ variant: 'warning', title: 'Invalid range', message: 'Start time must be before end time.' });
+      showToast('warning', 'Invalid range', 'Start time must be before end time.');
       return;
     }
 
@@ -268,11 +265,11 @@ export function RequesterBookingsScreenEnhanced({
         endTime: endTimeIso,
         purpose: form.purpose,
       });
-      setNotice({ variant: 'success', title: 'Booking created', message: 'Your booking request has been submitted.' });
+      showToast('success', 'Booking created', 'Your booking request has been submitted.');
       setForm(NEW_BOOKING_INITIAL);
       await reload();
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Booking failed', message: getErrorMessage(error, 'Could not create booking.') });
+      showToast('error', 'Booking failed', getErrorMessage(error, 'Could not create booking.'));
     } finally {
       setSubmitting(false);
     }
@@ -280,7 +277,7 @@ export function RequesterBookingsScreenEnhanced({
 
   async function handleCancelBooking(bookingId: string) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
@@ -289,10 +286,10 @@ export function RequesterBookingsScreenEnhanced({
     setSubmitting(true);
     try {
       await cancelMyBooking(accessToken, bookingId);
-      setNotice({ variant: 'success', title: 'Booking cancelled', message: 'Your booking has been cancelled.' });
+      showToast('success', 'Booking cancelled', 'Your booking has been cancelled.');
       await reload();
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Cancellation failed', message: getErrorMessage(error, 'Could not cancel booking.') });
+      showToast('error', 'Cancellation failed', getErrorMessage(error, 'Could not cancel booking.'));
     } finally {
       setSubmitting(false);
     }
@@ -300,18 +297,18 @@ export function RequesterBookingsScreenEnhanced({
 
   async function handleCreateRecurringBooking(data: any) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
     setSubmitting(true);
     try {
       await createRecurringBooking(accessToken, data);
-      setNotice({ variant: 'success', title: 'Recurring booking created', message: 'Your recurring bookings have been created.' });
+      showToast('success', 'Recurring booking created', 'Your recurring bookings have been created.');
       setShowRecurringForm(false);
       await reload();
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Failed', message: getErrorMessage(error, 'Could not create recurring booking.') });
+      showToast('error', 'Failed', getErrorMessage(error, 'Could not create recurring booking.'));
     } finally {
       setSubmitting(false);
     }
@@ -323,11 +320,11 @@ export function RequesterBookingsScreenEnhanced({
     setSubmitting(true);
     try {
       await requestBookingModification(accessToken, modificationBooking.id, data);
-      setNotice({ variant: 'success', title: 'Modification requested', message: 'Your reschedule request has been submitted.' });
+      showToast('success', 'Modification requested', 'Your reschedule request has been submitted.');
       setShowModificationModal(false);
       await reload();
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Request failed', message: getErrorMessage(error, 'Could not request modification.') });
+      showToast('error', 'Request failed', getErrorMessage(error, 'Could not request modification.'));
     } finally {
       setSubmitting(false);
     }
@@ -335,18 +332,18 @@ export function RequesterBookingsScreenEnhanced({
 
   async function handleCheckIn(bookingId: string) {
     if (!accessToken) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
     setSubmitting(true);
     try {
       await checkInBooking(accessToken, bookingId);
-      setNotice({ variant: 'success', title: 'Checked in', message: 'You have checked in to your booking.' });
+      showToast('success', 'Checked in', 'You have checked in to your booking.');
       setCheckInBookingId(null);
       await reload();
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Check-in failed', message: getErrorMessage(error, 'Could not check in.') });
+      showToast('error', 'Check-in failed', getErrorMessage(error, 'Could not check in.'));
     } finally {
       setSubmitting(false);
     }
@@ -405,11 +402,6 @@ export function RequesterBookingsScreenEnhanced({
         </p>
       </div>
 
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title}>
-          {notice.message}
-        </Alert>
-      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border)' }}>

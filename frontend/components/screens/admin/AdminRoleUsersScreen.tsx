@@ -5,6 +5,7 @@ import { Copy, Eye, Search, UserPlus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { CreateUserPanel } from '@/components/screens/admin/CreateUserPanel';
 import { UserIdentityCell } from '@/components/screens/admin/UserIdentityCell';
 import { UserStatsGrid } from '@/components/screens/admin/UserStatsGrid';
@@ -37,12 +38,6 @@ import {
   getUserTypeChipColor,
   getUserTypeLabel,
 } from '@/lib/user-display';
-
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 type CreatedInviteState = {
   email: string;
@@ -158,6 +153,7 @@ function roleSpecificHeaders(userType: UserType) {
 export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
   const router = useRouter();
   const { session } = useAuth();
+  const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
   const config = roleConfig[userType];
 
@@ -167,7 +163,6 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
   const [users, setUsers] = React.useState<UserResponse[]>([]);
   const [loadingUsers, setLoadingUsers] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
   const [createdInvite, setCreatedInvite] = React.useState<CreatedInviteState>(null);
   const [isCopyingLink, startCopyLinkTransition] = React.useTransition();
@@ -206,9 +201,9 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
     startCopyLinkTransition(async () => {
       try {
         await navigator.clipboard.writeText(createdInvite.link);
-        setNotice({ variant: 'success', title: 'Copied', message: 'Access link copied to clipboard.' });
+        showToast('success', 'Copied', 'Access link copied to clipboard.');
       } catch {
-        setNotice({ variant: 'error', title: 'Copy failed', message: 'Could not copy the access link.' });
+        showToast('error', 'Copy failed', 'Could not copy the access link.');
       }
     });
   }
@@ -290,12 +285,6 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
             {getUserTypeLabel(userType)}
           </Chip>
         </div>
-
-        {notice && (
-          <Alert variant={notice.variant} title={notice.title}>
-            {notice.message}
-          </Alert>
-        )}
 
         <UserStatsGrid
           totalUsers={totalUsers}
@@ -476,7 +465,6 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
                     setCreatedInvite({ email: createdUser.email, link: createdUser.lastInviteReference });
                   }
                 }}
-                onNotice={setNotice}
                 onCancel={() => setIsCreateDialogOpen(false)}
               />
             </Card>

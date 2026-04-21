@@ -5,12 +5,22 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.university.smartcampus.ticket.entity.TicketAttachmentEntity;
 
 public interface TicketAttachmentRepository extends JpaRepository<TicketAttachmentEntity, UUID> {
 
     List<TicketAttachmentEntity> findByTicketIdOrderByUploadedAtAsc(UUID ticketId);
+
+    @Query("""
+            select attachment.fileUrl
+            from TicketAttachmentEntity attachment
+            where attachment.ticket.id = :ticketId
+            order by attachment.uploadedAt asc
+            """)
+    List<String> findFileUrlsByTicketId(@Param("ticketId") UUID ticketId);
 
     Optional<TicketAttachmentEntity> findByIdAndTicketId(UUID id, UUID ticketId);
 

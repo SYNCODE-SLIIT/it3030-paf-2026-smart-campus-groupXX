@@ -5,16 +5,11 @@ import { useRouter } from 'next/navigation';
 import { TicketPlus } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card } from '@/components/ui';
+import { useToast } from '@/components/providers/ToastProvider';
+import { Alert, Button, Card, Skeleton } from '@/components/ui';
 import { SubmitTicketModal, TicketCard } from '@/components/tickets';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
-
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 const PRIORITY_ORDER: TicketPriority[] = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
 
@@ -97,14 +92,32 @@ function StatusSection({ label, color, tickets, onView }: StatusSectionProps) {
 }
 
 export function StudentTicketsScreen() {
+  return (
+    <RequesterTicketsScreen
+      workspaceLabel="Student Workspace"
+      description="Report campus issues and track their resolution."
+      ticketsBasePath="/students/tickets"
+    />
+  );
+}
+
+export function RequesterTicketsScreen({
+  workspaceLabel,
+  description,
+  ticketsBasePath,
+}: {
+  workspaceLabel: string;
+  description: string;
+  ticketsBasePath: string;
+}) {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
   const [tickets, setTickets] = React.useState<TicketSummaryResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
 
   const reload = React.useCallback(async () => {
@@ -134,8 +147,8 @@ export function StudentTicketsScreen() {
   const inProgressCount = tickets.filter((t) => t.status === 'IN_PROGRESS').length;
 
   const handleView = React.useCallback(
-    (code: string) => { router.push(`/students/tickets/${code}`); },
-    [router],
+    (code: string) => { router.push(`${ticketsBasePath}/${code}`); },
+    [router, ticketsBasePath],
   );
 
   return (
@@ -154,7 +167,7 @@ export function StudentTicketsScreen() {
               color: 'var(--text-muted)',
             }}
           >
-            Student Workspace
+            {workspaceLabel}
           </p>
           <h1
             style={{
@@ -169,7 +182,7 @@ export function StudentTicketsScreen() {
             Support Tickets
           </h1>
           <p style={{ margin: '8px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
-            Report campus issues and track their resolution.
+            {description}
           </p>
         </div>
         <Button
@@ -180,12 +193,6 @@ export function StudentTicketsScreen() {
           New Ticket
         </Button>
       </div>
-
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)}>
-          {notice.message}
-        </Alert>
-      )}
 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
@@ -214,9 +221,21 @@ export function StudentTicketsScreen() {
       )}
 
       {loading && (
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 48 }}>
-          Loading tickets…
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ background: 'var(--surface-1)', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Skeleton variant="line" width={180} height={14} />
+                <Skeleton variant="line" width={60} height={14} />
+              </div>
+              <Skeleton variant="line" width="85%" height={12} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Skeleton variant="line" width={70} height={10} />
+                <Skeleton variant="line" width={90} height={10} />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {!loading && tickets.length === 0 && !loadError && (
@@ -244,7 +263,7 @@ export function StudentTicketsScreen() {
         onClose={() => setModalOpen(false)}
         onSuccess={() => {
           void reload();
-          setNotice({ variant: 'success', title: 'Ticket submitted', message: 'Your support ticket has been created.' });
+          showToast('success', 'Ticket submitted', 'Your support ticket has been created.');
         }}
       />
     </div>
