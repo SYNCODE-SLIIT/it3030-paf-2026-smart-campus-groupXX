@@ -228,6 +228,7 @@ export function CatalogueLocationsScreen({
               title={editingLocation ? `Edit ${editingLocation.locationName}` : 'Add Location'}
               location={editingLocation}
               buildingOptions={buildings}
+              existingLocations={locations}
               submitting={saving}
               onCancel={() => {
                 setFormOpen(false);

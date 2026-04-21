@@ -40,26 +40,6 @@ public class LocationService {
         "NONE"
     );
 
-    private static final Set<String> LOCATION_TYPES_REQUIRING_WING = Set.of(
-        "ROOM",
-        "LAB",
-        "HALL",
-        "LIBRARY_SPACE",
-        "EVENT_SPACE",
-        "SPORTS_AREA",
-        "STORAGE",
-        "OTHER"
-    );
-
-    private static final Set<String> LOCATION_TYPES_REQUIRING_ROOM_CODE = Set.of(
-        "ROOM",
-        "LAB",
-        "HALL",
-        "LIBRARY_SPACE",
-        "EVENT_SPACE",
-        "STORAGE"
-    );
-
     private final LocationRepository locationRepository;
     private final BuildingRepository buildingRepository;
     private final ResourceRepository resourceRepository;
@@ -99,8 +79,9 @@ public class LocationService {
         Building building = requireActiveBuilding(request.buildingId());
         String normalizedName = normalizeRequiredLocationName(request.locationName());
         String normalizedType = normalizeRequiredLocationType(request.locationType());
-        String normalizedWing = normalizeWing(building, request.wing(), normalizedType);
-        String normalizedRoomCode = normalizeRoomCode(building, normalizedWing, request.roomCode(), normalizedType);
+        String normalizedFloor = normalizeFloor(request.floor());
+        String normalizedWing = normalizeWing(building, request.wing());
+        String normalizedRoomCode = normalizeRoomCode(building, normalizedWing, normalizedFloor, request.roomCode(), normalizedType);
         ensureLocationNameAvailable(normalizedName, building.getId(), null);
         ensureRoomCodeAvailable(normalizedRoomCode, building.getId(), null);
 
@@ -111,7 +92,7 @@ public class LocationService {
         location.setRoomCode(normalizedRoomCode);
         location.setLocationName(normalizedName);
         location.setLocationType(normalizedType);
-        location.setFloor(trimToNull(request.floor()));
+        location.setFloor(normalizedFloor);
 
         return locationMapper.toResponse(locationRepository.save(location));
     }
@@ -130,15 +111,18 @@ public class LocationService {
         String nextType = request.locationType() == null
             ? normalizeRequiredLocationType(location.getLocationType())
             : normalizeRequiredLocationType(request.locationType());
+        String nextFloor = request.floor() == null
+            ? normalizeFloor(location.getFloor())
+            : normalizeFloor(request.floor());
         String nextName = request.locationName() == null
             ? normalizeRequiredLocationName(location.getLocationName())
             : normalizeRequiredLocationName(request.locationName());
         String nextWing = request.wing() == null
-            ? normalizeWing(nextBuilding, location.getWing(), nextType)
-            : normalizeWing(nextBuilding, request.wing(), nextType);
+            ? normalizeWing(nextBuilding, location.getWing())
+            : normalizeWing(nextBuilding, request.wing());
         String nextRoomCode = request.roomCode() == null
-            ? normalizeRoomCode(nextBuilding, nextWing, location.getRoomCode(), nextType)
-            : normalizeRoomCode(nextBuilding, nextWing, request.roomCode(), nextType);
+            ? normalizeRoomCode(nextBuilding, nextWing, nextFloor, location.getRoomCode(), nextType)
+            : normalizeRoomCode(nextBuilding, nextWing, nextFloor, request.roomCode(), nextType);
 
         ensureLocationNameAvailable(nextName, nextBuilding.getId(), id);
         ensureRoomCodeAvailable(nextRoomCode, nextBuilding.getId(), id);
@@ -149,6 +133,7 @@ public class LocationService {
         location.setLocationName(nextName);
         location.setLocationType(nextType);
         location.setWing(nextWing);
+        location.setFloor(nextFloor);
         location.setRoomCode(nextRoomCode);
 
         return locationMapper.toResponse(location);
@@ -197,53 +182,72 @@ public class LocationService {
         return normalized;
     }
 
-    private String normalizeWing(Building building, String wing, String locationType) {
+    private String normalizeFloor(String floor) {
+        if (!StringUtils.hasText(floor)) {
+            return "1";
+        }
+
+        String normalizedFloor = floor.trim();
+        if (!normalizedFloor.matches("\\d+")) {
+            throw new BadRequestException("Floor must be numeric.");
+        }
+
+        return normalizedFloor;
+    }
+
+    private String normalizeWing(Building building, String wing) {
         if (!building.isHasWings()) {
             return "NONE";
         }
 
         String normalizedWing = normalizeOptionalUpperValue(wing);
-        if (!locationTypeRequiresWing(locationType)) {
-            return normalizedWing == null ? "NONE" : requireAllowedWing(normalizedWing);
-        }
-
         if (normalizedWing == null || "NONE".equals(normalizedWing)) {
-            throw new BadRequestException("Wing is required for the selected building and location type.");
+            throw new BadRequestException("Wing is required for the selected building.");
         }
 
         return requireAllowedWing(normalizedWing);
     }
 
-    private String normalizeRoomCode(Building building, String wing, String roomCode, String locationType) {
+    private String normalizeRoomCode(Building building, String wing, String floor, String roomCode, String locationType) {
         String normalizedRoomCode = normalizeOptionalUpperValue(roomCode);
-
         if (normalizedRoomCode == null) {
-            if (roomCodeRequired(building, locationType)) {
-                throw new BadRequestException("Room code is required for the selected building and location type.");
-            }
-            return null;
+            throw new BadRequestException("Location code is required.");
         }
 
-        String expectedPrefix = resolveExpectedPrefix(building, wing);
-        if (expectedPrefix != null && !normalizedRoomCode.startsWith(expectedPrefix)) {
-            throw new BadRequestException("Room code must start with " + expectedPrefix + " for the selected building configuration.");
+        String prefix = resolveExpectedPrefix(building, wing, locationType);
+        if (!StringUtils.hasText(prefix)) {
+            throw new BadRequestException("The selected building does not have enough prefix information to derive a location code.");
+        }
+
+        if (usesFlexibleCodeStructure(building, locationType)) {
+            if (!normalizedRoomCode.startsWith(prefix)) {
+                throw new BadRequestException("Location code must start with " + prefix + ".");
+            }
+            if (normalizedRoomCode.equals(prefix) || normalizedRoomCode.equals(prefix + "-")) {
+                throw new BadRequestException("Location code must include a suffix after " + prefix + ".");
+            }
+            return normalizedRoomCode;
+        }
+
+        String requiredStart = prefix + floor;
+        if (!normalizedRoomCode.startsWith(requiredStart)) {
+            throw new BadRequestException("Location code must start with " + requiredStart + ".");
+        }
+
+        String suffix = normalizedRoomCode.substring(requiredStart.length());
+        if (!StringUtils.hasText(suffix)) {
+            throw new BadRequestException("Location code must include a room suffix after " + requiredStart + ".");
         }
 
         return normalizedRoomCode;
     }
 
-    private boolean locationTypeRequiresWing(String locationType) {
-        return LOCATION_TYPES_REQUIRING_WING.contains(locationType);
+    private boolean usesFlexibleCodeStructure(Building building, String locationType) {
+        return (building.getBuildingType() != null && building.getBuildingType().name().equals("OUTDOOR"))
+            || "OUTDOOR_AREA".equals(locationType);
     }
 
-    private boolean roomCodeRequired(Building building, String locationType) {
-        return building.getBuildingType() != null
-            && building.getBuildingType().name().equals("OUTDOOR")
-            ? false
-            : LOCATION_TYPES_REQUIRING_ROOM_CODE.contains(locationType);
-    }
-
-    private String resolveExpectedPrefix(Building building, String wing) {
+    private String resolveExpectedPrefix(Building building, String wing, String locationType) {
         if (building.isHasWings()) {
             if ("LEFT_WING".equals(wing)) {
                 return trimToNull(building.getLeftWingPrefix());
@@ -254,7 +258,16 @@ public class LocationService {
             return null;
         }
 
-        return trimToNull(building.getDefaultPrefix());
+        String defaultPrefix = trimToNull(building.getDefaultPrefix());
+        if (defaultPrefix != null) {
+            return defaultPrefix;
+        }
+
+        if (usesFlexibleCodeStructure(building, locationType)) {
+            return trimToNull(building.getBuildingCode());
+        }
+
+        return trimToNull(building.getBuildingCode());
     }
 
     private String requireAllowedWing(String wing) {
@@ -282,7 +295,7 @@ public class LocationService {
             ? locationRepository.existsByRoomCodeIgnoreCaseAndBuilding_Id(roomCode, buildingId)
             : locationRepository.existsByRoomCodeIgnoreCaseAndBuilding_IdAndIdNot(roomCode, buildingId, currentLocationId);
         if (exists) {
-            throw new ConflictException("A location with this room code already exists for the selected building.");
+            throw new ConflictException("Location code " + roomCode + " already exists.");
         }
     }
 

@@ -12,32 +12,35 @@ import type {
   UpdateLocationRequest,
 } from '@/lib/api-types';
 import {
+  buildLocationCode,
+  extractCodeSuffixFromStoredCode,
   formatBuildingOptionLabel,
   getLocationCodeGuidance,
   locationTypeOptions,
   locationTypeRequiresWing,
-  roomCodeRequired,
+  normalizeFloorValue,
+  normalizeCodeSuffixInput,
+  resolveLocationCodePrefix,
   wingOptions,
-  expectedRoomCodePrefix,
 } from '@/lib/location-display';
 
 type LocationFormValues = {
   buildingId: string;
   wing: LocationWing | '';
   floor: string;
-  roomCode: string;
+  codeSuffix: string;
   locationName: string;
   locationType: LocationType;
   description: string;
 };
 
-type LocationFormErrors = Partial<Record<'buildingId' | 'wing' | 'roomCode' | 'locationName', string>>;
+type LocationFormErrors = Partial<Record<'buildingId' | 'wing' | 'floor' | 'codeSuffix' | 'locationName', string>>;
 
 const defaultValues: LocationFormValues = {
   buildingId: '',
   wing: 'NONE',
-  floor: '',
-  roomCode: '',
+  floor: '1',
+  codeSuffix: '',
   locationName: '',
   locationType: 'ROOM',
   description: '',
@@ -51,8 +54,8 @@ function valuesFromLocation(location: CatalogueLocationResponse | null): Locatio
   return {
     buildingId: location.buildingId ?? '',
     wing: location.wing ?? 'NONE',
-    floor: location.floor ?? '',
-    roomCode: location.roomCode ?? '',
+    floor: normalizeFloorValue(location.floor),
+    codeSuffix: '',
     locationName: location.locationName,
     locationType: location.locationType,
     description: location.description ?? '',
@@ -63,6 +66,7 @@ export function LocationFormModal({
   title,
   location,
   buildingOptions,
+  existingLocations,
   submitting,
   onSubmit,
   onCancel,
@@ -70,6 +74,7 @@ export function LocationFormModal({
   title: string;
   location: CatalogueLocationResponse | null;
   buildingOptions: BuildingResponse[];
+  existingLocations: CatalogueLocationResponse[];
   submitting: boolean;
   onSubmit: (payload: CreateLocationRequest | UpdateLocationRequest) => Promise<void>;
   onCancel: () => void;
@@ -77,42 +82,71 @@ export function LocationFormModal({
   const [values, setValues] = React.useState<LocationFormValues>(() => valuesFromLocation(location));
   const [errors, setErrors] = React.useState<LocationFormErrors>({});
 
-  React.useEffect(() => {
-    setValues(valuesFromLocation(location));
-    setErrors({});
-  }, [location]);
-
   const selectedBuilding = React.useMemo(
     () => buildingOptions.find((building) => building.id === values.buildingId) ?? null,
     [buildingOptions, values.buildingId],
   );
+
+  React.useEffect(() => {
+    const nextValues = valuesFromLocation(location);
+    const nextBuilding = buildingOptions.find((building) => building.id === nextValues.buildingId) ?? null;
+    nextValues.codeSuffix = extractCodeSuffixFromStoredCode(
+      nextBuilding,
+      nextValues.wing,
+      nextValues.floor,
+      location?.roomCode,
+      nextValues.locationType,
+    );
+    setValues(nextValues);
+    setErrors({});
+  }, [buildingOptions, location]);
 
   const shouldShowWing = React.useMemo(
     () => Boolean(selectedBuilding?.hasWings),
     [selectedBuilding],
   );
 
-  const wingRequired = React.useMemo(
-    () => locationTypeRequiresWing(selectedBuilding, values.locationType),
-    [selectedBuilding, values.locationType],
+  const normalizedFloor = React.useMemo(
+    () => normalizeFloorValue(values.floor),
+    [values.floor],
+  );
+
+  const finalLocationCode = React.useMemo(
+    () => buildLocationCode(selectedBuilding, values.wing, normalizedFloor, values.codeSuffix, values.locationType),
+    [normalizedFloor, selectedBuilding, values.codeSuffix, values.locationType, values.wing],
   );
 
   function validate(next: LocationFormValues) {
     const nextErrors: LocationFormErrors = {};
     const nextBuilding = buildingOptions.find((building) => building.id === next.buildingId) ?? null;
+    const nextFloor = normalizeFloorValue(next.floor);
+    const nextFinalCode = buildLocationCode(nextBuilding, next.wing, nextFloor, next.codeSuffix, next.locationType);
 
     if (!next.buildingId) nextErrors.buildingId = 'Building is required.';
     if (!next.locationName.trim()) nextErrors.locationName = 'Location name is required.';
-    if (locationTypeRequiresWing(nextBuilding, next.locationType) && !next.wing) {
+    if (nextFloor && !/^\d+$/.test(nextFloor)) {
+      nextErrors.floor = 'Floor must be numeric.';
+    }
+    if (locationTypeRequiresWing(nextBuilding) && !next.wing) {
       nextErrors.wing = 'Wing is required for the selected building.';
     }
-    if (roomCodeRequired(nextBuilding, next.locationType) && !next.roomCode.trim()) {
-      nextErrors.roomCode = 'Room code is required for this building and location type.';
+    if (!next.codeSuffix.trim()) {
+      nextErrors.codeSuffix = 'Code suffix is required.';
     }
 
-    const prefix = expectedRoomCodePrefix(nextBuilding, next.wing);
-    if (prefix && next.roomCode.trim() && !next.roomCode.trim().toUpperCase().startsWith(prefix)) {
-      nextErrors.roomCode = `Room code must start with ${prefix}.`;
+    const prefix = resolveLocationCodePrefix(nextBuilding, next.wing, next.locationType);
+    if (!prefix && nextBuilding) {
+      nextErrors.codeSuffix = 'This building does not have enough prefix information to derive a valid code.';
+    }
+
+    if (nextFinalCode) {
+      const duplicateLocation = existingLocations.find((existingLocation) =>
+        existingLocation.roomCode?.toUpperCase() === nextFinalCode.toUpperCase()
+          && existingLocation.id !== location?.id,
+      );
+      if (duplicateLocation) {
+        nextErrors.codeSuffix = `Location code ${nextFinalCode} already exists.`;
+      }
     }
 
     return nextErrors;
@@ -124,11 +158,18 @@ export function LocationFormModal({
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    const nextFloor = normalizeFloorValue(values.floor);
+    const nextFinalCode = buildLocationCode(selectedBuilding, values.wing, nextFloor, values.codeSuffix, values.locationType);
+    if (!nextFinalCode) {
+      setErrors({ codeSuffix: 'A valid location code could not be generated from the selected building.' });
+      return;
+    }
+
     const payload: CreateLocationRequest | UpdateLocationRequest = {
       buildingId: values.buildingId,
       wing: selectedBuilding?.hasWings ? (values.wing || null) : 'NONE',
-      floor: values.floor.trim() || null,
-      roomCode: values.roomCode.trim().toUpperCase() || null,
+      floor: nextFloor,
+      roomCode: nextFinalCode,
       locationName: values.locationName.trim(),
       locationType: values.locationType,
       description: values.description.trim() || null,
@@ -160,6 +201,13 @@ export function LocationFormModal({
                 ...current,
                 buildingId: event.target.value,
                 wing: nextBuilding?.hasWings ? (current.wing === 'NONE' ? '' : current.wing) : 'NONE',
+                codeSuffix: normalizeCodeSuffixInput(
+                  current.codeSuffix,
+                  nextBuilding,
+                  nextBuilding?.hasWings ? (current.wing === 'NONE' ? '' : current.wing) : 'NONE',
+                  current.floor,
+                  current.locationType,
+                ),
               }));
             }}
             options={[
@@ -174,16 +222,36 @@ export function LocationFormModal({
           <Select
             label="Location Type"
             value={values.locationType}
-            onChange={(event) => setValues((current) => ({ ...current, locationType: event.target.value as LocationType }))}
+            onChange={(event) => setValues((current) => ({
+              ...current,
+              locationType: event.target.value as LocationType,
+              codeSuffix: normalizeCodeSuffixInput(
+                current.codeSuffix,
+                selectedBuilding,
+                current.wing,
+                current.floor,
+                event.target.value as LocationType,
+              ),
+            }))}
             options={locationTypeOptions}
           />
           {shouldShowWing && (
             <Select
               label="Wing"
               value={values.wing}
-              onChange={(event) => setValues((current) => ({ ...current, wing: event.target.value as LocationWing | '' }))}
+              onChange={(event) => setValues((current) => ({
+                ...current,
+                wing: event.target.value as LocationWing | '',
+                codeSuffix: normalizeCodeSuffixInput(
+                  current.codeSuffix,
+                  selectedBuilding,
+                  event.target.value as LocationWing | '',
+                  current.floor,
+                  current.locationType,
+                ),
+              }))}
               options={[
-                { value: '', label: wingRequired ? 'Select wing' : 'No wing' },
+                { value: '', label: 'Select wing' },
                 ...wingOptions,
               ]}
               error={errors.wing}
@@ -192,18 +260,40 @@ export function LocationFormModal({
           <Input
             label="Floor"
             value={values.floor}
-            onChange={(event) => setValues((current) => ({ ...current, floor: event.target.value.toUpperCase() }))}
-            placeholder="e.g. 2"
+            onChange={(event) => setValues((current) => ({
+              ...current,
+              floor: event.target.value.replace(/[^\d]/g, ''),
+            }))}
+            onBlur={() => setValues((current) => ({ ...current, floor: normalizeFloorValue(current.floor) }))}
+            placeholder="1"
+            error={errors.floor}
           />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <Input
-            label="Room Code / Location Code"
-            value={values.roomCode}
-            onChange={(event) => setValues((current) => ({ ...current, roomCode: event.target.value.toUpperCase() }))}
-            placeholder="e.g. A201"
-            error={errors.roomCode}
+            label="Code Suffix / Room Number"
+            value={values.codeSuffix}
+            onChange={(event) => setValues((current) => ({
+              ...current,
+              codeSuffix: normalizeCodeSuffixInput(
+                event.target.value,
+                selectedBuilding,
+                current.wing,
+                current.floor,
+                current.locationType,
+              ),
+            }))}
+            placeholder={selectedBuilding?.hasWings ? 'e.g. 02' : 'e.g. 01'}
+            error={errors.codeSuffix}
+            hint="Enter only the room-number or suffix portion. The final code is derived automatically."
+          />
+          <Input
+            label="Final Location Code"
+            value={finalLocationCode ?? ''}
+            readOnly
+            disabled
+            hint="This is the final code that will be saved."
           />
           <Input
             label="Location Name"
@@ -215,7 +305,7 @@ export function LocationFormModal({
         </div>
 
         <Alert variant="info" title="Code guidance">
-          {getLocationCodeGuidance(selectedBuilding, values.wing, values.locationType)}
+          {getLocationCodeGuidance(selectedBuilding, values.wing, normalizedFloor, values.locationType)}
         </Alert>
 
         <Textarea
