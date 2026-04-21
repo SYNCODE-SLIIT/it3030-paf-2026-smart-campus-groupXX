@@ -38,6 +38,15 @@ public final class AppEnums {
         MAINTENANCE,
         INACTIVE
     }
+
+    public enum BuildingType {
+        ACADEMIC,
+        LIBRARY,
+        ADMINISTRATIVE,
+        SPORTS,
+        OUTDOOR,
+        OTHER
+    }
     
     public enum UserType {
         STUDENT,

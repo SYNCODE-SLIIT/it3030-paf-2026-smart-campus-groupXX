@@ -2,12 +2,14 @@ import {
   type AccountStatus,
   type AddCommentRequest,
   type AssignTicketRequest,
+  type BuildingResponse,
   type BookingDecisionRequest,
   type BookingModificationResponse,
   type BookingNotificationResponse,
   type BookingResponse,
   type CancelBookingRequest,
   type CheckInResponse,
+  type CreateBuildingRequest,
   type CreateBookingRequest,
   type CreateRecurringBookingRequest,
   type CreateResourceRequest,
@@ -37,6 +39,7 @@ import {
   type TicketStatusHistoryResponse,
   type TicketStatusUpdateRequest,
   type TicketSummaryResponse,
+  type UpdateBuildingRequest,
   type UpdateResourceRequest,
   type UpdateTicketRequest,
   type UpdateUserRequest,
@@ -420,6 +423,35 @@ export async function updateResource(accessToken: string, resourceId: string, pa
 
 export async function deleteResource(accessToken: string, resourceId: string) {
   return request<MessageResponse>(`/api/resources/${resourceId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export async function listBuildings(accessToken: string) {
+  return request<BuildingResponse[]>('/api/admin/buildings', {
+    accessToken,
+  });
+}
+
+export async function createBuilding(accessToken: string, payload: CreateBuildingRequest) {
+  return request<BuildingResponse>('/api/admin/buildings', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function updateBuilding(accessToken: string, buildingId: string, payload: UpdateBuildingRequest) {
+  return request<BuildingResponse>(`/api/admin/buildings/${buildingId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function deactivateBuilding(accessToken: string, buildingId: string) {
+  return request<MessageResponse>(`/api/admin/buildings/${buildingId}`, {
     method: 'DELETE',
     accessToken,
   });

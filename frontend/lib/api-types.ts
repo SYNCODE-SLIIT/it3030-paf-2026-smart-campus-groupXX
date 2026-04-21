@@ -44,6 +44,14 @@ export type ResourceManagedByRole =
   | 'EVENTS_MANAGER'
   | 'TRANSPORT_MANAGER';
 
+export type BuildingType =
+  | 'ACADEMIC'
+  | 'LIBRARY'
+  | 'ADMINISTRATIVE'
+  | 'SPORTS'
+  | 'OUTDOOR'
+  | 'OTHER';
+
 export type StudentFaculty =
   | 'FACULTY_OF_COMPUTING'
   | 'FACULTY_OF_ENGINEERING'
@@ -222,6 +230,45 @@ export interface ResourceSummary {
   id: string;
   code: string;
   name: string;
+}
+
+export interface BuildingResponse {
+  id: string;
+  buildingName: string;
+  buildingCode: string;
+  buildingType: BuildingType;
+  hasWings: boolean;
+  leftWingPrefix: string | null;
+  rightWingPrefix: string | null;
+  defaultPrefix: string | null;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBuildingRequest {
+  buildingName: string;
+  buildingCode: string;
+  buildingType: BuildingType;
+  hasWings: boolean;
+  leftWingPrefix?: string | null;
+  rightWingPrefix?: string | null;
+  defaultPrefix?: string | null;
+  description?: string | null;
+  isActive?: boolean | null;
+}
+
+export interface UpdateBuildingRequest {
+  buildingName?: string;
+  buildingCode?: string;
+  buildingType?: BuildingType;
+  hasWings?: boolean;
+  leftWingPrefix?: string | null;
+  rightWingPrefix?: string | null;
+  defaultPrefix?: string | null;
+  description?: string | null;
+  isActive?: boolean | null;
 }
 
 export interface CreateBookingRequest {

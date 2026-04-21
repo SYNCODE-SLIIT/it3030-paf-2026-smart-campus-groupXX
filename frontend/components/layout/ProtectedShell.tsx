@@ -79,6 +79,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: Us
               href: '/admin/resources',
               allowedUserTypes: ['ADMIN'],
             },
+            {
+              label: 'Buildings Management',
+              icon: BookOpen,
+              href: '/admin/buildings',
+              allowedUserTypes: ['ADMIN'],
+            },
           ],
         },
         {
