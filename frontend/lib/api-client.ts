@@ -4,13 +4,19 @@ import {
   type AccountStatus,
   type AddCommentRequest,
   type AssignTicketRequest,
+  type BuildingResponse,
   type BookingDecisionRequest,
   type BookingModificationResponse,
   type BookingNotificationResponse,
   type BookingResponse,
   type CancelBookingRequest,
+  type CatalogueResourceTypeResponse,
+  type CatalogueLocationResponse,
   type CheckInResponse,
+  type CreateBuildingRequest,
   type CreateBookingRequest,
+  type CreateResourceTypeRequest,
+  type CreateLocationRequest,
   type CreateRecurringBookingRequest,
   type CreateResourceRequest,
   type CreateTicketRequest,
@@ -18,11 +24,15 @@ import {
   type ErrorResponse,
   type ManagerRole,
   type ManagerRoleUpdateRequest,
+  type ManagedByRoleOption,
   type MessageResponse,
   type ModificationDecisionRequest,
+  type LocationOption,
   type RecurringBookingResponse,
   type RequestModificationRequest,
+  type ResourceFeatureOption,
   type ResourceResponse,
+  type ResourceTypeOption,
   type SessionSyncResponse,
   type StudentOnboardingRequest,
   type StudentOnboardingStateResponse,
@@ -35,7 +45,10 @@ import {
   type TicketStatusHistoryResponse,
   type TicketStatusUpdateRequest,
   type TicketSummaryResponse,
+  type UpdateBuildingRequest,
+  type UpdateLocationRequest,
   type UpdateResourceRequest,
+  type UpdateResourceTypeRequest,
   type UpdateTicketRequest,
   type UpdateUserRequest,
   type UserResponse,
@@ -421,6 +434,30 @@ export async function listResources(accessToken: string) {
   });
 }
 
+export async function listResourceTypeOptions(accessToken: string) {
+  return request<ResourceTypeOption[]>('/api/resources/lookups/types', {
+    accessToken,
+  });
+}
+
+export async function listLocationOptions(accessToken: string) {
+  return request<LocationOption[]>('/api/resources/lookups/locations', {
+    accessToken,
+  });
+}
+
+export async function listResourceFeatureOptions(accessToken: string) {
+  return request<ResourceFeatureOption[]>('/api/resources/lookups/features', {
+    accessToken,
+  });
+}
+
+export async function listManagedByRoleOptions(accessToken: string) {
+  return request<ManagedByRoleOption[]>('/api/resources/lookups/managed-roles', {
+    accessToken,
+  });
+}
+
 export async function createResource(accessToken: string, payload: CreateResourceRequest) {
   return request<ResourceResponse>('/api/resources', {
     method: 'POST',
@@ -439,6 +476,103 @@ export async function updateResource(accessToken: string, resourceId: string, pa
 
 export async function deleteResource(accessToken: string, resourceId: string) {
   return request<MessageResponse>(`/api/resources/${resourceId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export async function listBuildings(accessToken: string) {
+  return request<BuildingResponse[]>('/api/admin/buildings', {
+    accessToken,
+  });
+}
+
+export async function createBuilding(accessToken: string, payload: CreateBuildingRequest) {
+  return request<BuildingResponse>('/api/admin/buildings', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function updateBuilding(accessToken: string, buildingId: string, payload: UpdateBuildingRequest) {
+  return request<BuildingResponse>(`/api/admin/buildings/${buildingId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function deactivateBuilding(accessToken: string, buildingId: string) {
+  return request<MessageResponse>(`/api/admin/buildings/${buildingId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export async function listCatalogueBuildings(accessToken: string) {
+  return request<BuildingResponse[]>('/api/catalog/buildings', {
+    accessToken,
+  });
+}
+
+export async function listCatalogueLocations(accessToken: string) {
+  return request<CatalogueLocationResponse[]>('/api/catalog/locations', {
+    accessToken,
+  });
+}
+
+export async function createCatalogueLocation(accessToken: string, payload: CreateLocationRequest) {
+  return request<CatalogueLocationResponse>('/api/catalog/locations', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function updateCatalogueLocation(accessToken: string, locationId: string, payload: UpdateLocationRequest) {
+  return request<CatalogueLocationResponse>(`/api/catalog/locations/${locationId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function deleteCatalogueLocation(accessToken: string, locationId: string) {
+  return request<MessageResponse>(`/api/catalog/locations/${locationId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export async function listCatalogueResourceTypes(accessToken: string) {
+  return request<CatalogueResourceTypeResponse[]>('/api/catalog/resource-types', {
+    accessToken,
+  });
+}
+
+export async function createCatalogueResourceType(accessToken: string, payload: CreateResourceTypeRequest) {
+  return request<CatalogueResourceTypeResponse>('/api/catalog/resource-types', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function updateCatalogueResourceType(
+  accessToken: string,
+  resourceTypeId: string,
+  payload: UpdateResourceTypeRequest,
+) {
+  return request<CatalogueResourceTypeResponse>(`/api/catalog/resource-types/${resourceTypeId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function deleteCatalogueResourceType(accessToken: string, resourceTypeId: string) {
+  return request<MessageResponse>(`/api/catalog/resource-types/${resourceTypeId}`, {
     method: 'DELETE',
     accessToken,
   });

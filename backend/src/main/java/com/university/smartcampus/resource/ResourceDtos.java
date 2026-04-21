@@ -89,8 +89,11 @@ public final class ResourceDtos {
 
     public record LocationDetails(
         UUID id,
+        UUID buildingId,
         String locationName,
+        String buildingCode,
         String buildingName,
+        String wing,
         String floor,
         String roomCode,
         String locationType
@@ -122,8 +125,11 @@ public final class ResourceDtos {
 
     public record LocationOption(
         UUID id,
+        UUID buildingId,
         String locationName,
+        String buildingCode,
         String buildingName,
+        String wing,
         String floor,
         String roomCode,
         String locationType

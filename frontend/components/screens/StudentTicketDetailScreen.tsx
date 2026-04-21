@@ -37,6 +37,24 @@ import {
 import { PRIORITY_LABELS, SEC_HD_LABEL } from '@/components/tickets/detail/ticketDetailHelpers';
 
 export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
+  return (
+    <RequesterTicketDetailScreen
+      ticketRef={ticketRef}
+      ticketsHref="/students/tickets"
+      formIdPrefix="student"
+    />
+  );
+}
+
+export function RequesterTicketDetailScreen({
+  ticketRef,
+  ticketsHref,
+  formIdPrefix,
+}: {
+  ticketRef: string;
+  ticketsHref: string;
+  formIdPrefix: string;
+}) {
   const { session, appUser } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
@@ -189,7 +207,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
   if (loadError || !ticket) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Button variant="ghost" size="sm" iconLeft={<ArrowLeft size={14} />} onClick={() => router.back()}>Back</Button>
+        <Button variant="ghost" size="sm" iconLeft={<ArrowLeft size={14} />} onClick={() => router.push(ticketsHref)}>Back</Button>
         <Alert variant="error" title="Could not load ticket">{loadError ?? 'Ticket not found.'}</Alert>
       </div>
     );
@@ -204,7 +222,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
     <>
       <style>{`@media(max-width:960px){.ticket-detail-grid{grid-template-columns:1fr!important}}`}</style>
 
-      <Button variant="ghost" size="sm" iconLeft={<ArrowLeft size={14} />} onClick={() => router.back()} style={{ marginBottom: 16 }}>
+      <Button variant="ghost" size="sm" iconLeft={<ArrowLeft size={14} />} onClick={() => router.push(ticketsHref)} style={{ marginBottom: 16 }}>
         Back to Tickets
       </Button>
 
@@ -241,7 +259,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             commentSubmitting={commentSubmitting}
             onCommentChange={setCommentText}
             onCommentSubmit={handleAddComment}
-            formIdPrefix="student"
+            formIdPrefix={formIdPrefix}
             currentUserId={appUser?.id}
             onDeleteComment={handleDeleteComment}
             commentDeleting={commentDeleting}
