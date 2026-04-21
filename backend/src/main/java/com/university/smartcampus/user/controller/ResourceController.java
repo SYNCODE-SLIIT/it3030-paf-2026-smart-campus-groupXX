@@ -21,7 +21,11 @@ import com.university.smartcampus.AppEnums.ResourceStatus;
 import com.university.smartcampus.auth.service.CurrentUserService;
 import com.university.smartcampus.common.dto.ApiDtos.MessageResponse;
 import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
+import com.university.smartcampus.resource.ResourceDtos.LocationOption;
+import com.university.smartcampus.resource.ResourceDtos.ManagedByRoleOption;
+import com.university.smartcampus.resource.ResourceDtos.ResourceFeatureOption;
 import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
+import com.university.smartcampus.resource.ResourceDtos.ResourceTypeOption;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
 import com.university.smartcampus.resource.ResourceService;
 
@@ -55,6 +59,30 @@ public class ResourceController {
     public ResourceResponse getResource(@PathVariable UUID id, Authentication authentication) {
         currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return resourceService.getResourceById(id);
+    }
+
+    @GetMapping("/lookups/types")
+    public List<ResourceTypeOption> listResourceTypeOptions(Authentication authentication) {
+        currentUserService.requireCurrentUser(authentication);
+        return resourceService.getResourceTypeOptions();
+    }
+
+    @GetMapping("/lookups/locations")
+    public List<LocationOption> listLocationOptions(Authentication authentication) {
+        currentUserService.requireCurrentUser(authentication);
+        return resourceService.getLocationOptions();
+    }
+
+    @GetMapping("/lookups/features")
+    public List<ResourceFeatureOption> listResourceFeatureOptions(Authentication authentication) {
+        currentUserService.requireCurrentUser(authentication);
+        return resourceService.getResourceFeatureOptions();
+    }
+
+    @GetMapping("/lookups/managed-roles")
+    public List<ManagedByRoleOption> listManagedByRoleOptions(Authentication authentication) {
+        currentUserService.requireCurrentUser(authentication);
+        return resourceService.getManagedByRoleOptions();
     }
 
     @PostMapping
