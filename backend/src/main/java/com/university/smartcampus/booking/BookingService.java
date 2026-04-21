@@ -43,6 +43,7 @@ public class BookingService {
         this.bookingValidator = bookingValidator;
     }
 
+    @Transactional
     public BookingDtos.BookingResponse createBooking(UserEntity requester, BookingDtos.CreateBookingRequest request) {
         Objects.requireNonNull(requester, "Requester is required.");
         Objects.requireNonNull(request, "Request is required.");

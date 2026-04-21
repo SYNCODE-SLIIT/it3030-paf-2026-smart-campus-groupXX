@@ -169,6 +169,8 @@ export function RequesterBookingsScreenEnhanced({
   const [showModificationModal, setShowModificationModal] = React.useState(false);
   const [modificationBooking, setModificationBooking] = React.useState<BookingResponse | null>(null);
   const [checkInBookingId, setCheckInBookingId] = React.useState<string | null>(null);
+  const [cancellationBooking, setCancellationBooking] = React.useState<BookingResponse | null>(null);
+  const [cancellationReason, setCancellationReason] = React.useState('');
 
   const reload = React.useCallback(async () => {
     if (!accessToken) {
@@ -275,18 +277,28 @@ export function RequesterBookingsScreenEnhanced({
     }
   }
 
-  async function handleCancelBooking(bookingId: string) {
+  function handleCancelBooking(booking: BookingResponse) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
-    if (!confirm('Cancel this booking?')) return;
+    setCancellationBooking(booking);
+    setCancellationReason('');
+  }
+
+  async function handleConfirmCancellation() {
+    if (!accessToken || !cancellationBooking) {
+      return;
+    }
 
     setSubmitting(true);
     try {
-      await cancelMyBooking(accessToken, bookingId);
+      const reason = cancellationReason.trim();
+      await cancelMyBooking(accessToken, cancellationBooking.id, reason ? { reason } : undefined);
       showToast('success', 'Booking cancelled', 'Your booking has been cancelled.');
+      setCancellationBooking(null);
+      setCancellationReason('');
       await reload();
     } catch (error) {
       showToast('error', 'Cancellation failed', getErrorMessage(error, 'Could not cancel booking.'));
@@ -599,7 +611,7 @@ export function RequesterBookingsScreenEnhanced({
                                 </Button>
                               )}
                               {canCancelByRequester(booking) && (
-                                <Button variant="ghost-danger" onClick={() => handleCancelBooking(booking.id)} disabled={submitting} style={{ fontSize: 11 }}>
+                                <Button variant="ghost-danger" onClick={() => handleCancelBooking(booking)} disabled={submitting} style={{ fontSize: 11 }}>
                                   Cancel
                                 </Button>
                               )}
@@ -696,6 +708,54 @@ export function RequesterBookingsScreenEnhanced({
             onCheckIn={() => handleCheckIn(selectedCheckInBooking.id)}
             isLoading={submitting}
           />
+        </Dialog>
+      )}
+
+      {/* Cancellation Dialog */}
+      {cancellationBooking && (
+        <Dialog
+          open={!!cancellationBooking}
+          onClose={() => {
+            if (submitting) return;
+            setCancellationBooking(null);
+            setCancellationReason('');
+          }}
+          title="Cancel Booking"
+          size="sm"
+        >
+          <div style={{ padding: '20px 24px', display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--text-body)' }}>
+              Are you sure you want to cancel booking for{' '}
+              <strong style={{ color: 'var(--text-h)' }}>{cancellationBooking.resource.code}</strong>?
+            </p>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                Cancellation reason (optional)
+              </label>
+              <Textarea
+                value={cancellationReason}
+                onChange={(event) => setCancellationReason(event.target.value)}
+                rows={3}
+                placeholder="Add context for managers, if needed"
+                disabled={submitting}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setCancellationBooking(null);
+                  setCancellationReason('');
+                }}
+                disabled={submitting}
+              >
+                Keep booking
+              </Button>
+              <Button variant="danger" onClick={handleConfirmCancellation} loading={submitting}>
+                Confirm cancel
+              </Button>
+            </div>
+          </div>
         </Dialog>
       )}
     </div>
