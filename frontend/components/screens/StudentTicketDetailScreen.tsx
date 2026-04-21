@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
-import { Alert, Button, Input, Select, Skeleton } from '@/components/ui';
+import { Alert, Button, Dialog, Input, Select, Skeleton } from '@/components/ui';
 import {
   addTicketComment,
+  deleteTicket,
   deleteTicketAttachment,
   deleteTicketComment,
   getErrorMessage,
@@ -17,6 +18,7 @@ import {
   listTicketAttachments,
   listTicketComments,
   updateTicket,
+  updateTicketComment,
   uploadTicketAttachment,
 } from '@/lib/api-client';
 import type {
@@ -80,6 +82,9 @@ export function RequesterTicketDetailScreen({
 
   const [attachmentUploading, setAttachmentUploading] = React.useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = React.useState<string | null>(null);
+
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!accessToken) {
@@ -156,6 +161,17 @@ export function RequesterTicketDetailScreen({
     }
   }
 
+  async function handleEditComment(commentId: string, newText: string) {
+    if (!accessToken) return;
+    try {
+      const updated = await updateTicketComment(accessToken, ticketRef, commentId, { commentText: newText });
+      setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)));
+    } catch (error) {
+      showToast('error', 'Edit failed', getErrorMessage(error, 'Could not update the comment.'));
+      throw error;
+    }
+  }
+
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !accessToken) return;
@@ -183,6 +199,19 @@ export function RequesterTicketDetailScreen({
       showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the attachment.'));
     } finally {
       setDeletingAttachmentId(null);
+    }
+  }
+
+  async function handleDeleteTicket() {
+    if (!accessToken) return;
+    setDeleting(true);
+    try {
+      await deleteTicket(accessToken, ticketRef);
+      router.push('/students/tickets');
+    } catch (error) {
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the ticket.'));
+      setDeleting(false);
+      setDeleteModalOpen(false);
     }
   }
 
@@ -214,6 +243,7 @@ export function RequesterTicketDetailScreen({
   }
 
   const isCreator = appUser?.id === ticket.reportedById;
+  const canDelete = isCreator && ticket.status === 'OPEN' && ticket.assignedToId === null;
   const canModify = isCreator && ticket.status === 'OPEN';
   const canComment = ticket.status !== 'CLOSED' && ticket.status !== 'REJECTED';
   const commentLockReason = `Comments are disabled for ${ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.`;
@@ -263,6 +293,7 @@ export function RequesterTicketDetailScreen({
             currentUserId={appUser?.id}
             onDeleteComment={handleDeleteComment}
             commentDeleting={commentDeleting}
+            onEditComment={handleEditComment}
           />
           <TicketAttachmentsCard
             attachments={attachments}
@@ -280,6 +311,23 @@ export function RequesterTicketDetailScreen({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <TicketDetailsCard ticket={ticket} />
           <TicketHistoryCard history={history} />
+
+          {canDelete && (
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px' }}>
+              <p style={{ margin: '0 0 10px', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                Danger Zone
+              </p>
+              <Button
+                variant="danger"
+                size="sm"
+                iconLeft={<Trash2 size={13} />}
+                style={{ width: '100%' }}
+                onClick={() => setDeleteModalOpen(true)}
+              >
+                Delete Ticket
+              </Button>
+            </div>
+          )}
 
           {canModify && (
             <div
@@ -321,6 +369,22 @@ export function RequesterTicketDetailScreen({
           )}
         </div>
       </div>
+
+      <Dialog open={deleteModalOpen} onClose={() => { if (!deleting) setDeleteModalOpen(false); }} title="Delete Ticket" size="sm">
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-body)' }}>
+            This will permanently delete ticket <strong>{ticketRef}</strong> and all its attachments. This action cannot be undone.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button variant="ghost" size="sm" onClick={() => setDeleteModalOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" loading={deleting} onClick={() => { void handleDeleteTicket(); }}>
+              Delete Ticket
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </>
   );
 }

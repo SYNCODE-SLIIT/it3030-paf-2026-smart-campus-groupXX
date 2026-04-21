@@ -29,12 +29,15 @@ import com.university.smartcampus.ticket.dto.TicketDtos.TicketResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketStatusHistoryResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketStatusUpdateRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketSummaryResponse;
+import com.university.smartcampus.ticket.dto.TicketDtos.UpdateCommentRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.UpdateTicketRequest;
 import com.university.smartcampus.ticket.entity.TicketAttachmentEntity;
+import com.university.smartcampus.ticket.entity.TicketAssignmentHistoryEntity;
 import com.university.smartcampus.ticket.entity.TicketCommentEntity;
 import com.university.smartcampus.ticket.entity.TicketEntity;
 import com.university.smartcampus.ticket.entity.TicketStatusHistoryEntity;
 import com.university.smartcampus.ticket.repository.TicketAttachmentRepository;
+import com.university.smartcampus.ticket.repository.TicketAssignmentHistoryRepository;
 import com.university.smartcampus.ticket.repository.TicketCommentRepository;
 import com.university.smartcampus.ticket.repository.TicketRepository;
 import com.university.smartcampus.ticket.repository.TicketStatusHistoryRepository;
@@ -48,6 +51,7 @@ public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final TicketAttachmentRepository ticketAttachmentRepository;
+    private final TicketAssignmentHistoryRepository ticketAssignmentHistoryRepository;
     private final TicketCommentRepository ticketCommentRepository;
     private final TicketStatusHistoryRepository ticketStatusHistoryRepository;
     private final TicketAttachmentStorageClient ticketAttachmentStorageClient;
@@ -56,12 +60,14 @@ public class TicketService {
     public TicketService(
             TicketRepository ticketRepository,
             TicketAttachmentRepository ticketAttachmentRepository,
+            TicketAssignmentHistoryRepository ticketAssignmentHistoryRepository,
             TicketCommentRepository ticketCommentRepository,
             TicketStatusHistoryRepository ticketStatusHistoryRepository,
             TicketAttachmentStorageClient ticketAttachmentStorageClient,
             UserRepository userRepository) {
         this.ticketRepository = ticketRepository;
         this.ticketAttachmentRepository = ticketAttachmentRepository;
+        this.ticketAssignmentHistoryRepository = ticketAssignmentHistoryRepository;
         this.ticketCommentRepository = ticketCommentRepository;
         this.ticketStatusHistoryRepository = ticketStatusHistoryRepository;
         this.ticketAttachmentStorageClient = ticketAttachmentStorageClient;
@@ -156,15 +162,15 @@ public class TicketService {
         TicketEntity ticket = getTicketEntity(ticketRef);
 
         if (isAdmin(user)) {
-            if (!isTerminalStatus(ticket.getStatus())) {
-                throw new BadRequestException("Admins can only delete resolved, closed, or rejected tickets.");
+            if (ticket.getStatus() != TicketStatus.CLOSED) {
+                throw new BadRequestException("Admins can only delete closed tickets.");
             }
         } else {
             if (!ticket.getReportedBy().getId().equals(user.getId())) {
                 throw new ForbiddenException("Only the ticket reporter or admin can delete tickets.");
             }
-            if (ticket.getStatus() != TicketStatus.OPEN) {
-                throw new BadRequestException("Tickets can only be deleted by the reporter while open.");
+            if (ticket.getAssignedTo() != null) {
+                throw new BadRequestException("Tickets can only be deleted by the reporter before assignment.");
             }
         }
 
@@ -186,12 +192,11 @@ public class TicketService {
         TicketEntity ticket = getTicketEntity(ticketRef);
         requireTicketStatusManagementAccess(manager, ticket);
 
-        if (ticket.getStatus() == TicketStatus.CLOSED) {
+        TicketStatus oldStatus = ticket.getStatus();
+        if (oldStatus == TicketStatus.CLOSED) {
             throw new BadRequestException("Closed tickets cannot be updated.");
         }
-        if (request.newStatus() == TicketStatus.OPEN) {
-            throw new BadRequestException("Cannot transition a ticket back to OPEN.");
-        }
+        validateStatusTransition(oldStatus, request.newStatus());
         if (request.newStatus() == TicketStatus.REJECTED && !StringUtils.hasText(request.rejectionReason())) {
             throw new BadRequestException("Rejection reason is required when rejecting a ticket.");
         }
@@ -199,7 +204,6 @@ public class TicketService {
             throw new BadRequestException("Resolution notes are required when resolving a ticket.");
         }
 
-        TicketStatus oldStatus = ticket.getStatus();
         ticket.setStatus(request.newStatus());
 
         if (StringUtils.hasText(request.resolutionNotes())) {
@@ -231,7 +235,10 @@ public class TicketService {
         if (ticket.getStatus() != TicketStatus.OPEN) {
             throw new BadRequestException("Tickets cannot be reassigned after they are accepted.");
         }
-        ticket.setAssignedTo(resolveAssignableAssignee(assignedToUserId));
+        UserEntity oldAssignee = ticket.getAssignedTo();
+        UserEntity newAssignee = resolveAssignableAssignee(assignedToUserId);
+        ticket.setAssignedTo(newAssignee);
+        recordAssignmentHistory(ticket, oldAssignee, newAssignee, actor, null);
         return toTicketResponse(ticket);
     }
 
@@ -269,6 +276,39 @@ public class TicketService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public TicketCommentResponse getComment(UserEntity user, String ticketRef, UUID commentId) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketCommentEntity comment = ticketCommentRepository.findByIdAndTicketId(commentId, ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket comment not found."));
+        return toCommentResponse(comment);
+    }
+
+    @Transactional
+    public TicketCommentResponse updateComment(UserEntity user, String ticketRef, UUID commentId,
+            UpdateCommentRequest request) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketCommentEntity comment = ticketCommentRepository.findByIdAndTicketId(commentId, ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket comment not found."));
+
+        if (!comment.getUser().getId().equals(user.getId())) {
+            throw new ForbiddenException("You can only edit your own comments.");
+        }
+
+        TicketCommentEntity latestComment = ticketCommentRepository
+                .findFirstByTicketIdOrderByCreatedAtDescIdDesc(ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket comment not found."));
+        if (!latestComment.getId().equals(comment.getId())) {
+            throw new BadRequestException("Only the latest ticket comment can be edited.");
+        }
+
+        comment.setCommentText(request.commentText());
+        comment.setEdited(true);
+        ticketCommentRepository.saveAndFlush(comment);
+
+        return toCommentResponse(comment);
+    }
+
     @Transactional
     public void deleteComment(UserEntity user, String ticketRef, UUID commentId) {
         TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
@@ -299,12 +339,28 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
+    public TicketStatusHistoryResponse getStatusHistoryEntry(UserEntity user, String ticketRef, UUID historyId) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketStatusHistoryEntity history = ticketStatusHistoryRepository.findByIdAndTicketId(historyId, ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket status history entry not found."));
+        return toHistoryResponse(history);
+    }
+
+    @Transactional(readOnly = true)
     public List<TicketAttachmentResponse> listAttachments(UserEntity user, String ticketRef) {
         TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
         return ticketAttachmentRepository.findByTicketIdOrderByUploadedAtAsc(ticket.getId())
                 .stream()
                 .map(this::toAttachmentResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TicketAttachmentResponse getAttachment(UserEntity user, String ticketRef, UUID attachmentId) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketAttachmentEntity attachment = ticketAttachmentRepository.findByIdAndTicketId(attachmentId, ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket attachment not found."));
+        return toAttachmentResponse(attachment);
     }
 
     @Transactional
@@ -369,6 +425,19 @@ public class TicketService {
         history.setNote(note);
         history.setChangedAt(Instant.now());
         ticketStatusHistoryRepository.save(history);
+    }
+
+    private void recordAssignmentHistory(TicketEntity ticket, UserEntity oldAssignee, UserEntity newAssignee,
+            UserEntity changedBy, String note) {
+        TicketAssignmentHistoryEntity history = new TicketAssignmentHistoryEntity();
+        history.setId(UUID.randomUUID());
+        history.setTicket(ticket);
+        history.setOldAssignee(oldAssignee);
+        history.setNewAssignee(newAssignee);
+        history.setChangedBy(changedBy);
+        history.setNote(note);
+        history.setChangedAt(Instant.now());
+        ticketAssignmentHistoryRepository.save(history);
     }
 
     private void requireAttachmentManagementAccess(UserEntity user, TicketEntity ticket) {
@@ -449,10 +518,23 @@ public class TicketService {
                 && ticket.getAssignedTo().getId().equals(user.getId());
     }
 
-    private boolean isTerminalStatus(TicketStatus status) {
-        return status == TicketStatus.RESOLVED
-                || status == TicketStatus.CLOSED
-                || status == TicketStatus.REJECTED;
+    private void validateStatusTransition(TicketStatus currentStatus, TicketStatus nextStatus) {
+        if (nextStatus == TicketStatus.OPEN) {
+            throw new BadRequestException("Cannot transition a ticket back to OPEN.");
+        }
+        if (currentStatus == nextStatus) {
+            throw new BadRequestException("No status transition requested.");
+        }
+
+        boolean allowed = switch (currentStatus) {
+            case OPEN -> nextStatus == TicketStatus.IN_PROGRESS;
+            case IN_PROGRESS -> nextStatus == TicketStatus.RESOLVED || nextStatus == TicketStatus.REJECTED;
+            case RESOLVED, REJECTED -> nextStatus == TicketStatus.CLOSED;
+            case CLOSED -> false;
+        };
+        if (!allowed) {
+            throw new BadRequestException("Invalid ticket status transition.");
+        }
     }
 
     private boolean isAdmin(UserEntity user) {

@@ -18,6 +18,7 @@ import {
   listTicketAttachments,
   listTicketComments,
   listUsers,
+  updateTicketComment,
   updateTicketStatus,
 } from '@/lib/api-client';
 import type {
@@ -37,6 +38,7 @@ import {
   TicketDetailsCard,
   TicketHeaderCard,
   TicketHistoryCard,
+  TicketLifecycleCard,
 } from '@/components/tickets/detail';
 
 export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
@@ -164,6 +166,17 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
     }
   }
 
+  async function handleEditComment(commentId: string, newText: string) {
+    if (!accessToken) return;
+    try {
+      const updated = await updateTicketComment(accessToken, ticketRef, commentId, { commentText: newText });
+      setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)));
+    } catch (error) {
+      showToast('error', 'Edit failed', getErrorMessage(error, 'Could not update the comment.'));
+      throw error;
+    }
+  }
+
   async function handleDeleteTicket() {
     if (!accessToken) return;
     setDeleting(true);
@@ -204,13 +217,14 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
     );
   }
 
-  const isClosed = ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
-  const isDone = ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
+  const isStatusLocked = ticket.status === 'CLOSED';
+  const isCommentLocked = ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
+  const canDelete = ticket.status === 'CLOSED';
   const isAssignedToMe = Boolean(appUser && ticket.assignedToId === appUser.id);
-  const canManageStatus = isAssignedToMe && !isClosed;
+  const canManageStatus = isAssignedToMe && !isStatusLocked;
   const canComment = ticket.status === 'IN_PROGRESS';
 
-  const commentLockReason = isClosed
+  const commentLockReason = isCommentLocked
     ? `Comments are disabled for ${ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.`
     : 'Comments are available while the ticket is in progress.';
 
@@ -270,9 +284,11 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
             onCommentChange={setCommentText}
             onCommentSubmit={handleAddComment}
             formIdPrefix="admin"
+            currentUserId={appUser?.id}
             canDeleteAny
             onDeleteComment={handleDeleteComment}
             commentDeleting={commentDeleting}
+            onEditComment={handleEditComment}
           />
           <TicketAttachmentsCard attachments={attachments} />
         </div>
@@ -289,7 +305,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
               onRejectOpen={() => setRejectModalOpen(true)}
             />
           )}
-          {isDone && (
+          {canDelete && (
             <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px' }}>
               <p style={{ margin: '0 0 10px', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
                 Danger Zone
@@ -306,6 +322,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
             </div>
           )}
           <TicketDetailsCard ticket={ticket} />
+          <TicketLifecycleCard ticket={ticket} history={history} />
           <TicketHistoryCard history={history} />
         </div>
       </div>

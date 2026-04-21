@@ -378,7 +378,7 @@ export function AdminTicketsScreen() {
               color={DONE_STATUS_COLOR[status] ?? 'var(--border)'}
               tickets={t}
               onView={handleView}
-              onDelete={handleDeleteRequest}
+              onDelete={status === 'CLOSED' ? handleDeleteRequest : undefined}
             />
           ))}
         </div>

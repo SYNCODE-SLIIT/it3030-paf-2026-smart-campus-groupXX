@@ -15,6 +15,7 @@ import {
   getTicketHistory,
   listTicketAttachments,
   listTicketComments,
+  updateTicketComment,
   updateTicketStatus,
 } from '@/lib/api-client';
 import type {
@@ -32,6 +33,7 @@ import {
   TicketDetailsCard,
   TicketHeaderCard,
   TicketHistoryCard,
+  TicketLifecycleCard,
 } from '@/components/tickets/detail';
 
 export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
@@ -137,6 +139,17 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
     }
   }
 
+  async function handleEditComment(commentId: string, newText: string) {
+    if (!accessToken) return;
+    try {
+      const updated = await updateTicketComment(accessToken, ticketRef, commentId, { commentText: newText });
+      setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)));
+    } catch (error) {
+      showToast('error', 'Edit failed', getErrorMessage(error, 'Could not update the comment.'));
+      throw error;
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -164,10 +177,12 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
     );
   }
 
-  const isFinal = ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
-  const canComment = ticket.status !== 'OPEN' && !isFinal;
+  const isStatusLocked = ticket.status === 'CLOSED';
+  const canComment = ticket.status !== 'OPEN'
+    && ticket.status !== 'CLOSED'
+    && ticket.status !== 'REJECTED';
 
-  const commentLockReason = isFinal
+  const commentLockReason = (ticket.status === 'CLOSED' || ticket.status === 'REJECTED')
     ? `Comments are disabled for ${ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.`
     : 'Accept the ticket first to enable comments.';
 
@@ -214,13 +229,14 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             currentUserId={appUser?.id}
             onDeleteComment={handleDeleteComment}
             commentDeleting={commentDeleting}
+            onEditComment={handleEditComment}
           />
           <TicketAttachmentsCard attachments={attachments} />
         </div>
 
         {/* Sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {!isFinal && (
+          {!isStatusLocked && (
             <TicketActionsCard
               ticket={ticket}
               statusSubmitting={statusSubmitting}
@@ -231,6 +247,7 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             />
           )}
           <TicketDetailsCard ticket={ticket} />
+          <TicketLifecycleCard ticket={ticket} history={history} />
           <TicketHistoryCard history={history} />
         </div>
       </div>

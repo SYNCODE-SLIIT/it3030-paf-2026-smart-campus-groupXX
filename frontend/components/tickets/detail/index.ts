@@ -7,3 +7,4 @@ export { TicketDescriptionCard } from './TicketDescriptionCard';
 export { TicketDetailsCard } from './TicketDetailsCard';
 export { TicketHeaderCard } from './TicketHeaderCard';
 export { TicketHistoryCard } from './TicketHistoryCard';
+export { TicketLifecycleCard } from './TicketLifecycleCard';

@@ -1,6 +1,7 @@
 import {
   type AccountStatus,
   type AddCommentRequest,
+  type UpdateCommentRequest,
   type AssignTicketRequest,
   type BuildingResponse,
   type BookingDecisionRequest,
@@ -35,6 +36,8 @@ import {
   type StudentOnboardingRequest,
   type StudentOnboardingStateResponse,
   type TicketAttachmentResponse,
+  type TicketAnalyticsQuery,
+  type TicketAnalyticsResponse,
   type TicketCategory,
   type TicketCommentResponse,
   type TicketPriority,
@@ -772,7 +775,24 @@ export async function listMyTickets(
   if (params?.category) qs.set('category', params.category);
   if (params?.priority) qs.set('priority', params.priority);
   const query = qs.toString();
-  return request<TicketSummaryResponse[]>(`/api/tickets${query ? `?${query}` : ''}`, { accessToken });
+  const data = await request<unknown>(`/api/tickets${query ? `?${query}` : ''}`, { accessToken });
+  return extractHalCollection<TicketSummaryResponse>(data);
+}
+
+export async function getTicketAnalytics(
+  accessToken: string,
+  params?: TicketAnalyticsQuery,
+): Promise<TicketAnalyticsResponse> {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set('from', params.from);
+  if (params?.to) qs.set('to', params.to);
+  if (params?.bucket) qs.set('bucket', params.bucket);
+  if (params?.assigneeId) qs.set('assigneeId', params.assigneeId);
+  if (params?.unassignedOnly !== undefined) qs.set('unassignedOnly', String(params.unassignedOnly));
+  if (params?.category) qs.set('category', params.category);
+  if (params?.priority) qs.set('priority', params.priority);
+  const query = qs.toString();
+  return request<TicketAnalyticsResponse>(`/api/tickets/analytics${query ? `?${query}` : ''}`, { accessToken });
 }
 
 export async function createTicket(accessToken: string, payload: CreateTicketRequest): Promise<TicketResponse> {
@@ -781,6 +801,16 @@ export async function createTicket(accessToken: string, payload: CreateTicketReq
 
 function ticketApiPath(ticketRef: string) {
   return `/api/tickets/${encodeURIComponent(ticketRef)}`;
+}
+
+function extractHalCollection<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  const embedded = (data as Record<string, unknown>)?._embedded;
+  if (!embedded || typeof embedded !== 'object') return [];
+  const values = Object.values(embedded as Record<string, unknown>);
+  if (values.length === 0) return [];
+  const first = values[0];
+  return Array.isArray(first) ? (first as T[]) : [];
 }
 
 export async function getTicket(accessToken: string, ticketRef: string): Promise<TicketResponse> {
@@ -803,7 +833,8 @@ export async function listTicketComments(
   accessToken: string,
   ticketRef: string,
 ): Promise<TicketCommentResponse[]> {
-  return request<TicketCommentResponse[]>(`${ticketApiPath(ticketRef)}/comments`, { accessToken });
+  const data = await request<unknown>(`${ticketApiPath(ticketRef)}/comments`, { accessToken });
+  return extractHalCollection<TicketCommentResponse>(data);
 }
 
 export async function addTicketComment(
@@ -822,11 +853,21 @@ export async function deleteTicketComment(
   return request<void>(`${ticketApiPath(ticketRef)}/comments/${commentId}`, { method: 'DELETE', accessToken });
 }
 
+export async function updateTicketComment(
+  accessToken: string,
+  ticketRef: string,
+  commentId: string,
+  payload: UpdateCommentRequest,
+): Promise<TicketCommentResponse> {
+  return request<TicketCommentResponse>(`${ticketApiPath(ticketRef)}/comments/${commentId}`, { method: 'PATCH', accessToken, body: payload });
+}
+
 export async function listTicketAttachments(
   accessToken: string,
   ticketRef: string,
 ): Promise<TicketAttachmentResponse[]> {
-  return request<TicketAttachmentResponse[]>(`${ticketApiPath(ticketRef)}/attachments`, { accessToken });
+  const data = await request<unknown>(`${ticketApiPath(ticketRef)}/attachments`, { accessToken });
+  return extractHalCollection<TicketAttachmentResponse>(data);
 }
 
 export async function uploadTicketAttachment(
@@ -878,7 +919,8 @@ export async function getTicketHistory(
   accessToken: string,
   ticketRef: string,
 ): Promise<TicketStatusHistoryResponse[]> {
-  return request<TicketStatusHistoryResponse[]>(`${ticketApiPath(ticketRef)}/history`, { accessToken });
+  const data = await request<unknown>(`${ticketApiPath(ticketRef)}/history`, { accessToken });
+  return extractHalCollection<TicketStatusHistoryResponse>(data);
 }
 
 export async function updateTicketStatus(

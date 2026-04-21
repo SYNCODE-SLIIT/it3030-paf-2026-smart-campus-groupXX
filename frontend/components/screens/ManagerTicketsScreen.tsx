@@ -92,6 +92,7 @@ function TicketSection({ label, color, tickets, onView }: SectionProps) {
             <TicketCard
               ticket={ticket}
               showReporter
+              showSlaBadge
               onView={() => onView(ticket.ticketCode)}
             />
           </div>

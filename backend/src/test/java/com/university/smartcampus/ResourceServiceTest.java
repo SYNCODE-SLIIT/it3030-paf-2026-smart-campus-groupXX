@@ -194,28 +194,37 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
     }
 
     private ResourceType seedResourceType(String code, String name, ResourceCategory category) {
-        ResourceType resourceType = new ResourceType();
-        resourceType.setCode(code);
-        resourceType.setName(name);
-        resourceType.setCategory(category);
-        resourceType.setDescription(name + " type");
-        resourceType.setBookableDefault(true);
-        resourceType.setMovableDefault(false);
-        return resourceTypeRepository.save(resourceType);
+        return resourceTypeRepository.findByCodeIgnoreCase(code)
+            .orElseGet(() -> {
+                ResourceType resourceType = new ResourceType();
+                resourceType.setCode(code);
+                resourceType.setName(name);
+                resourceType.setCategory(category);
+                resourceType.setDescription(name + " type");
+                resourceType.setBookableDefault(true);
+                resourceType.setMovableDefault(false);
+                return resourceTypeRepository.save(resourceType);
+            });
     }
 
     private Location seedLocation(String locationName) {
-        Location location = new Location();
-        location.setLocationName(locationName);
-        location.setLocationType("OTHER");
-        return locationRepository.save(location);
+        return locationRepository.findByLocationNameIgnoreCase(locationName)
+            .orElseGet(() -> {
+                Location location = new Location();
+                location.setLocationName(locationName);
+                location.setLocationType("OTHER");
+                return locationRepository.save(location);
+            });
     }
 
     private ResourceFeature seedFeature(String code, String name) {
-        ResourceFeature feature = new ResourceFeature();
-        feature.setCode(code);
-        feature.setName(name);
-        feature.setDescription(name + " feature");
-        return resourceFeatureRepository.save(feature);
+        return resourceFeatureRepository.findByCodeIgnoreCase(code)
+            .orElseGet(() -> {
+                ResourceFeature feature = new ResourceFeature();
+                feature.setCode(code);
+                feature.setName(name);
+                feature.setDescription(name + " feature");
+                return resourceFeatureRepository.save(feature);
+            });
     }
 }

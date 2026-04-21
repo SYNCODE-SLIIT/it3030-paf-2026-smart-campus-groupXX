@@ -607,6 +607,147 @@ export interface StudentOnboardingRequest {
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
 export type TicketCategory = 'ELECTRICAL' | 'NETWORK' | 'EQUIPMENT' | 'FURNITURE' | 'CLEANLINESS' | 'FACILITY_DAMAGE' | 'ACCESS_SECURITY' | 'OTHER';
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type TicketAnalyticsBucket = 'DAY' | 'WEEK' | 'MONTH';
+
+export interface TicketAnalyticsQuery {
+  from?: string;
+  to?: string;
+  bucket?: TicketAnalyticsBucket;
+  assigneeId?: string;
+  unassignedOnly?: boolean;
+  category?: TicketCategory;
+  priority?: TicketPriority;
+}
+
+export interface TicketAnalyticsSummary {
+  totalTickets: number;
+  activeBacklog: number;
+  open: number;
+  inProgress: number;
+  resolved: number;
+  closed: number;
+  rejected: number;
+  unassignedOpen: number;
+  urgentActive: number;
+  positiveResolutionRate: number | null;
+  rejectionRate: number | null;
+}
+
+export interface TicketAnalyticsTiming {
+  averageActiveAgeMinutes: number | null;
+  averageTimeToAssignMinutes: number | null;
+  averageTimeToAcceptMinutes: number | null;
+  averageTimeToResolveMinutes: number | null;
+  averageTimeInProgressMinutes: number | null;
+  averageClosureLagMinutes: number | null;
+}
+
+export interface TicketAnalyticsCommunication {
+  totalComments: number;
+  averageCommentsPerTicket: number;
+  ticketsWithAttachments: number;
+  totalAttachments: number;
+  averageAttachmentsPerTicket: number;
+}
+
+export interface TicketAnalyticsAssignment {
+  totalAssignmentEvents: number;
+  reassignmentEvents: number;
+  ticketsAssignedInWindow: number;
+}
+
+export interface TicketAnalyticsBreakdownRow {
+  key: string;
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface TicketAnalyticsTrendPoint {
+  bucketStart: string;
+  bucketEnd: string;
+  created: number;
+  resolved: number;
+  rejected: number;
+  activeBacklog: number;
+}
+
+export interface TicketAnalyticsAttentionTicket {
+  id: string;
+  ticketCode: string;
+  title: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  assignedToId: string | null;
+  assignedToName: string | null;
+  reportedByEmail: string;
+  createdAt: string;
+  lastStatusChangedAt: string;
+  ageMinutes: number;
+  reason: string;
+}
+
+export interface TicketAnalyticsStatusEvent {
+  id: string;
+  ticketId: string;
+  ticketCode: string | null;
+  title: string | null;
+  oldStatus: TicketStatus | null;
+  newStatus: TicketStatus;
+  changedById: string;
+  changedByEmail: string;
+  note: string | null;
+  changedAt: string;
+}
+
+export interface TicketAnalyticsManagerPerformance {
+  assigneeId: string;
+  assigneeName: string | null;
+  assigneeEmail: string;
+  assignedTotal: number;
+  active: number;
+  urgentActive: number;
+  resolvedClosed: number;
+  rejected: number;
+  averageTimeToAcceptMinutes: number | null;
+  averageTimeToResolveMinutes: number | null;
+  assignmentEvents: number;
+  reassignmentEvents: number;
+}
+
+export interface TicketAnalyticsSlaRow {
+  priority: TicketPriority;
+  total: number;
+  compliant: number;
+  complianceRate: number | null;
+  targetMinutes: number;
+}
+
+export interface TicketAnalyticsSla {
+  ttfrCompliance: TicketAnalyticsSlaRow[];
+  ttrCompliance: TicketAnalyticsSlaRow[];
+  overallTtfrComplianceRate: number | null;
+  overallTtrComplianceRate: number | null;
+}
+
+export interface TicketAnalyticsResponse {
+  from: string;
+  to: string;
+  bucket: TicketAnalyticsBucket;
+  summary: TicketAnalyticsSummary;
+  timing: TicketAnalyticsTiming;
+  communication: TicketAnalyticsCommunication;
+  assignment: TicketAnalyticsAssignment;
+  statusBreakdown: TicketAnalyticsBreakdownRow[];
+  priorityBreakdown: TicketAnalyticsBreakdownRow[];
+  categoryBreakdown: TicketAnalyticsBreakdownRow[];
+  trends: TicketAnalyticsTrendPoint[];
+  attentionTickets: TicketAnalyticsAttentionTicket[];
+  recentStatusEvents: TicketAnalyticsStatusEvent[];
+  managerPerformance: TicketAnalyticsManagerPerformance[];
+  sla: TicketAnalyticsSla;
+}
 
 export interface TicketSummaryResponse {
   id: string;
@@ -670,6 +811,10 @@ export interface TicketCommentResponse {
 }
 
 export interface AddCommentRequest {
+  commentText: string;
+}
+
+export interface UpdateCommentRequest {
   commentText: string;
 }
 
