@@ -8,6 +8,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Button, Card, Chip } from '@/components/ui';
 import { AdminResourcesScreen } from '@/components/screens/AdminResourcesScreen';
 import { CatalogueLocationsScreen } from '@/components/screens/catalogue/CatalogueLocationsScreen';
+import { CatalogueResourceTypesScreen } from '@/components/screens/catalogue/CatalogueResourceTypesScreen';
 import { getErrorMessage, listResources } from '@/lib/api-client';
 import type { ResourceResponse } from '@/lib/api-types';
 
@@ -68,7 +69,7 @@ export function CatalogueManagementDashboardScreen({
   const [resources, setResources] = React.useState<ResourceResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [activeSection, setActiveSection] = React.useState<'resources' | 'locations'>('resources');
+  const [activeSection, setActiveSection] = React.useState<'resources' | 'locations' | 'resource-types'>('resources');
 
   const loadResources = React.useCallback(async () => {
     if (!accessToken) {
@@ -187,7 +188,7 @@ export function CatalogueManagementDashboardScreen({
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>Catalogue Operations</div>
                 <div style={{ marginTop: 4, color: 'var(--text-muted)', fontSize: 13 }}>
-                  Manage normalized resources and their building-based locations from the same workspace.
+                  Manage normalized resources, building-based locations, and reusable resource types from the same workspace.
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -197,9 +198,14 @@ export function CatalogueManagementDashboardScreen({
                 <Button variant={activeSection === 'locations' ? 'glass' : 'subtle'} size="sm" onClick={() => setActiveSection('locations')}>
                   Locations
                 </Button>
+                <Button variant={activeSection === 'resource-types' ? 'glass' : 'subtle'} size="sm" onClick={() => setActiveSection('resource-types')}>
+                  Resource Types
+                </Button>
               </div>
             </div>
-            {activeSection === 'resources' ? <AdminResourcesScreen embedded /> : <CatalogueLocationsScreen embedded />}
+            {activeSection === 'resources' && <AdminResourcesScreen embedded />}
+            {activeSection === 'locations' && <CatalogueLocationsScreen embedded />}
+            {activeSection === 'resource-types' && <CatalogueResourceTypesScreen embedded />}
           </div>
         </div>
       </Card>

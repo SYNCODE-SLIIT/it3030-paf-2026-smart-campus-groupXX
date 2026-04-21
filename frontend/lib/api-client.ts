@@ -8,10 +8,12 @@ import {
   type BookingNotificationResponse,
   type BookingResponse,
   type CancelBookingRequest,
+  type CatalogueResourceTypeResponse,
   type CatalogueLocationResponse,
   type CheckInResponse,
   type CreateBuildingRequest,
   type CreateBookingRequest,
+  type CreateResourceTypeRequest,
   type CreateLocationRequest,
   type CreateRecurringBookingRequest,
   type CreateResourceRequest,
@@ -44,6 +46,7 @@ import {
   type UpdateBuildingRequest,
   type UpdateLocationRequest,
   type UpdateResourceRequest,
+  type UpdateResourceTypeRequest,
   type UpdateTicketRequest,
   type UpdateUserRequest,
   type UserResponse,
@@ -490,6 +493,39 @@ export async function updateCatalogueLocation(accessToken: string, locationId: s
 
 export async function deleteCatalogueLocation(accessToken: string, locationId: string) {
   return request<MessageResponse>(`/api/catalog/locations/${locationId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export async function listCatalogueResourceTypes(accessToken: string) {
+  return request<CatalogueResourceTypeResponse[]>('/api/catalog/resource-types', {
+    accessToken,
+  });
+}
+
+export async function createCatalogueResourceType(accessToken: string, payload: CreateResourceTypeRequest) {
+  return request<CatalogueResourceTypeResponse>('/api/catalog/resource-types', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function updateCatalogueResourceType(
+  accessToken: string,
+  resourceTypeId: string,
+  payload: UpdateResourceTypeRequest,
+) {
+  return request<CatalogueResourceTypeResponse>(`/api/catalog/resource-types/${resourceTypeId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function deleteCatalogueResourceType(accessToken: string, resourceTypeId: string) {
+  return request<MessageResponse>(`/api/catalog/resource-types/${resourceTypeId}`, {
     method: 'DELETE',
     accessToken,
   });

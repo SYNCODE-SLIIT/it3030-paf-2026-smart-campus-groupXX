@@ -223,6 +223,34 @@ export interface ResourceTypeOption {
   isMovableDefault: boolean;
 }
 
+export interface CatalogueResourceTypeResponse {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  description: string | null;
+  isBookableDefault: boolean;
+  isMovableDefault: boolean;
+}
+
+export interface CreateResourceTypeRequest {
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  description?: string | null;
+  isBookableDefault: boolean;
+  isMovableDefault: boolean;
+}
+
+export interface UpdateResourceTypeRequest {
+  code?: string;
+  name?: string;
+  category?: ResourceCategory;
+  description?: string | null;
+  isBookableDefault?: boolean;
+  isMovableDefault?: boolean;
+}
+
 export interface LocationOption {
   id: string;
   buildingId: string | null;

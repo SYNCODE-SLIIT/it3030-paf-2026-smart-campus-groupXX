@@ -12,5 +12,11 @@ public interface ResourceTypeRepository extends JpaRepository<ResourceType, UUID
 
     boolean existsByCodeIgnoreCase(String code);
 
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, UUID id);
+
+    boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, UUID id);
+
     List<ResourceType> findAllByOrderByNameAsc();
 }
