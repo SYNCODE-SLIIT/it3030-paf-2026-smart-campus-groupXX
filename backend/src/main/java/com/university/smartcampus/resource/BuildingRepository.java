@@ -9,6 +9,8 @@ public interface BuildingRepository extends JpaRepository<Building, UUID> {
 
     List<Building> findAllByOrderByBuildingNameAsc();
 
+    List<Building> findAllByActiveTrueOrderByBuildingNameAsc();
+
     boolean existsByBuildingNameIgnoreCase(String buildingName);
 
     boolean existsByBuildingNameIgnoreCaseAndIdNot(String buildingName, UUID id);

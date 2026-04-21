@@ -10,4 +10,6 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, UUID>,
     boolean existsByCodeIgnoreCase(String code);
 
     boolean existsByCodeIgnoreCaseAndIdNot(String code, UUID id);
+
+    boolean existsByLocationEntity_Id(UUID locationId);
 }

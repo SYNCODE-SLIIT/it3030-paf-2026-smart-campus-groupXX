@@ -100,7 +100,10 @@ export function formatResourceTypeOptionLabel(option: ResourceTypeOption) {
 }
 
 export function formatLocationOptionLabel(option: LocationOption) {
-  const details = [option.buildingName, option.floor, option.roomCode, option.locationType]
+  const buildingLabel = option.buildingName
+    ? `${option.buildingName}${option.buildingCode ? ` (${option.buildingCode})` : ''}`
+    : null;
+  const details = [buildingLabel, option.wing, option.floor, option.roomCode, option.locationType]
     .filter(Boolean)
     .join(' · ');
 

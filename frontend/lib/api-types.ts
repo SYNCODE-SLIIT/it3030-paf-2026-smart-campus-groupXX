@@ -52,6 +52,20 @@ export type BuildingType =
   | 'OUTDOOR'
   | 'OTHER';
 
+export type LocationType =
+  | 'BUILDING'
+  | 'ROOM'
+  | 'LAB'
+  | 'HALL'
+  | 'LIBRARY_SPACE'
+  | 'EVENT_SPACE'
+  | 'SPORTS_AREA'
+  | 'OUTDOOR_AREA'
+  | 'STORAGE'
+  | 'OTHER';
+
+export type LocationWing = 'LEFT_WING' | 'RIGHT_WING' | 'NONE';
+
 export type StudentFaculty =
   | 'FACULTY_OF_COMPUTING'
   | 'FACULTY_OF_ENGINEERING'
@@ -179,11 +193,14 @@ export interface ResourceTypeDetails {
 
 export interface LocationDetails {
   id: string;
+  buildingId: string | null;
   locationName: string;
+  buildingCode: string | null;
   buildingName: string | null;
+  wing: LocationWing | null;
   floor: string | null;
   roomCode: string | null;
-  locationType: string;
+  locationType: LocationType;
 }
 
 export interface ResourceFeatureDetails {
@@ -208,11 +225,14 @@ export interface ResourceTypeOption {
 
 export interface LocationOption {
   id: string;
+  buildingId: string | null;
   locationName: string;
+  buildingCode: string | null;
   buildingName: string | null;
+  wing: LocationWing | null;
   floor: string | null;
   roomCode: string | null;
-  locationType: string;
+  locationType: LocationType;
 }
 
 export interface ResourceFeatureOption {
@@ -269,6 +289,40 @@ export interface UpdateBuildingRequest {
   defaultPrefix?: string | null;
   description?: string | null;
   isActive?: boolean | null;
+}
+
+export interface CatalogueLocationResponse {
+  id: string;
+  buildingId: string | null;
+  buildingName: string | null;
+  buildingCode: string | null;
+  buildingHasWings: boolean;
+  wing: LocationWing | null;
+  floor: string | null;
+  roomCode: string | null;
+  locationName: string;
+  locationType: LocationType;
+  description: string | null;
+}
+
+export interface CreateLocationRequest {
+  buildingId: string;
+  wing?: LocationWing | null;
+  floor?: string | null;
+  roomCode?: string | null;
+  locationName: string;
+  locationType: LocationType;
+  description?: string | null;
+}
+
+export interface UpdateLocationRequest {
+  buildingId?: string;
+  wing?: LocationWing | null;
+  floor?: string | null;
+  roomCode?: string | null;
+  locationName?: string;
+  locationType?: LocationType;
+  description?: string | null;
 }
 
 export interface CreateBookingRequest {

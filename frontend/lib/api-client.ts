@@ -8,9 +8,11 @@ import {
   type BookingNotificationResponse,
   type BookingResponse,
   type CancelBookingRequest,
+  type CatalogueLocationResponse,
   type CheckInResponse,
   type CreateBuildingRequest,
   type CreateBookingRequest,
+  type CreateLocationRequest,
   type CreateRecurringBookingRequest,
   type CreateResourceRequest,
   type CreateTicketRequest,
@@ -40,6 +42,7 @@ import {
   type TicketStatusUpdateRequest,
   type TicketSummaryResponse,
   type UpdateBuildingRequest,
+  type UpdateLocationRequest,
   type UpdateResourceRequest,
   type UpdateTicketRequest,
   type UpdateUserRequest,
@@ -452,6 +455,41 @@ export async function updateBuilding(accessToken: string, buildingId: string, pa
 
 export async function deactivateBuilding(accessToken: string, buildingId: string) {
   return request<MessageResponse>(`/api/admin/buildings/${buildingId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export async function listCatalogueBuildings(accessToken: string) {
+  return request<BuildingResponse[]>('/api/catalog/buildings', {
+    accessToken,
+  });
+}
+
+export async function listCatalogueLocations(accessToken: string) {
+  return request<CatalogueLocationResponse[]>('/api/catalog/locations', {
+    accessToken,
+  });
+}
+
+export async function createCatalogueLocation(accessToken: string, payload: CreateLocationRequest) {
+  return request<CatalogueLocationResponse>('/api/catalog/locations', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function updateCatalogueLocation(accessToken: string, locationId: string, payload: UpdateLocationRequest) {
+  return request<CatalogueLocationResponse>(`/api/catalog/locations/${locationId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function deleteCatalogueLocation(accessToken: string, locationId: string) {
+  return request<MessageResponse>(`/api/catalog/locations/${locationId}`, {
     method: 'DELETE',
     accessToken,
   });

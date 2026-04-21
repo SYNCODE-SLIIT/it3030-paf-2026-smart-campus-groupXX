@@ -6,9 +6,12 @@ import com.university.smartcampus.common.entity.TimestampedEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -21,6 +24,13 @@ public class Location extends TimestampedEntity {
 
     @Column(name = "building_name", length = 150)
     private String buildingName;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "building_id")
+    private Building building;
+
+    @Column(name = "wing", length = 30)
+    private String wing;
 
     @Column(length = 50)
     private String floor;
@@ -51,6 +61,22 @@ public class Location extends TimestampedEntity {
 
     public void setBuildingName(String buildingName) {
         this.buildingName = buildingName;
+    }
+
+    public Building getBuilding() {
+        return building;
+    }
+
+    public void setBuilding(Building building) {
+        this.building = building;
+    }
+
+    public String getWing() {
+        return wing;
+    }
+
+    public void setWing(String wing) {
+        this.wing = wing;
     }
 
     public String getFloor() {

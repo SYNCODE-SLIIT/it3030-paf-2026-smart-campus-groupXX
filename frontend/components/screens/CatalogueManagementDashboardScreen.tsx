@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Button, Card, Chip } from '@/components/ui';
 import { AdminResourcesScreen } from '@/components/screens/AdminResourcesScreen';
+import { CatalogueLocationsScreen } from '@/components/screens/catalogue/CatalogueLocationsScreen';
 import { getErrorMessage, listResources } from '@/lib/api-client';
 import type { ResourceResponse } from '@/lib/api-types';
 
@@ -67,6 +68,7 @@ export function CatalogueManagementDashboardScreen({
   const [resources, setResources] = React.useState<ResourceResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [activeSection, setActiveSection] = React.useState<'resources' | 'locations'>('resources');
 
   const loadResources = React.useCallback(async () => {
     if (!accessToken) {
@@ -181,13 +183,23 @@ export function CatalogueManagementDashboardScreen({
           </div>
 
           <div style={{ display: 'grid', gap: 12 }}>
-            <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>Resource Management</div>
-              <div style={{ marginTop: 4, color: 'var(--text-muted)', fontSize: 13 }}>
-                The existing resource management table and form are now wired to the normalized resource catalogue payload and lookup data.
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>Catalogue Operations</div>
+                <div style={{ marginTop: 4, color: 'var(--text-muted)', fontSize: 13 }}>
+                  Manage normalized resources and their building-based locations from the same workspace.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Button variant={activeSection === 'resources' ? 'glass' : 'subtle'} size="sm" onClick={() => setActiveSection('resources')}>
+                  Resources
+                </Button>
+                <Button variant={activeSection === 'locations' ? 'glass' : 'subtle'} size="sm" onClick={() => setActiveSection('locations')}>
+                  Locations
+                </Button>
               </div>
             </div>
-            <AdminResourcesScreen embedded />
+            {activeSection === 'resources' ? <AdminResourcesScreen embedded /> : <CatalogueLocationsScreen embedded />}
           </div>
         </div>
       </Card>
