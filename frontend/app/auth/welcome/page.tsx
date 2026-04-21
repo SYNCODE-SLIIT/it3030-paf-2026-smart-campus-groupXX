@@ -76,8 +76,8 @@ function inviteReasonNotice(reason: string | null, remainingAttempts: number | n
     case 'invite_expired':
       return {
         variant: 'warning' as const,
-        title: 'Invite expired',
-        message: 'Too many wrong account tries. Open the invite link again.',
+        title: 'Invite link expired',
+        message: 'This invite link is invalid or has expired. Ask an administrator to send a new invite email.',
       };
     case 'access_denied':
       return {
@@ -231,6 +231,11 @@ function AuthWelcomeContent() {
   }
 
   if (!hasInviteContext) {
+    const emptyInviteTitle = reason === 'invite_expired' ? 'Invite link expired' : 'Invite session required';
+    const emptyInviteMessage = reason === 'invite_expired'
+      ? 'This link can no longer be used. Ask an administrator to send a new invite email.'
+      : 'Open the generated invite link from your email to continue onboarding.';
+
     return (
       <div
         style={{
@@ -254,7 +259,7 @@ function AuthWelcomeContent() {
                 color: 'var(--text-h)',
               }}
             >
-              Invite session required
+              {emptyInviteTitle}
             </p>
             {notice && (
               <Alert variant={notice.variant} title={notice.title}>
@@ -262,7 +267,7 @@ function AuthWelcomeContent() {
               </Alert>
             )}
             <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-body)' }}>
-              Open the generated invite link from your email to continue onboarding.
+              {emptyInviteMessage}
             </p>
           </div>
         </Card>

@@ -403,13 +403,13 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         mockMvc.perform(post("/api/admin/users/{id}/invite", student.getId())
                 .with(jwtFor("admin@campus.test")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("Access link generated."));
+            .andExpect(jsonPath("$.message").value("Sign-in email sent."));
 
         mockMvc.perform(post("/api/auth/login-link/request")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"missing@campus.test\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("If the account exists, an access link has been generated."));
+            .andExpect(jsonPath("$.message").value("If the account exists, a sign-in email has been sent."));
     }
 
     @Test

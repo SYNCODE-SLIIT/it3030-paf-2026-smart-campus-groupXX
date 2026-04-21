@@ -126,9 +126,11 @@ function AuthCallbackClient() {
       }
 
       try {
-        const queryError = searchParams.get('error');
-        const queryErrorCode = searchParams.get('error_code');
-        const queryErrorDescription = searchParams.get('error_description')?.toLowerCase();
+        const queryError = searchParams.get('error') ?? hashParams.get('error');
+        const queryErrorCode = searchParams.get('error_code') ?? hashParams.get('error_code');
+        const queryErrorDescription = (
+          searchParams.get('error_description') ?? hashParams.get('error_description')
+        )?.toLowerCase();
         const queryCode = searchParams.get('code');
         const queryAccessToken = searchParams.get('access_token');
         const queryRefreshToken = searchParams.get('refresh_token');
@@ -139,6 +141,11 @@ function AuthCallbackClient() {
           queryErrorDescription?.includes('user email from external provider');
 
         if (queryError) {
+          if (queryErrorCode === 'otp_expired' || queryErrorDescription?.includes('expired')) {
+            router.replace(isInviteFlow ? toInviteWelcome('invite_expired') : '/login?reason=auth_failed');
+            return;
+          }
+
           if (providerMissingEmail) {
             router.replace(isInviteFlow ? toInviteWelcome('provider_email_missing') : '/login?reason=provider_email_missing');
             return;

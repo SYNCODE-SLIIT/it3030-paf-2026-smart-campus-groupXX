@@ -112,11 +112,11 @@ export function UserDetailsPanel({
       try {
         const response = await resendInvite(accessToken, currentUser.id);
         await onReload(currentUser.id);
-        showToast('success', 'Access link generated', response.message);
+        showToast('success', 'Email sent', response.message);
       } catch (error) {
-        const message = getErrorMessage(error, 'We could not generate a new access link.');
+        const message = getErrorMessage(error, 'We could not send a new sign-in email.');
         setPanelError(message);
-        showToast('error', 'Link generation failed', message);
+        showToast('error', 'Email send failed', message);
       }
     });
   }

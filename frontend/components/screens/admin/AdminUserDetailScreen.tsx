@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, ArrowLeft, Copy, Edit3, Mail, Save, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Copy, Edit3, Mail, Save, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
 import { AuditLogTimeline } from '@/components/screens/admin/AuditLogTimeline';
 import { useToast } from '@/components/providers/ToastProvider';
 import { ProfileFields } from '@/components/screens/admin/ProfileFields';
@@ -239,56 +240,6 @@ function MetaItem({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function ConfirmMessage({
-  action,
-  disabled,
-  loading,
-  onCancel,
-  onConfirm,
-}: {
-  action: Exclude<ConfirmAction, null>;
-  disabled?: boolean;
-  loading?: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const isDelete = action === 'delete';
-
-  return (
-    <div className="admin-confirm-message" role="status">
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <span style={{ color: isDelete ? 'var(--red-500)' : 'var(--yellow-700)', display: 'flex', marginTop: 1 }}>
-          <AlertTriangle size={15} />
-        </span>
-        <div>
-          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 800, color: 'var(--text-h)' }}>
-            {isDelete ? 'Delete this user?' : 'Generate a new access link?'}
-          </p>
-          <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-            {isDelete
-              ? 'This permanently removes the user record and linked auth identity when one exists.'
-              : 'This creates a fresh invitation link and updates the latest access metadata.'}
-          </p>
-        </div>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-        <Button variant="ghost" size="xs" iconLeft={<X size={12} />} onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          variant={isDelete ? 'danger' : 'primary'}
-          size="xs"
-          loading={loading}
-          disabled={disabled}
-          onClick={onConfirm}
-        >
-          Confirm
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export function AdminUserDetailScreen({ userId }: { userId: string }) {
   const router = useRouter();
   const { session, appUser } = useAuth();
@@ -436,9 +387,9 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         const refreshed = await getUser(accessToken, user.id);
         setUser(refreshed);
         void loadActivity(0, false);
-        showToast('success', 'Access link generated', 'A fresh access link is ready.');
+        showToast('success', 'Email sent', 'A fresh sign-in email was sent.');
       } catch (error) {
-        showToast('error', 'Link generation failed', getErrorMessage(error, 'We could not generate a new access link.'));
+        showToast('error', 'Email send failed', getErrorMessage(error, 'We could not send a new sign-in email.'));
       } finally {
         setConfirmAction(null);
       }
@@ -688,13 +639,6 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
           display: grid;
           gap: 18px;
         }
-        .admin-confirm-message {
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: var(--surface-2);
-          padding: 13px;
-          box-shadow: var(--chip-shadow);
-        }
         @media (max-width: 960px) {
           .admin-action-cluster {
             justify-content: flex-start;
@@ -800,21 +744,6 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
                   Delete
                 </Button>
               </div>
-              {confirmAction && (
-                <ConfirmMessage
-                  action={confirmAction}
-                  loading={confirmAction === 'delete' ? isDeleting : isResending}
-                  disabled={confirmAction === 'delete' ? isSelf : suspended}
-                  onCancel={() => setConfirmAction(null)}
-                  onConfirm={() => {
-                    if (confirmAction === 'delete') {
-                      void handleDelete();
-                      return;
-                    }
-                    void handleResendInvite();
-                  }}
-                />
-              )}
             </div>
           </div>
 
@@ -959,6 +888,41 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
           )}
         </div>
       </Card>
+
+      {confirmAction && (
+        <AdminConfirmDialog
+          open
+          title={confirmAction === 'delete' ? 'Delete user?' : 'Reinvite user?'}
+          description={
+            confirmAction === 'delete'
+              ? 'This permanently removes the user record and linked auth identity when one exists.'
+              : 'This sends a fresh sign-in email and updates the latest delivery metadata.'
+          }
+          confirmLabel={confirmAction === 'delete' ? 'Delete User' : 'Send Email'}
+          confirmVariant={confirmAction === 'delete' ? 'danger' : 'primary'}
+          confirmIcon={confirmAction === 'delete' ? <Trash2 size={14} /> : <Mail size={14} />}
+          loading={confirmAction === 'delete' ? isDeleting : isResending}
+          disabled={confirmAction === 'delete' ? isSelf : suspended}
+          alertVariant={confirmAction === 'delete' ? 'warning' : 'info'}
+          onClose={() => setConfirmAction(null)}
+          onConfirm={() => {
+            if (confirmAction === 'delete') {
+              void handleDelete();
+              return;
+            }
+            void handleResendInvite();
+          }}
+        >
+          <div style={{ display: 'grid', gap: 8, color: 'var(--text-body)', fontSize: 13 }}>
+            <span>
+              <strong style={{ color: 'var(--text-h)' }}>Email:</strong> {user.email}
+            </span>
+            <span>
+              <strong style={{ color: 'var(--text-h)' }}>Status:</strong> {user.accountStatus}
+            </span>
+          </div>
+        </AdminConfirmDialog>
+      )}
     </div>
   );
 }

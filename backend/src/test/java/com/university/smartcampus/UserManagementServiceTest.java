@@ -19,6 +19,7 @@ import com.university.smartcampus.common.dto.ApiDtos.UserResponse;
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.AcademicYear;
 import com.university.smartcampus.common.enums.AppEnums.AdminAction;
+import com.university.smartcampus.common.enums.AppEnums.AuthDeliveryMethod;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.Semester;
 import com.university.smartcampus.common.enums.AppEnums.StudentFaculty;
@@ -221,6 +222,54 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
         var entries = auditLogRepository.findByTargetUserIdOrderByCreatedAtDesc(studentUser.getId());
         assertThat(entries).hasSize(1);
         assertThat(entries.get(0).getAction()).isEqualTo(AdminAction.INVITE_RESENT);
+    }
+
+    @Test
+    void resendInviteForInvitedStudentSendsInviteLink() {
+        UserEntity studentUser = seedStudent("invited-student-link@campus.test");
+
+        userManagementService.resendInvite(studentUser.getId());
+
+        assertThat(recordingAuthProviderClient.deliveries()).hasSize(1);
+        assertThat(recordingAuthProviderClient.deliveries().get(0).deliveryMethod())
+            .isEqualTo(AuthDeliveryMethod.INVITE_EMAIL);
+    }
+
+    @Test
+    void resendInviteForActiveStudentSendsMagicLink() {
+        UserEntity studentUser = seedStudent("active-student-link@campus.test");
+        studentUser.setAccountStatus(AccountStatus.ACTIVE);
+        studentUser.setActivatedAt(Instant.now());
+        userRepository.saveAndFlush(studentUser);
+
+        userManagementService.resendInvite(studentUser.getId());
+
+        assertThat(recordingAuthProviderClient.deliveries()).hasSize(1);
+        assertThat(recordingAuthProviderClient.deliveries().get(0).deliveryMethod())
+            .isEqualTo(AuthDeliveryMethod.LOGIN_LINK_EMAIL);
+    }
+
+    @Test
+    void resendInviteForActiveManagerSendsMagicLink() {
+        UserEntity manager = seedManager("active-manager-link@campus.test", ManagerRole.CATALOG_MANAGER);
+
+        userManagementService.resendInvite(manager.getId());
+
+        assertThat(recordingAuthProviderClient.deliveries()).hasSize(1);
+        assertThat(recordingAuthProviderClient.deliveries().get(0).deliveryMethod())
+            .isEqualTo(AuthDeliveryMethod.LOGIN_LINK_EMAIL);
+    }
+
+    @Test
+    void resendInviteForSuspendedUserIsBlocked() {
+        UserEntity studentUser = seedStudent("suspended-student-link@campus.test");
+        studentUser.setAccountStatus(AccountStatus.SUSPENDED);
+        userRepository.saveAndFlush(studentUser);
+
+        assertThatThrownBy(() -> userManagementService.resendInvite(studentUser.getId()))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Suspended users cannot receive login links.");
+        assertThat(recordingAuthProviderClient.deliveries()).isEmpty();
     }
 
     @Test

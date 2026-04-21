@@ -282,9 +282,9 @@ public class UserManagementService {
 
         int previousInviteCount = user.getInviteSendCount();
 
-        AuthProviderClient.DeliveryResult delivery = user.getAccountStatus() == AccountStatus.INVITED
-                ? authProviderClient.sendInviteLink(user.getEmail())
-                : authProviderClient.sendMagicLink(user.getEmail());
+        AuthProviderClient.DeliveryResult delivery = user.getAccountStatus() == AccountStatus.ACTIVE
+                ? authProviderClient.sendMagicLink(user.getEmail())
+                : authProviderClient.sendInviteLink(user.getEmail());
 
         recordDelivery(user, delivery);
 
@@ -297,7 +297,7 @@ public class UserManagementService {
             logAuditAction(AdminAction.INVITE_RESENT, performedByAdmin, user, details);
         }
 
-        return new MessageResponse("Access link generated.");
+        return new MessageResponse("Sign-in email sent.");
     }
 
     @Transactional
@@ -309,7 +309,7 @@ public class UserManagementService {
                     .ifPresent(user -> recordDelivery(user, authProviderClient.sendMagicLink(user.getEmail())));
         }
 
-        return new MessageResponse("If the account exists, an access link has been generated.");
+        return new MessageResponse("If the account exists, a sign-in email has been sent.");
     }
 
     @Transactional

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Open_Sans, Poppins, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { AuthHashRedirector } from '@/components/auth/AuthHashRedirector';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { getInitialServerAppUser } from '@/lib/server-auth';
 
@@ -42,7 +43,10 @@ export default async function RootLayout({
         className={`${openSans.variable} ${poppins.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <AuthProvider initialAppUser={initialAppUser}>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <AuthHashRedirector />
+            {children}
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

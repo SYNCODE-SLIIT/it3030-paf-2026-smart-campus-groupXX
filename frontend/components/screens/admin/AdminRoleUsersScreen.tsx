@@ -445,7 +445,7 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
                     Add {getUserTypeLabel(userType)}
                   </p>
                   <p style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-body)' }}>
-                    Create the account and generate its first access link.
+                    Create the account and send its first sign-in email.
                   </p>
                 </div>
                 <button type="button" className="admin-dialog-close" aria-label="Close" onClick={() => setIsCreateDialogOpen(false)}>

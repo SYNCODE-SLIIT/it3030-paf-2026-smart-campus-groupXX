@@ -1,14 +1,15 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Copy, Mail, Search, Trash2, UserPlus, X } from 'lucide-react';
+import { Copy, Mail, Search, Trash2, UserPlus, X } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
 import { CreateUserPanel } from '@/components/screens/admin/CreateUserPanel';
 import { UserStatsGrid } from '@/components/screens/admin/UserStatsGrid';
 import { UserTableCard, type RoleTab } from '@/components/screens/admin/UserTableCard';
-import { Alert, Button, Card, Input, Skeleton, Textarea, Toast, ToastStack } from '@/components/ui';
+import { Alert, Button, Card, Input, Skeleton, Textarea } from '@/components/ui';
 import { deleteUser, getErrorMessage, getUser, listUsers, resendInvite } from '@/lib/api-client';
 import type { AccountStatus, UserResponse } from '@/lib/api-types';
 
@@ -75,17 +76,16 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
   }, [reloadUsers]);
 
   React.useEffect(() => {
-    if (!isCreateDialogOpen && !createdInvite) return;
+    if (!createdInvite) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
-      if (createdInvite) { setCreatedInvite(null); return; }
-      setIsCreateDialogOpen(false);
+      setCreatedInvite(null);
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createdInvite, isCreateDialogOpen]);
+  }, [createdInvite]);
 
 
   function handleCopyGeneratedLink() {
@@ -116,9 +116,9 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
       await resendInvite(accessToken, targetUser.id);
       const refreshed = await getUser(accessToken, targetUser.id);
       setUsers((current) => current.map((user) => (user.id === refreshed.id ? refreshed : user)));
-      showToast('success', 'Access link generated', `A fresh access link is ready for ${targetUser.email}.`);
+      showToast('success', 'Email sent', `A fresh sign-in email was sent to ${targetUser.email}.`);
     } catch (error) {
-      showToast('error', 'Link generation failed', getErrorMessage(error, 'We could not generate a new access link.'));
+      showToast('error', 'Email send failed', getErrorMessage(error, 'We could not send a new sign-in email.'));
     } finally {
       setReinvitingUserId(null);
     }
@@ -314,41 +314,39 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
         />
       </div>
 
-      <ToastStack>
-        {pendingUserAction && (
-          <Toast
-            variant={pendingUserAction.type === 'delete' ? 'warning' : 'info'}
-            title={pendingUserAction.type === 'delete' ? 'Confirm delete user' : 'Confirm reinvite user'}
-            icon={pendingUserAction.type === 'delete' ? <AlertTriangle size={18} /> : <Mail size={18} />}
-            dismissible
-            onDismiss={() => setPendingUserAction(null)}
-            actions={
-              <>
-                <Button variant="ghost" size="xs" onClick={() => setPendingUserAction(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant={pendingUserAction.type === 'delete' ? 'danger' : 'primary'}
-                  size="xs"
-                  iconLeft={pendingUserAction.type === 'delete' ? <Trash2 size={12} /> : <Mail size={12} />}
-                  loading={
-                    pendingUserAction.type === 'delete'
-                      ? deletingUserId === pendingUserAction.user.id
-                      : reinvitingUserId === pendingUserAction.user.id
-                  }
-                  onClick={() => { void handleConfirmPendingUserAction(); }}
-                >
-                  Confirm
-                </Button>
-              </>
-            }
-          >
-            {pendingUserAction.type === 'delete'
-              ? `Delete ${pendingUserAction.user.email}? This permanently removes the account.`
-              : `Generate a fresh access link for ${pendingUserAction.user.email}?`}
-          </Toast>
-        )}
-      </ToastStack>
+      {pendingUserAction && (
+        <AdminConfirmDialog
+          open
+          title={pendingUserAction.type === 'delete' ? 'Delete user?' : 'Reinvite user?'}
+          description={
+            pendingUserAction.type === 'delete'
+              ? 'This permanently removes the account and linked identity when one exists.'
+              : 'This sends a fresh sign-in email and updates the user invite metadata.'
+          }
+          confirmLabel={pendingUserAction.type === 'delete' ? 'Delete User' : 'Send Email'}
+          confirmVariant={pendingUserAction.type === 'delete' ? 'danger' : 'primary'}
+          confirmIcon={pendingUserAction.type === 'delete' ? <Trash2 size={14} /> : <Mail size={14} />}
+          loading={
+            pendingUserAction.type === 'delete'
+              ? deletingUserId === pendingUserAction.user.id
+              : reinvitingUserId === pendingUserAction.user.id
+          }
+          alertVariant={pendingUserAction.type === 'delete' ? 'warning' : 'info'}
+          onClose={() => setPendingUserAction(null)}
+          onConfirm={() => {
+            void handleConfirmPendingUserAction();
+          }}
+        >
+          <div style={{ display: 'grid', gap: 8, color: 'var(--text-body)', fontSize: 13 }}>
+            <span>
+              <strong style={{ color: 'var(--text-h)' }}>Email:</strong> {pendingUserAction.user.email}
+            </span>
+            <span>
+              <strong style={{ color: 'var(--text-h)' }}>Status:</strong> {pendingUserAction.user.accountStatus}
+            </span>
+          </div>
+        </AdminConfirmDialog>
+      )}
 
       {/* Create user dialog */}
       {isCreateDialogOpen && (
@@ -383,7 +381,7 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
                     Add User
                   </p>
                   <p style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-body)' }}>
-                    Create the account and copy the generated link to test sign-in right away.
+                    Create the account and send the first sign-in email right away.
                   </p>
                 </div>
                 <button
@@ -407,7 +405,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
                     setCreatedInvite({ email: createdUser.email, link: createdUser.lastInviteReference });
                     return;
                   }
-                  showToast('warning', 'User created', 'No access link was returned.');
                 }}
                 onCancel={() => setIsCreateDialogOpen(false)}
               />

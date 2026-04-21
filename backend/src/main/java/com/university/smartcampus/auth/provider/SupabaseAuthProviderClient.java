@@ -37,20 +37,14 @@ public class SupabaseAuthProviderClient implements AuthProviderClient {
         String redirectUri = withInviteRedirectContext(properties.getAuth().getSupabase().getInviteRedirectTo(), email);
 
         try {
-            return generateLink(
-                    "invite",
-                    email,
-                    AuthDeliveryMethod.INVITE_EMAIL,
-                    redirectUri);
+            sendInviteEmail(email, redirectUri);
+            return new DeliveryResult(AuthDeliveryMethod.INVITE_EMAIL, null, redirectUri);
         } catch (ExternalServiceException exception) {
             // Existing auth identities cannot receive invite links; fall back to a
-            // generated magic link.
+            // login-link email for the same address.
             if (isEmailAlreadyRegistered(exception)) {
-                return generateLink(
-                        "magiclink",
-                        email,
-                        AuthDeliveryMethod.LOGIN_LINK_EMAIL,
-                        redirectUri);
+                sendMagicLinkEmail(email, redirectUri);
+                return new DeliveryResult(AuthDeliveryMethod.LOGIN_LINK_EMAIL, null, redirectUri);
             }
 
             throw exception;
@@ -81,32 +75,36 @@ public class SupabaseAuthProviderClient implements AuthProviderClient {
 
     @Override
     public DeliveryResult sendMagicLink(String email) {
-        return generateLink(
-                "magiclink",
-                email,
-                AuthDeliveryMethod.LOGIN_LINK_EMAIL,
-                properties.getAuth().getSupabase().getMagicLinkRedirectTo());
+        String redirectUri = properties.getAuth().getSupabase().getMagicLinkRedirectTo();
+        sendMagicLinkEmail(email, redirectUri);
+        return new DeliveryResult(AuthDeliveryMethod.LOGIN_LINK_EMAIL, null, redirectUri);
     }
 
-    @SuppressWarnings("unchecked")
-    private DeliveryResult generateLink(
-            String type,
-            String email,
-            AuthDeliveryMethod deliveryMethod,
-            String redirectUri) {
-        ensureConfigured();
-
+    private void sendInviteEmail(String email, String redirectUri) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("type", type);
         body.put("email", email);
-
         if (StringUtils.hasText(redirectUri)) {
             body.put("redirect_to", redirectUri);
         }
+        sendAuthEmail("/invite", body, "Failed to send an invite email through Supabase.");
+    }
+
+    private void sendMagicLinkEmail(String email, String redirectUri) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("email", email);
+        body.put("create_user", false);
+        if (StringUtils.hasText(redirectUri)) {
+            body.put("email_redirect_to", redirectUri);
+        }
+        sendAuthEmail("/otp", body, "Failed to send a sign-in email through Supabase.");
+    }
+
+    private void sendAuthEmail(String path, Map<String, Object> body, String failureMessage) {
+        ensureConfigured();
 
         try {
-            Map<String, Object> response = restClient().post()
-                    .uri("/admin/generate_link")
+            restClient().post()
+                    .uri(path)
                     .headers(headers -> {
                         headers.setContentType(MediaType.APPLICATION_JSON);
                         headers.set(HttpHeaders.AUTHORIZATION,
@@ -115,27 +113,14 @@ public class SupabaseAuthProviderClient implements AuthProviderClient {
                     })
                     .body(body)
                     .retrieve()
-                    .body(Map.class);
-
-            String authReference = null;
-            if (response != null) {
-                Map<String, Object> propertiesMap = response.get("properties") instanceof Map<?, ?> nested
-                        ? (Map<String, Object>) nested
-                        : null;
-                authReference = firstNonBlank(
-                        (String) response.get("action_link"),
-                        propertiesMap == null ? null : (String) propertiesMap.get("action_link"),
-                        (String) response.get("email"));
-            }
-
-            return new DeliveryResult(deliveryMethod, authReference, redirectUri);
+                    .toBodilessEntity();
         } catch (RestClientResponseException exception) {
             String responseMessage = exception.getResponseBodyAsString();
             String suffix = StringUtils.hasText(responseMessage) ? " Supabase response: " + responseMessage : "";
-            throw new ExternalServiceException("Failed to generate an auth access link through Supabase." + suffix,
+            throw new ExternalServiceException(failureMessage + suffix,
                     exception);
         } catch (RestClientException exception) {
-            throw new ExternalServiceException("Failed to generate an auth access link through Supabase.", exception);
+            throw new ExternalServiceException(failureMessage, exception);
         }
     }
 
@@ -169,14 +154,5 @@ public class SupabaseAuthProviderClient implements AuthProviderClient {
 
     private String trimTrailingSlash(String input) {
         return input.endsWith("/") ? input.substring(0, input.length() - 1) : input;
-    }
-
-    private String firstNonBlank(String... values) {
-        for (String value : values) {
-            if (StringUtils.hasText(value)) {
-                return value;
-            }
-        }
-        return null;
     }
 }

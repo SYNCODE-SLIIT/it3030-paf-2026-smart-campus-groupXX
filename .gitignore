@@ -25,6 +25,7 @@
 **/out/
 **/build/
 **/coverage/
+**/*.tsbuildinfo
 
 # Logs and Debugging
 npm-debug.log*

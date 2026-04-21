@@ -394,9 +394,10 @@ export function UserTableCard({
                         loading={reinvitingUserId === user.id}
                         disabled={user.accountStatus === 'SUSPENDED'}
                         iconLeft={<Mail size={13} />}
-                        style={{ width: 32, padding: 0 }}
                         onClick={() => onReinviteUser(user)}
-                      />
+                      >
+                        Reinvite
+                      </Button>
                       <Button
                         variant="ghost-danger"
                         size="xs"

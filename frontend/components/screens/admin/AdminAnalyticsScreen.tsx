@@ -152,7 +152,7 @@ export function AdminAnalyticsScreen() {
             <CountCard label="Total Users" value={totalUsers} caption="Across all roles" icon={Users} />
             <CountCard label="Active Users" value={activeUsers} caption={`${percent(activeUsers, totalUsers)} active`} icon={Activity} />
             <CountCard label="Pending Invites" value={pendingInvites} caption="Awaiting access setup" icon={Clock} />
-            <CountCard label="Invite Sends" value={inviteSends} caption="Generated access links" icon={UserPlus} />
+            <CountCard label="Invite Sends" value={inviteSends} caption="Sign-in emails sent" icon={UserPlus} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18 }}>
