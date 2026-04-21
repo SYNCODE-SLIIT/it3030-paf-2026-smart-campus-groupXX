@@ -627,7 +627,7 @@ export function AdminDashboardScreen() {
               color: 'var(--text-h)',
             }}
           >
-            Operational Summary
+            Admin Dashboard
           </h1>
           <p style={{ margin: '8px 0 0', maxWidth: 720, color: 'var(--text-muted)', fontSize: 14, lineHeight: 1.6 }}>
             A command-center view of account lifecycle, onboarding progress, role composition, and admin activity.
