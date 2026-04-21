@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { MapPinned, Plus, Search } from 'lucide-react';
+import { MapPinned, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { LocationFormModal } from '@/components/screens/catalogue/locations/LocationFormModal';
-import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { Alert, Button, Card, Chip, IconButton, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import {
   createCatalogueLocation,
   deleteCatalogueLocation,
@@ -26,8 +26,12 @@ import { formatBuildingOptionLabel, getLocationTypeLabel, getWingLabel, location
 
 export function CatalogueLocationsScreen({
   embedded = false,
+  addOpen,
+  onAddOpenChange,
 }: {
   embedded?: boolean;
+  addOpen?: boolean;
+  onAddOpenChange?: (open: boolean) => void;
 }) {
   const { session } = useAuth();
   const { showToast } = useToast();
@@ -37,7 +41,7 @@ export function CatalogueLocationsScreen({
   const [buildings, setBuildings] = React.useState<BuildingResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [formOpen, setFormOpen] = React.useState(false);
+  const [internalFormOpen, setInternalFormOpen] = React.useState(false);
   const [editingLocation, setEditingLocation] = React.useState<CatalogueLocationResponse | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -46,6 +50,13 @@ export function CatalogueLocationsScreen({
   const [typeFilter, setTypeFilter] = React.useState('');
 
   const deferredSearch = React.useDeferredValue(searchText);
+  const isControlled = onAddOpenChange !== undefined;
+  const formOpen = isControlled ? (addOpen ?? false) : internalFormOpen;
+
+  function setFormOpen(open: boolean) {
+    if (isControlled) onAddOpenChange?.(open);
+    else setInternalFormOpen(open);
+  }
 
   const reloadData = React.useCallback(async () => {
     if (!accessToken) {
@@ -180,17 +191,19 @@ export function CatalogueLocationsScreen({
                 </div>
               </div>
             </div>
-            <Button
-              variant="glass"
-              size="sm"
-              iconLeft={<Plus size={14} />}
-              onClick={() => {
-                setEditingLocation(null);
-                setFormOpen(true);
-              }}
-            >
-              Add Location
-            </Button>
+            {!isControlled && (
+              <Button
+                variant="glass"
+                size="sm"
+                iconLeft={<Plus size={14} />}
+                onClick={() => {
+                  setEditingLocation(null);
+                  setFormOpen(true);
+                }}
+              >
+                Add Location
+              </Button>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
@@ -223,22 +236,21 @@ export function CatalogueLocationsScreen({
 
           {loadError && <Alert variant="error" title="Could not load locations">{loadError}</Alert>}
 
-          {formOpen && (
-            <LocationFormModal
-              title={editingLocation ? `Edit ${editingLocation.locationName}` : 'Add Location'}
-              location={editingLocation}
-              buildingOptions={buildings}
-              existingLocations={locations}
-              submitting={saving}
-              onCancel={() => {
-                setFormOpen(false);
-                setEditingLocation(null);
-              }}
-              onSubmit={async (payload) => {
-                await handleSave(payload);
-              }}
-            />
-          )}
+          <LocationFormModal
+            open={formOpen}
+            title={editingLocation ? `Edit ${editingLocation.locationName}` : 'Add Location'}
+            location={editingLocation}
+            buildingOptions={buildings}
+            existingLocations={locations}
+            submitting={saving}
+            onClose={() => {
+              setFormOpen(false);
+              setEditingLocation(null);
+            }}
+            onSubmit={async (payload) => {
+              await handleSave(payload);
+            }}
+          />
 
           <div style={{ overflowX: 'auto' }}>
             <Table>
@@ -250,7 +262,7 @@ export function CatalogueLocationsScreen({
                   <TableHeader>Floor</TableHeader>
                   <TableHeader>Code</TableHeader>
                   <TableHeader>Type</TableHeader>
-                  <TableHeader>Actions</TableHeader>
+                  <TableHeader style={{ textAlign: 'right' }}>Actions</TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -280,26 +292,26 @@ export function CatalogueLocationsScreen({
                       <TableCell>{location.floor ?? '—'}</TableCell>
                       <TableCell>{location.roomCode ?? '—'}</TableCell>
                       <TableCell><Chip color="blue">{getLocationTypeLabel(location.locationType as LocationType)}</Chip></TableCell>
-                      <TableCell>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          <Button
-                            size="xs"
-                            variant="subtle"
+                      <TableCell style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+                          <IconButton
+                            variant="neutral"
+                            icon={<Pencil size={13} />}
+                            title="Edit location"
+                            aria-label={`Edit ${location.locationName}`}
                             onClick={() => {
                               setEditingLocation(location);
                               setFormOpen(true);
                             }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="xs"
+                          />
+                          <IconButton
                             variant="danger"
+                            icon={<Trash2 size={13} />}
+                            title="Delete location"
+                            aria-label={`Delete ${location.locationName}`}
                             loading={deletingId === location.id}
                             onClick={() => void handleDelete(location)}
-                          >
-                            Remove
-                          </Button>
+                          />
                         </div>
                       </TableCell>
                     </TableRow>

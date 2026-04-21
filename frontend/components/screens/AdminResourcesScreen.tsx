@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { FolderOpen, Plus, Search } from 'lucide-react';
+import { CircleSlash, FolderOpen, Pencil, Plus, Search } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
-import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { Alert, Button, Card, Chip, IconButton, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import {
   createResource,
   deleteResource,
@@ -39,8 +39,12 @@ import { ResourceFormModal } from '@/components/screens/admin/resources/Resource
 
 export function AdminResourcesScreen({
   embedded = false,
+  addOpen,
+  onAddOpenChange,
 }: {
   embedded?: boolean;
+  addOpen?: boolean;
+  onAddOpenChange?: (open: boolean) => void;
 }) {
   const { session } = useAuth();
   const { showToast } = useToast();
@@ -58,8 +62,14 @@ export function AdminResourcesScreen({
   const [searchText, setSearchText] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('');
-  const [formOpen, setFormOpen] = React.useState(false);
+  const [internalFormOpen, setInternalFormOpen] = React.useState(false);
   const [editingResource, setEditingResource] = React.useState<ResourceResponse | null>(null);
+  const isControlled = onAddOpenChange !== undefined;
+  const formOpen = isControlled ? (addOpen ?? false) : internalFormOpen;
+  function setFormOpen(open: boolean) {
+    if (isControlled) onAddOpenChange?.(open);
+    else setInternalFormOpen(open);
+  }
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
@@ -254,17 +264,19 @@ export function AdminResourcesScreen({
                 </div>
               </div>
             </div>
-            <Button
-              variant="glass"
-              size="sm"
-              iconLeft={<Plus size={14} />}
-              onClick={() => {
-                setEditingResource(null);
-                setFormOpen(true);
-              }}
-            >
-              Add Resource
-            </Button>
+            {!isControlled && (
+              <Button
+                variant="glass"
+                size="sm"
+                iconLeft={<Plus size={14} />}
+                onClick={() => {
+                  setEditingResource(null);
+                  setFormOpen(true);
+                }}
+              >
+                Add Resource
+              </Button>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
@@ -292,26 +304,25 @@ export function AdminResourcesScreen({
           {loadError && <Alert variant="error" title="Could not load resources">{loadError}</Alert>}
           {lookupError && !formOpen && <Alert variant="error" title="Lookup data unavailable">{lookupError}</Alert>}
 
-          {formOpen && (
-            <ResourceFormModal
-              title={editingResource ? `Edit ${editingResource.code}` : 'Add Resource'}
-              resource={editingResource}
-              submitting={saving}
-              resourceTypeOptions={resourceTypeOptions}
-              locationOptions={locationOptions}
-              featureOptions={featureOptions}
-              managedByRoleOptions={managedByRoleOptions}
-              lookupsLoading={lookupLoading}
-              lookupError={lookupError}
-              onCancel={() => {
-                setFormOpen(false);
-                setEditingResource(null);
-              }}
-              onSubmit={async (payload) => {
-                await handleSave(payload);
-              }}
-            />
-          )}
+          <ResourceFormModal
+            open={formOpen}
+            title={editingResource ? `Edit ${editingResource.code}` : 'Add Resource'}
+            resource={editingResource}
+            submitting={saving}
+            resourceTypeOptions={resourceTypeOptions}
+            locationOptions={locationOptions}
+            featureOptions={featureOptions}
+            managedByRoleOptions={managedByRoleOptions}
+            lookupsLoading={lookupLoading}
+            lookupError={lookupError}
+            onClose={() => {
+              setFormOpen(false);
+              setEditingResource(null);
+            }}
+            onSubmit={async (payload) => {
+              await handleSave(payload);
+            }}
+          />
 
           <div style={{ overflowX: 'auto' }}>
             <Table>
@@ -323,7 +334,7 @@ export function AdminResourcesScreen({
                   <TableHeader>Status</TableHeader>
                   <TableHeader>Location</TableHeader>
                   <TableHeader>Availability</TableHeader>
-                  <TableHeader>Actions</TableHeader>
+                  <TableHeader style={{ textAlign: 'right' }}>Actions</TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -355,21 +366,26 @@ export function AdminResourcesScreen({
                         <TableCell><Chip color={getResourceStatusChipColor(resource.status)}>{getResourceStatusLabel(resource.status)}</Chip></TableCell>
                         <TableCell>{location ?? '—'}</TableCell>
                         <TableCell>{resourceAvailabilityLabel(resource)}</TableCell>
-                        <TableCell>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <Button
-                              size="xs"
-                              variant="subtle"
+                        <TableCell style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+                            <IconButton
+                              variant="neutral"
+                              icon={<Pencil size={13} />}
+                              title="Edit resource"
+                              aria-label={`Edit ${resource.code}`}
                               onClick={() => {
                                 setEditingResource(resource);
                                 setFormOpen(true);
                               }}
-                            >
-                              Edit
-                            </Button>
-                            <Button size="xs" variant="danger" loading={deletingId === resource.id} onClick={() => void handleDelete(resource)}>
-                              Deactivate
-                            </Button>
+                            />
+                            <IconButton
+                              variant="warning"
+                              icon={<CircleSlash size={13} />}
+                              title="Deactivate resource"
+                              aria-label={`Deactivate ${resource.code}`}
+                              loading={deletingId === resource.id}
+                              onClick={() => void handleDelete(resource)}
+                            />
                           </div>
                         </TableCell>
                       </TableRow>

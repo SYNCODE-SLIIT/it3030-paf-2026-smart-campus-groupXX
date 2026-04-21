@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Building2, Plus, Search } from 'lucide-react';
+import { Building2, CircleSlash, Pencil, Plus, Search } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { BuildingFormModal } from '@/components/screens/admin/buildings/BuildingFormModal';
-import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { Alert, Button, Card, Chip, IconButton, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import { createBuilding, deactivateBuilding, getErrorMessage, listBuildings, updateBuilding } from '@/lib/api-client';
 import { buildingTypeOptions, getBuildingLayoutLabel, getBuildingTypeChipColor, getBuildingTypeLabel } from '@/lib/building-display';
 import type { BuildingResponse, CreateBuildingRequest, UpdateBuildingRequest } from '@/lib/api-types';
@@ -212,20 +212,19 @@ export function AdminBuildingsScreen() {
 
           {loadError && <Alert variant="error" title="Could not load buildings">{loadError}</Alert>}
 
-          {formOpen && (
-            <BuildingFormModal
-              title={editingBuilding ? `Edit ${editingBuilding.buildingName}` : 'Add Building'}
-              building={editingBuilding}
-              submitting={saving}
-              onCancel={() => {
-                setFormOpen(false);
-                setEditingBuilding(null);
-              }}
-              onSubmit={async (payload) => {
-                await handleSave(payload);
-              }}
-            />
-          )}
+          <BuildingFormModal
+            open={formOpen}
+            title={editingBuilding ? `Edit ${editingBuilding.buildingName}` : 'Add Building'}
+            building={editingBuilding}
+            submitting={saving}
+            onClose={() => {
+              setFormOpen(false);
+              setEditingBuilding(null);
+            }}
+            onSubmit={async (payload) => {
+              await handleSave(payload);
+            }}
+          />
 
           <div style={{ overflowX: 'auto' }}>
             <Table>
@@ -236,7 +235,7 @@ export function AdminBuildingsScreen() {
                   <TableHeader>Type</TableHeader>
                   <TableHeader>Layout</TableHeader>
                   <TableHeader>Status</TableHeader>
-                  <TableHeader>Actions</TableHeader>
+                  <TableHeader style={{ textAlign: 'right' }}>Actions</TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -265,27 +264,27 @@ export function AdminBuildingsScreen() {
                           {building.isActive ? 'Active' : 'Inactive'}
                         </Chip>
                       </TableCell>
-                      <TableCell>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          <Button
-                            size="xs"
-                            variant="subtle"
+                      <TableCell style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+                          <IconButton
+                            variant="neutral"
+                            icon={<Pencil size={13} />}
+                            title="Edit building"
+                            aria-label={`Edit ${building.buildingName}`}
                             onClick={() => {
                               setEditingBuilding(building);
                               setFormOpen(true);
                             }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="xs"
-                            variant="danger"
+                          />
+                          <IconButton
+                            variant="warning"
+                            icon={<CircleSlash size={13} />}
+                            title={building.isActive ? 'Deactivate building' : 'Building already inactive'}
+                            aria-label={`Deactivate ${building.buildingName}`}
                             disabled={!building.isActive}
                             loading={deactivatingId === building.id}
                             onClick={() => void handleDeactivate(building)}
-                          >
-                            Deactivate
-                          </Button>
+                          />
                         </div>
                       </TableCell>
                     </TableRow>

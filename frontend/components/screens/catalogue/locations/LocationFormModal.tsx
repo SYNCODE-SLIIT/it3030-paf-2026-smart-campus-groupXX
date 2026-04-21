@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import { Alert, Button, Card, Input, Select, Textarea } from '@/components/ui';
+import { Alert, Button, Dialog, Input, Select, Textarea } from '@/components/ui';
 import type {
   BuildingResponse,
   CatalogueLocationResponse,
@@ -63,21 +63,23 @@ function valuesFromLocation(location: CatalogueLocationResponse | null): Locatio
 }
 
 export function LocationFormModal({
+  open,
   title,
   location,
   buildingOptions,
   existingLocations,
   submitting,
   onSubmit,
-  onCancel,
+  onClose,
 }: {
+  open: boolean;
   title: string;
   location: CatalogueLocationResponse | null;
   buildingOptions: BuildingResponse[];
   existingLocations: CatalogueLocationResponse[];
   submitting: boolean;
   onSubmit: (payload: CreateLocationRequest | UpdateLocationRequest) => Promise<void>;
-  onCancel: () => void;
+  onClose: () => void;
 }) {
   const [values, setValues] = React.useState<LocationFormValues>(() => valuesFromLocation(location));
   const [errors, setErrors] = React.useState<LocationFormErrors>({});
@@ -88,6 +90,7 @@ export function LocationFormModal({
   );
 
   React.useEffect(() => {
+    if (!open) return;
     const nextValues = valuesFromLocation(location);
     const nextBuilding = buildingOptions.find((building) => building.id === nextValues.buildingId) ?? null;
     nextValues.codeSuffix = extractCodeSuffixFromStoredCode(
@@ -99,7 +102,7 @@ export function LocationFormModal({
     );
     setValues(nextValues);
     setErrors({});
-  }, [buildingOptions, location]);
+  }, [buildingOptions, location, open]);
 
   const shouldShowWing = React.useMemo(
     () => Boolean(selectedBuilding?.hasWings),
@@ -178,19 +181,14 @@ export function LocationFormModal({
     await onSubmit(payload);
   }
 
-  return (
-    <Card>
-      <form onSubmit={(event) => void handleSubmit(event)} style={{ display: 'grid', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div>
-            <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: 'var(--text-h)' }}>{title}</p>
-            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              Assign locations to buildings and keep room-code structure aligned with the campus model.
-            </p>
-          </div>
-          <Button type="button" variant="subtle" size="sm" onClick={onCancel}>Close</Button>
-        </div>
+  function handleClose() {
+    if (submitting) return;
+    onClose();
+  }
 
+  return (
+    <Dialog open={open} onClose={handleClose} title={title} size="md" closeOnBackdropClick={!submitting}>
+      <form onSubmit={(event) => void handleSubmit(event)} style={{ padding: 24, display: 'grid', gap: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <Select
             label="Building"
@@ -316,12 +314,12 @@ export function LocationFormModal({
         />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <Button type="button" variant="subtle" onClick={onCancel}>Cancel</Button>
+          <Button type="button" variant="subtle" onClick={handleClose} disabled={submitting}>Cancel</Button>
           <Button type="submit" variant="glass" loading={submitting}>
             {location ? 'Update Location' : 'Create Location'}
           </Button>
         </div>
       </form>
-    </Card>
+    </Dialog>
   );
 }
