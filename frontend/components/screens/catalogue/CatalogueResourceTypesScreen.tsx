@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Boxes, Plus, Search } from 'lucide-react';
+import { Boxes, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { ResourceTypeFormModal } from '@/components/screens/catalogue/resource-types/ResourceTypeFormModal';
-import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { Alert, Button, Card, Chip, IconButton, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import {
   createCatalogueResourceType,
   deleteCatalogueResourceType,
@@ -24,8 +24,12 @@ import { getResourceCategoryChipColor, getResourceCategoryLabel, resourceCategor
 
 export function CatalogueResourceTypesScreen({
   embedded = false,
+  addOpen,
+  onAddOpenChange,
 }: {
   embedded?: boolean;
+  addOpen?: boolean;
+  onAddOpenChange?: (open: boolean) => void;
 }) {
   const { session } = useAuth();
   const { showToast } = useToast();
@@ -34,7 +38,7 @@ export function CatalogueResourceTypesScreen({
   const [resourceTypes, setResourceTypes] = React.useState<CatalogueResourceTypeResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [formOpen, setFormOpen] = React.useState(false);
+  const [internalFormOpen, setInternalFormOpen] = React.useState(false);
   const [editingResourceType, setEditingResourceType] = React.useState<CatalogueResourceTypeResponse | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -42,6 +46,13 @@ export function CatalogueResourceTypesScreen({
   const [categoryFilter, setCategoryFilter] = React.useState('');
 
   const deferredSearch = React.useDeferredValue(searchText);
+  const isControlled = onAddOpenChange !== undefined;
+  const formOpen = isControlled ? (addOpen ?? false) : internalFormOpen;
+
+  function setFormOpen(open: boolean) {
+    if (isControlled) onAddOpenChange?.(open);
+    else setInternalFormOpen(open);
+  }
 
   const reloadResourceTypes = React.useCallback(async () => {
     if (!accessToken) {
@@ -166,17 +177,19 @@ export function CatalogueResourceTypesScreen({
                 </div>
               </div>
             </div>
-            <Button
-              variant="glass"
-              size="sm"
-              iconLeft={<Plus size={14} />}
-              onClick={() => {
-                setEditingResourceType(null);
-                setFormOpen(true);
-              }}
-            >
-              Add Resource Type
-            </Button>
+            {!isControlled && (
+              <Button
+                variant="glass"
+                size="sm"
+                iconLeft={<Plus size={14} />}
+                onClick={() => {
+                  setEditingResourceType(null);
+                  setFormOpen(true);
+                }}
+              >
+                Add Resource Type
+              </Button>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
@@ -197,20 +210,19 @@ export function CatalogueResourceTypesScreen({
 
           {loadError && <Alert variant="error" title="Could not load resource types">{loadError}</Alert>}
 
-          {formOpen && (
-            <ResourceTypeFormModal
-              title={editingResourceType ? `Edit ${editingResourceType.name}` : 'Add Resource Type'}
-              resourceType={editingResourceType}
-              submitting={saving}
-              onCancel={() => {
-                setFormOpen(false);
-                setEditingResourceType(null);
-              }}
-              onSubmit={async (payload) => {
-                await handleSave(payload);
-              }}
-            />
-          )}
+          <ResourceTypeFormModal
+            open={formOpen}
+            title={editingResourceType ? `Edit ${editingResourceType.name}` : 'Add Resource Type'}
+            resourceType={editingResourceType}
+            submitting={saving}
+            onClose={() => {
+              setFormOpen(false);
+              setEditingResourceType(null);
+            }}
+            onSubmit={async (payload) => {
+              await handleSave(payload);
+            }}
+          />
 
           <div style={{ overflowX: 'auto' }}>
             <Table>
@@ -221,7 +233,7 @@ export function CatalogueResourceTypesScreen({
                   <TableHeader>Category</TableHeader>
                   <TableHeader>Defaults</TableHeader>
                   <TableHeader>Description</TableHeader>
-                  <TableHeader>Actions</TableHeader>
+                  <TableHeader style={{ textAlign: 'right' }}>Actions</TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -254,26 +266,26 @@ export function CatalogueResourceTypesScreen({
                         </div>
                       </TableCell>
                       <TableCell>{resourceType.description ?? '—'}</TableCell>
-                      <TableCell>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          <Button
-                            size="xs"
-                            variant="subtle"
+                      <TableCell style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+                          <IconButton
+                            variant="neutral"
+                            icon={<Pencil size={13} />}
+                            title="Edit resource type"
+                            aria-label={`Edit ${resourceType.name}`}
                             onClick={() => {
                               setEditingResourceType(resourceType);
                               setFormOpen(true);
                             }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="xs"
+                          />
+                          <IconButton
                             variant="danger"
+                            icon={<Trash2 size={13} />}
+                            title="Delete resource type"
+                            aria-label={`Delete ${resourceType.name}`}
                             loading={deletingId === resourceType.id}
                             onClick={() => void handleDelete(resourceType)}
-                          >
-                            Remove
-                          </Button>
+                          />
                         </div>
                       </TableCell>
                     </TableRow>

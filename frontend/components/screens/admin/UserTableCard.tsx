@@ -8,6 +8,7 @@ import {
   Alert,
   Button,
   Chip,
+  IconButton,
   Select,
   Skeleton,
   Table,
@@ -44,7 +45,6 @@ interface UserTableCardProps {
   loading: boolean;
   error: string | null;
   roleTab: RoleTab;
-  onRoleTabChange: (tab: RoleTab) => void;
   statusFilter: AccountStatus | '';
   onStatusFilterChange: (val: AccountStatus | '') => void;
   onReinviteUser: (user: UserResponse) => void;
@@ -63,44 +63,6 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
-function RoleTabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const [hovered, setHovered] = React.useState(false);
-  const highlighted = active || hovered;
-
-  return (
-    <button
-      role="tab"
-      aria-selected={active}
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '6px 14px',
-        border: `1px solid ${highlighted ? 'rgba(238,202,68,.4)' : 'transparent'}`,
-        borderRadius: 'var(--radius-xl)',
-        background: highlighted ? 'rgba(238,202,68,.12)' : 'transparent',
-        color: highlighted ? 'var(--yellow-700)' : 'var(--text-muted)',
-        fontFamily: 'var(--font-display)',
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '.04em',
-        cursor: 'pointer',
-        transition: 'background .15s, color .15s, border-color .15s',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
 
 function FilterToggleButton({ open, onClick }: { open: boolean; onClick: () => void }) {
   const [hovered, setHovered] = React.useState(false);
@@ -184,7 +146,6 @@ export function UserTableCard({
   loading,
   error,
   roleTab,
-  onRoleTabChange,
   statusFilter,
   onStatusFilterChange,
   onReinviteUser,
@@ -232,26 +193,8 @@ export function UserTableCard({
           gap: 12,
         }}
       >
-        {/* Tabs + filter toggle row */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 8,
-          }}
-        >
-          <div role="tablist" aria-label="Role filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {roleTabs.map((tab) => (
-              <RoleTabButton
-                key={tab.value}
-                label={tab.label}
-                active={roleTab === tab.value}
-                onClick={() => onRoleTabChange(tab.value)}
-              />
-            ))}
-          </div>
+        {/* Filter toggle */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <FilterToggleButton open={filtersOpen} onClick={() => setFiltersOpen((v) => !v)} />
         </div>
 
@@ -385,27 +328,23 @@ export function UserTableCard({
                     </Chip>
                   </TableCell>
                   <TableCell style={{ padding: '12px 20px', textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 7, justifyContent: 'flex-end' }}>
-                      <Button
-                        variant="subtle"
-                        size="xs"
+                    <div style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+                      <IconButton
+                        variant="neutral"
+                        icon={<Mail size={13} />}
                         title={user.accountStatus === 'SUSPENDED' ? 'Suspended users cannot be reinvited' : 'Reinvite user'}
                         aria-label={`Reinvite ${user.email}`}
                         loading={reinvitingUserId === user.id}
                         disabled={user.accountStatus === 'SUSPENDED'}
-                        iconLeft={<Mail size={13} />}
-                        style={{ width: 32, padding: 0 }}
                         onClick={() => onReinviteUser(user)}
                       />
-                      <Button
-                        variant="ghost-danger"
-                        size="xs"
+                      <IconButton
+                        variant="danger"
+                        icon={<Trash2 size={13} />}
                         title={currentUserId === user.id ? 'You cannot delete your own account' : 'Delete user'}
                         aria-label={`Delete ${user.email}`}
                         loading={deletingUserId === user.id}
                         disabled={currentUserId === user.id}
-                        iconLeft={<Trash2 size={13} />}
-                        style={{ width: 32, padding: 0 }}
                         onClick={() => onDeleteUser(user)}
                       />
                     </div>

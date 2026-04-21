@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Copy, Eye, Search, UserPlus, X } from 'lucide-react';
+import { Copy, Search, UserPlus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -412,9 +412,8 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
                       </TableCell>
                       <TableCell style={{ padding: '12px 20px', textAlign: 'right' }}>
                         <Button
-                          variant="subtle"
+                          variant="ghost"
                           size="xs"
-                          iconLeft={<Eye size={12} />}
                           onClick={() => router.push(`${config.detailBase}/${user.id}`)}
                         >
                           View

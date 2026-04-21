@@ -2,9 +2,10 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Trash2, User } from 'lucide-react';
+import { Clock, Trash2, User } from 'lucide-react';
 import { Button, Chip } from '@/components/ui';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
+import { computeSlaBadge } from '@/lib/sla';
 
 interface AssignOption {
   id: string;
@@ -15,6 +16,7 @@ interface TicketCardProps {
   ticket: TicketSummaryResponse;
   onView: () => void;
   showReporter?: boolean;
+  showSlaBadge?: boolean;
   assignOptions?: AssignOption[];
   onAssign?: (userId: string) => void;
   onDelete?: () => void;
@@ -98,13 +100,14 @@ function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-LK', { year: 'numeric', month: 'short', day: '2-digit' }).format(d);
 }
 
-export function TicketCard({ ticket, onView, showReporter = false, assignOptions, onAssign, onDelete }: TicketCardProps) {
+export function TicketCard({ ticket, onView, showReporter = false, showSlaBadge = false, assignOptions, onAssign, onDelete }: TicketCardProps) {
   const [assignOpen, setAssignOpen] = React.useState(false);
   const [assignMenuPosition, setAssignMenuPosition] = React.useState<AssignMenuPosition | null>(null);
   const assignRef = React.useRef<HTMLDivElement>(null);
   const assignButtonRef = React.useRef<HTMLButtonElement>(null);
   const assignMenuRef = React.useRef<HTMLDivElement>(null);
   const segs = STATUS_SEGS[ticket.status];
+  const slaBadge = showSlaBadge ? computeSlaBadge(ticket) : null;
 
   const updateAssignMenuPosition = React.useCallback(() => {
     const button = assignButtonRef.current;
@@ -291,6 +294,34 @@ export function TicketCard({ ticket, onView, showReporter = false, assignOptions
           {STATUS_DISPLAY[ticket.status]}
         </span>
       </div>
+
+      {/* SLA badge */}
+      {slaBadge && slaBadge !== 'ON_TRACK' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '5px 16px',
+            background: slaBadge === 'BREACHED' ? 'rgba(239,68,68,0.07)' : 'rgba(245,158,11,0.07)',
+            borderBottom: `1px solid ${slaBadge === 'BREACHED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)'}`,
+          }}
+        >
+          <Clock size={9} style={{ color: slaBadge === 'BREACHED' ? 'var(--red-500)' : 'var(--yellow-600)', flexShrink: 0 }} />
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: '.10em',
+              textTransform: 'uppercase',
+              color: slaBadge === 'BREACHED' ? 'var(--red-500)' : 'var(--yellow-600)',
+            }}
+          >
+            {slaBadge === 'BREACHED' ? 'SLA Breached' : 'SLA At Risk'}
+          </span>
+        </div>
+      )}
 
       {/* Footer */}
       <div style={{ padding: '10px 16px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>

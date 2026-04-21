@@ -22,7 +22,7 @@ export function TicketActionsCard({
 }: TicketActionsCardProps) {
   const { status } = ticket;
 
-  if (status === 'CLOSED' || status === 'REJECTED') return null;
+  if (status === 'CLOSED') return null;
 
   const buttons = (
     <>
@@ -36,15 +36,12 @@ export function TicketActionsCard({
           <Button fullWidth variant="success" size="sm" onClick={onResolveOpen} loading={statusSubmitting}>
             Mark Resolved
           </Button>
-          <Button fullWidth variant="subtle" size="sm" onClick={onClose} loading={statusSubmitting}>
-            Close Ticket
-          </Button>
           <Button fullWidth variant="danger" size="sm" onClick={onRejectOpen} loading={statusSubmitting}>
             Reject
           </Button>
         </>
       )}
-      {status === 'RESOLVED' && (
+      {(status === 'RESOLVED' || status === 'REJECTED') && (
         <Button fullWidth variant="subtle" size="sm" onClick={onClose} loading={statusSubmitting}>
           Close Ticket
         </Button>

@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
+import { Check } from 'lucide-react';
 
-import { Alert, Button, Card, Checkbox, Input, Select, Textarea, Toggle } from '@/components/ui';
+import { Alert, Button, Checkbox, Dialog, Input, Select, Textarea, Toggle } from '@/components/ui';
 import type {
   CreateResourceRequest,
   LocationOption,
@@ -52,6 +53,8 @@ const defaultValues: ResourceFormValues = {
   featureCodes: [],
 };
 
+const STEP_LABELS = ['Basics', 'Availability', 'Features'];
+
 function parseOptionalNumber(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -81,6 +84,7 @@ function valuesFromResource(resource: ResourceResponse | null): ResourceFormValu
 }
 
 export function ResourceFormModal({
+  open,
   title,
   resource,
   submitting,
@@ -91,8 +95,9 @@ export function ResourceFormModal({
   lookupsLoading,
   lookupError,
   onSubmit,
-  onCancel,
+  onClose,
 }: {
+  open: boolean;
   title: string;
   resource: ResourceResponse | null;
   submitting: boolean;
@@ -103,34 +108,69 @@ export function ResourceFormModal({
   lookupsLoading: boolean;
   lookupError: string | null;
   onSubmit: (payload: CreateResourceRequest | UpdateResourceRequest) => Promise<void>;
-  onCancel: () => void;
+  onClose: () => void;
 }) {
+  const [step, setStep] = React.useState(1);
   const [values, setValues] = React.useState<ResourceFormValues>(() => valuesFromResource(resource));
   const [errors, setErrors] = React.useState<ResourceFormErrors>({});
   const [managedByRoleTouched, setManagedByRoleTouched] = React.useState(false);
 
   React.useEffect(() => {
+    if (!open) return;
     setValues(valuesFromResource(resource));
     setErrors({});
     setManagedByRoleTouched(false);
-  }, [resource]);
+    setStep(1);
+  }, [open, resource]);
+
+  function validateStep(next: ResourceFormValues, targetStep: number) {
+    const nextErrors: ResourceFormErrors = {};
+    if (targetStep === 1) {
+      if (!resource && !next.code.trim()) nextErrors.code = 'Code is required.';
+      if (!next.name.trim()) nextErrors.name = 'Name is required.';
+      if (!next.resourceTypeId) nextErrors.resourceTypeId = 'Resource type is required.';
+    }
+    if (targetStep === 2) {
+      if (!next.locationId) nextErrors.locationId = 'Location is required.';
+      if (next.capacity.trim() && parseOptionalNumber(next.capacity) === null) nextErrors.capacity = 'Capacity must be a valid number.';
+      if (next.quantity.trim() && parseOptionalNumber(next.quantity) === null) nextErrors.quantity = 'Quantity must be a valid number.';
+    }
+    return nextErrors;
+  }
 
   function validate(next: ResourceFormValues) {
-    const nextErrors: ResourceFormErrors = {};
-    if (!resource && !next.code.trim()) nextErrors.code = 'Code is required.';
-    if (!next.name.trim()) nextErrors.name = 'Name is required.';
-    if (!next.resourceTypeId) nextErrors.resourceTypeId = 'Resource type is required.';
-    if (!next.locationId) nextErrors.locationId = 'Location is required.';
-    if (next.capacity.trim() && parseOptionalNumber(next.capacity) === null) nextErrors.capacity = 'Capacity must be a valid number.';
-    if (next.quantity.trim() && parseOptionalNumber(next.quantity) === null) nextErrors.quantity = 'Quantity must be a valid number.';
-    return nextErrors;
+    return {
+      ...validateStep(next, 1),
+      ...validateStep(next, 2),
+    };
+  }
+
+  function firstErrorStep(nextErrors: ResourceFormErrors) {
+    if (nextErrors.code || nextErrors.name || nextErrors.resourceTypeId) return 1;
+    if (nextErrors.locationId || nextErrors.capacity || nextErrors.quantity) return 2;
+    return 3;
+  }
+
+  function handleNext() {
+    const nextErrors = validateStep(values, step);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+    setStep((current) => Math.min(3, current + 1));
+  }
+
+  function handleClose() {
+    if (submitting) return;
+    onClose();
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const nextErrors = validate(values);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      setStep(firstErrorStep(nextErrors));
+      return;
+    }
 
     if (!resource) {
       const payload: CreateResourceRequest = {
@@ -197,16 +237,56 @@ export function ResourceFormModal({
   ];
 
   return (
-    <Card>
-      <form onSubmit={(event) => void handleSubmit(event)} style={{ display: 'grid', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div>
-            <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: 'var(--text-h)' }}>{title}</p>
-            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              Manage the normalized catalogue entry using resource types, locations, and reusable features.
-            </p>
-          </div>
-          <Button type="button" variant="subtle" size="sm" onClick={onCancel}>Close</Button>
+    <Dialog open={open} onClose={handleClose} title={title} size="lg" closeOnBackdropClick={!submitting}>
+      <form onSubmit={(event) => void handleSubmit(event)} style={{ padding: 24, display: 'grid', gap: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {([1, 2, 3] as const).map((s) => (
+            <React.Fragment key={s}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    background: s < step ? 'var(--green-500)' : s === step ? 'var(--yellow-400)' : 'var(--surface-2)',
+                    border: s > step ? '1.5px solid var(--border)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    color: s === step ? 'var(--yellow-900)' : s < step ? '#fff' : 'var(--text-muted)',
+                    flexShrink: 0,
+                    transition: 'background .2s',
+                  }}
+                >
+                  {s < step ? <Check size={12} strokeWidth={3} /> : s}
+                </div>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: s === step ? 700 : 400,
+                    color: s === step ? 'var(--text-h)' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-display)',
+                    letterSpacing: '.04em',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {STEP_LABELS[s - 1]}
+                </span>
+              </div>
+              {s < 3 && (
+                <div
+                  style={{
+                    flex: 1,
+                    height: 1,
+                    background: s < step ? 'var(--green-500)' : 'var(--border)',
+                    transition: 'background .2s',
+                  }}
+                />
+              )}
+            </React.Fragment>
+          ))}
         </div>
 
         {lookupError && (
@@ -215,164 +295,195 @@ export function ResourceFormModal({
           </Alert>
         )}
 
-        {resource && (
+        {resource && step === 1 && (
           <Alert variant="info" title="Code is read-only on existing resources">
-            The backend update contract does not currently support changing a resource code, so it is shown for reference only.
+            The backend update contract does not currently support changing a resource code.
           </Alert>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-          <Input
-            label="Code"
-            value={values.code}
-            onChange={(event) => setValues((current) => ({ ...current, code: event.target.value }))}
-            error={errors.code}
-            required={!resource}
-            disabled={Boolean(resource)}
-          />
-          <Input
-            label="Name"
-            value={values.name}
-            onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
-            error={errors.name}
-            required
-          />
-          <Select
-            label="Resource Type"
-            value={values.resourceTypeId}
-            onChange={(event) => setValues((current) => ({ ...current, resourceTypeId: event.target.value }))}
-            options={resourceTypeSelectOptions}
-            error={errors.resourceTypeId}
-            disabled={lookupsLoading}
-          />
-          <Select
-            label="Status"
-            value={values.status}
-            onChange={(event) => setValues((current) => ({ ...current, status: event.target.value as ResourceStatus }))}
-            options={resourceStatusOptions}
-          />
-        </div>
+        {step === 1 && (
+          <div style={{ display: 'grid', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+              <Input
+                label="Code"
+                value={values.code}
+                onChange={(event) => setValues((current) => ({ ...current, code: event.target.value }))}
+                error={errors.code}
+                required={!resource}
+                disabled={Boolean(resource)}
+              />
+              <Input
+                label="Name"
+                value={values.name}
+                onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
+                error={errors.name}
+                required
+              />
+              <Select
+                label="Resource Type"
+                value={values.resourceTypeId}
+                onChange={(event) => setValues((current) => ({ ...current, resourceTypeId: event.target.value }))}
+                options={resourceTypeSelectOptions}
+                error={errors.resourceTypeId}
+                disabled={lookupsLoading}
+              />
+            </div>
+            <Textarea
+              label="Description"
+              value={values.description}
+              onChange={(event) => setValues((current) => ({ ...current, description: event.target.value }))}
+              rows={4}
+            />
+          </div>
+        )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-          <Select
-            label="Location"
-            value={values.locationId}
-            onChange={(event) => setValues((current) => ({ ...current, locationId: event.target.value }))}
-            options={locationSelectOptions}
-            error={errors.locationId}
-            disabled={lookupsLoading}
-          />
-          <Select
-            label="Managed By Role"
-            value={values.managedByRole}
-            onChange={(event) => {
-              setManagedByRoleTouched(true);
-              setValues((current) => ({ ...current, managedByRole: event.target.value }));
-            }}
-            options={managedByRoleSelectOptions}
-            disabled={lookupsLoading || Boolean(lookupError)}
-            hint={!resource ? undefined : 'Current managed role is not returned by the resource response yet; choose a value only if you want to change it.'}
-          />
-          <Input
-            label="Capacity"
-            type="number"
-            min={0}
-            value={values.capacity}
-            onChange={(event) => setValues((current) => ({ ...current, capacity: event.target.value }))}
-            error={errors.capacity}
-          />
-          <Input
-            label="Quantity"
-            type="number"
-            min={0}
-            value={values.quantity}
-            onChange={(event) => setValues((current) => ({ ...current, quantity: event.target.value }))}
-            error={errors.quantity}
-          />
-        </div>
-
-        <Textarea
-          label="Description"
-          value={values.description}
-          onChange={(event) => setValues((current) => ({ ...current, description: event.target.value }))}
-          rows={4}
-        />
-
-        <div style={{ display: 'grid', gap: 12 }}>
-          <div>
-            <p style={{ margin: '0 0 8px', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
-              Features
-            </p>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: 12,
-                padding: 14,
-                border: '1.5px solid var(--input-border)',
-                borderRadius: 'var(--radius-md)',
-                background: 'var(--input-bg)',
-              }}
-            >
-              {featureOptions.length === 0 ? (
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  {lookupsLoading ? 'Loading feature options...' : 'No feature options are available yet.'}
-                </span>
-              ) : (
-                featureOptions.map((feature) => (
-                  <Checkbox
-                    key={feature.code}
-                    label={feature.name}
-                    checked={values.featureCodes.includes(feature.code)}
-                    onChange={(event) => {
-                      const checked = event.target.checked;
-                      setValues((current) => ({
-                        ...current,
-                        featureCodes: checked
-                          ? [...current.featureCodes, feature.code]
-                          : current.featureCodes.filter((code) => code !== feature.code),
-                      }));
-                    }}
-                  />
-                ))
-              )}
+        {step === 2 && (
+          <div style={{ display: 'grid', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+              <Select
+                label="Location"
+                value={values.locationId}
+                onChange={(event) => setValues((current) => ({ ...current, locationId: event.target.value }))}
+                options={locationSelectOptions}
+                error={errors.locationId}
+                disabled={lookupsLoading}
+              />
+              <Input
+                label="Capacity"
+                type="number"
+                min={0}
+                value={values.capacity}
+                onChange={(event) => setValues((current) => ({ ...current, capacity: event.target.value }))}
+                error={errors.capacity}
+              />
+              <Input
+                label="Quantity"
+                type="number"
+                min={0}
+                value={values.quantity}
+                onChange={(event) => setValues((current) => ({ ...current, quantity: event.target.value }))}
+                error={errors.quantity}
+              />
+              <Select
+                label="Status"
+                value={values.status}
+                onChange={(event) => setValues((current) => ({ ...current, status: event.target.value as ResourceStatus }))}
+                options={resourceStatusOptions}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+              <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+                <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
+                  Booking
+                </p>
+                <Toggle
+                  label="Bookable"
+                  checked={values.bookable}
+                  onChange={(checked) => setValues((current) => ({ ...current, bookable: checked }))}
+                />
+              </div>
+              <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+                <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
+                  Mobility
+                </p>
+                <Toggle
+                  label="Movable"
+                  checked={values.movable}
+                  onChange={(checked) => setValues((current) => ({ ...current, movable: checked }))}
+                />
+              </div>
             </div>
           </div>
-          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12 }}>
-            Feature selection uses the existing checkbox pattern for now so multi-select stays simple and consistent with the current UI.
-          </p>
-        </div>
+        )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
-          <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
-            <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
-              Booking
-            </p>
-            <Toggle
-              label="Bookable"
-              checked={values.bookable}
-              onChange={(checked) => setValues((current) => ({ ...current, bookable: checked }))}
+        {step === 3 && (
+          <div style={{ display: 'grid', gap: 14 }}>
+            <Select
+              label="Managed By Role"
+              value={values.managedByRole}
+              onChange={(event) => {
+                setManagedByRoleTouched(true);
+                setValues((current) => ({ ...current, managedByRole: event.target.value }));
+              }}
+              options={managedByRoleSelectOptions}
+              disabled={lookupsLoading || Boolean(lookupError)}
+              hint={!resource ? undefined : 'Choose a value only if you want to change the current managed role.'}
             />
+            <div>
+              <p style={{ margin: '0 0 8px', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
+                Features
+              </p>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: 12,
+                  padding: 14,
+                  border: '1.5px solid var(--input-border)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--input-bg)',
+                }}
+              >
+                {featureOptions.length === 0 ? (
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                    {lookupsLoading ? 'Loading feature options...' : 'No feature options are available yet.'}
+                  </span>
+                ) : (
+                  featureOptions.map((feature) => (
+                    <Checkbox
+                      key={feature.code}
+                      label={feature.name}
+                      checked={values.featureCodes.includes(feature.code)}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setValues((current) => ({
+                          ...current,
+                          featureCodes: checked
+                            ? [...current.featureCodes, feature.code]
+                            : current.featureCodes.filter((code) => code !== feature.code),
+                        }));
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
           </div>
-          <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
-            <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
-              Mobility
-            </p>
-            <Toggle
-              label="Movable"
-              checked={values.movable}
-              onChange={(checked) => setValues((current) => ({ ...current, movable: checked }))}
-            />
-          </div>
-        </div>
+        )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <Button type="button" variant="subtle" onClick={onCancel}>Cancel</Button>
-          <Button type="submit" variant="glass" loading={submitting} disabled={lookupsLoading}>
-            {resource ? 'Update Resource' : 'Create Resource'}
-          </Button>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--border)',
+          }}
+        >
+          <div>
+            {step > 1 && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setStep((current) => current - 1)} disabled={submitting}>
+                Back
+              </Button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button type="button" variant="subtle" size="sm" onClick={handleClose} disabled={submitting}>
+              Cancel
+            </Button>
+            {step < 3 ? (
+              <Button type="button" size="sm" onClick={handleNext} disabled={lookupsLoading}>
+                Next
+              </Button>
+            ) : (
+              <Button type="submit" size="sm" variant="glass" loading={submitting} disabled={lookupsLoading}>
+                {resource ? 'Update Resource' : 'Create Resource'}
+              </Button>
+            )}
+          </div>
         </div>
       </form>
-    </Card>
+    </Dialog>
   );
 }

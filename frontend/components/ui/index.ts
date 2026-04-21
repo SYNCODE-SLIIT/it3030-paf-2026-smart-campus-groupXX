@@ -6,6 +6,7 @@ export type { DropdownMenuItem } from './DropdownMenu';
 export { GlassPill } from './GlassPill';
 export { Badge } from './Badge';
 export { Button } from './Button';
+export { IconButton } from './IconButton';
 export { Card } from './Card';
 export { Checkbox } from './Checkbox';
 export { Chip } from './Chip';

@@ -6,9 +6,9 @@ import { TicketPlus } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
-import { Alert, Button, Card, Skeleton } from '@/components/ui';
+import { Alert, Button, Card, Dialog, Skeleton } from '@/components/ui';
 import { SubmitTicketModal, TicketCard } from '@/components/tickets';
-import { getErrorMessage, listMyTickets } from '@/lib/api-client';
+import { deleteTicket, getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
 
 const PRIORITY_ORDER: TicketPriority[] = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
@@ -32,9 +32,10 @@ interface StatusSectionProps {
   color: string;
   tickets: TicketSummaryResponse[];
   onView: (code: string) => void;
+  onDelete: (code: string) => void;
 }
 
-function StatusSection({ label, color, tickets, onView }: StatusSectionProps) {
+function StatusSection({ label, color, tickets, onView, onDelete }: StatusSectionProps) {
   if (tickets.length === 0) return null;
   const sorted = sortByPriority(tickets);
 
@@ -83,6 +84,7 @@ function StatusSection({ label, color, tickets, onView }: StatusSectionProps) {
               ticket={ticket}
               showReporter
               onView={() => onView(ticket.ticketCode)}
+              onDelete={ticket.status === 'OPEN' && ticket.assignedToId === null ? () => onDelete(ticket.ticketCode) : undefined}
             />
           </div>
         ))}
@@ -119,6 +121,8 @@ export function RequesterTicketsScreen({
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [deleteConfirmCode, setDeleteConfirmCode] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const reload = React.useCallback(async () => {
     if (!accessToken) {
@@ -145,6 +149,25 @@ export function RequesterTicketsScreen({
 
   const openCount = tickets.filter((t) => t.status === 'OPEN').length;
   const inProgressCount = tickets.filter((t) => t.status === 'IN_PROGRESS').length;
+
+  const handleDeleteRequest = React.useCallback((ticketCode: string) => {
+    setDeleteConfirmCode(ticketCode);
+  }, []);
+
+  const handleDeleteConfirm = React.useCallback(async () => {
+    if (!accessToken || !deleteConfirmCode) return;
+    setDeleting(true);
+    try {
+      await deleteTicket(accessToken, deleteConfirmCode);
+      setTickets((prev) => prev.filter((t) => t.ticketCode !== deleteConfirmCode));
+      showToast('success', 'Deleted', `Ticket ${deleteConfirmCode} has been permanently deleted.`);
+      setDeleteConfirmCode(null);
+    } catch (err) {
+      showToast('error', 'Delete failed', getErrorMessage(err, 'Could not delete the ticket.'));
+    } finally {
+      setDeleting(false);
+    }
+  }, [accessToken, deleteConfirmCode, showToast]);
 
   const handleView = React.useCallback(
     (code: string) => { router.push(`${ticketsBasePath}/${code}`); },
@@ -253,10 +276,32 @@ export function RequesterTicketsScreen({
               color={color}
               tickets={tickets.filter((t) => t.status === status)}
               onView={handleView}
+              onDelete={handleDeleteRequest}
             />
           ))}
         </div>
       )}
+
+      <Dialog
+        open={deleteConfirmCode !== null}
+        onClose={() => { if (!deleting) setDeleteConfirmCode(null); }}
+        title="Delete Ticket"
+        size="sm"
+      >
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-body)' }}>
+            This will permanently delete ticket <strong>{deleteConfirmCode}</strong> and all its attachments. This action cannot be undone.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmCode(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" loading={deleting} onClick={() => { void handleDeleteConfirm(); }}>
+              Delete Ticket
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       <SubmitTicketModal
         open={modalOpen}
