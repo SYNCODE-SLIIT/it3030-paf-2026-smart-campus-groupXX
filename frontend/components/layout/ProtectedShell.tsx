@@ -120,6 +120,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: Us
               allowedUserTypes: ['ADMIN'],
             },
             {
+              label: 'Bookings',
+              icon: Calendar,
+              href: '/admin/bookings',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
               label: 'Tickets',
               icon: Ticket,
               href: '/admin/tickets',
