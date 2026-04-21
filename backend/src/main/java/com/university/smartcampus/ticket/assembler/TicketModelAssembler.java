@@ -246,7 +246,7 @@ public class TicketModelAssembler {
         if (isAdmin(actor)) {
             return isTerminalStatus(ticket.status());
         }
-        return isReporter(actor, ticket) && ticket.status() == TicketStatus.OPEN;
+        return isReporter(actor, ticket) && ticket.assignedToId() == null;
     }
 
     private boolean canAssignTicket(UserEntity actor, TicketContext ticket) {

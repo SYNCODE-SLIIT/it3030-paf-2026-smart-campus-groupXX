@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
-import { Alert, Button, Input, Select, Skeleton } from '@/components/ui';
+import { Alert, Button, Dialog, Input, Select, Skeleton } from '@/components/ui';
 import {
   addTicketComment,
+  deleteTicket,
   deleteTicketAttachment,
   deleteTicketComment,
   getErrorMessage,
@@ -63,6 +64,9 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
 
   const [attachmentUploading, setAttachmentUploading] = React.useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = React.useState<string | null>(null);
+
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!accessToken) {
@@ -180,6 +184,19 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
     }
   }
 
+  async function handleDeleteTicket() {
+    if (!accessToken) return;
+    setDeleting(true);
+    try {
+      await deleteTicket(accessToken, ticketRef);
+      router.push('/students/tickets');
+    } catch (error) {
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the ticket.'));
+      setDeleting(false);
+      setDeleteModalOpen(false);
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -208,6 +225,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
   }
 
   const isCreator = appUser?.id === ticket.reportedById;
+  const canDelete = isCreator && ticket.status === 'OPEN' && ticket.assignedToId === null;
   const canModify = isCreator && ticket.status === 'OPEN';
   const canComment = ticket.status !== 'CLOSED' && ticket.status !== 'REJECTED';
   const commentLockReason = `Comments are disabled for ${ticket.status === 'CLOSED' ? 'closed' : 'rejected'} tickets.`;
@@ -276,6 +294,23 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
           <TicketDetailsCard ticket={ticket} />
           <TicketHistoryCard history={history} />
 
+          {canDelete && (
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px' }}>
+              <p style={{ margin: '0 0 10px', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                Danger Zone
+              </p>
+              <Button
+                variant="danger"
+                size="sm"
+                iconLeft={<Trash2 size={13} />}
+                style={{ width: '100%' }}
+                onClick={() => setDeleteModalOpen(true)}
+              >
+                Delete Ticket
+              </Button>
+            </div>
+          )}
+
           {canModify && (
             <div
               style={{
@@ -316,6 +351,22 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
           )}
         </div>
       </div>
+
+      <Dialog open={deleteModalOpen} onClose={() => { if (!deleting) setDeleteModalOpen(false); }} title="Delete Ticket" size="sm">
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-body)' }}>
+            This will permanently delete ticket <strong>{ticketRef}</strong> and all its attachments. This action cannot be undone.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button variant="ghost" size="sm" onClick={() => setDeleteModalOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" loading={deleting} onClick={() => { void handleDeleteTicket(); }}>
+              Delete Ticket
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </>
   );
 }

@@ -557,9 +557,13 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void reporterCanDeleteOwnOpenTicket() throws Exception {
-        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
-                seedTicket("student@campus.test", TicketStatus.OPEN));
+    void reporterCanDeleteOwnUnassignedOpenTicket() throws Exception {
+        TicketEntity ticket = seedTicket("student@campus.test", TicketStatus.OPEN);
+
+        mockMvc.perform(get("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._links['delete-ticket'].href").exists());
 
         mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
                         .with(jwtFor("student@campus.test")))
@@ -573,18 +577,22 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void reporterCannotDeleteOwnNonOpenTicket() throws Exception {
-        for (TicketStatus status : new TicketStatus[] {
-                TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REJECTED }) {
-            TicketEntity ticket = seedTicket("student@campus.test", status);
+    void reporterCannotDeleteOwnAssignedOpenTicket() throws Exception {
+        TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
+                seedTicket("student@campus.test", TicketStatus.OPEN));
 
-            mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
-                            .with(jwtFor("student@campus.test")))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Tickets can only be deleted by the reporter while open."));
+        mockMvc.perform(get("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._links['delete-ticket']").doesNotExist());
 
-            assertThat(ticketRepository.findById(ticket.getId())).isPresent();
-        }
+        mockMvc.perform(delete("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("student@campus.test")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        "Tickets can only be deleted by the reporter before assignment."));
+
+        assertThat(ticketRepository.findById(ticket.getId())).isPresent();
     }
 
     @Test

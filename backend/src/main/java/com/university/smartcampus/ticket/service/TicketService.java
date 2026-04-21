@@ -164,8 +164,8 @@ public class TicketService {
             if (!ticket.getReportedBy().getId().equals(user.getId())) {
                 throw new ForbiddenException("Only the ticket reporter or admin can delete tickets.");
             }
-            if (ticket.getStatus() != TicketStatus.OPEN) {
-                throw new BadRequestException("Tickets can only be deleted by the reporter while open.");
+            if (ticket.getAssignedTo() != null) {
+                throw new BadRequestException("Tickets can only be deleted by the reporter before assignment.");
             }
         }
 
