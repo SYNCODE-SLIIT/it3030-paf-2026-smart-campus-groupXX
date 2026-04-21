@@ -477,6 +477,10 @@ export interface AddCommentRequest {
   commentText: string;
 }
 
+export interface UpdateCommentRequest {
+  commentText: string;
+}
+
 export interface TicketAttachmentResponse {
   id: string;
   ticketId: string;

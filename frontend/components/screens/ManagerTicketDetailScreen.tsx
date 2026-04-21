@@ -15,6 +15,7 @@ import {
   getTicketHistory,
   listTicketAttachments,
   listTicketComments,
+  updateTicketComment,
   updateTicketStatus,
 } from '@/lib/api-client';
 import type {
@@ -137,6 +138,17 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
     }
   }
 
+  async function handleEditComment(commentId: string, newText: string) {
+    if (!accessToken) return;
+    try {
+      const updated = await updateTicketComment(accessToken, ticketRef, commentId, { commentText: newText });
+      setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)));
+    } catch (error) {
+      showToast('error', 'Edit failed', getErrorMessage(error, 'Could not update the comment.'));
+      throw error;
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -214,6 +226,7 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             currentUserId={appUser?.id}
             onDeleteComment={handleDeleteComment}
             commentDeleting={commentDeleting}
+            onEditComment={handleEditComment}
           />
           <TicketAttachmentsCard attachments={attachments} />
         </div>

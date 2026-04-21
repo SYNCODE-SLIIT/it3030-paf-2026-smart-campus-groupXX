@@ -17,6 +17,7 @@ import {
   listTicketAttachments,
   listTicketComments,
   updateTicket,
+  updateTicketComment,
   uploadTicketAttachment,
 } from '@/lib/api-client';
 import type {
@@ -138,6 +139,17 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
     }
   }
 
+  async function handleEditComment(commentId: string, newText: string) {
+    if (!accessToken) return;
+    try {
+      const updated = await updateTicketComment(accessToken, ticketRef, commentId, { commentText: newText });
+      setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)));
+    } catch (error) {
+      showToast('error', 'Edit failed', getErrorMessage(error, 'Could not update the comment.'));
+      throw error;
+    }
+  }
+
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !accessToken) return;
@@ -245,6 +257,7 @@ export function StudentTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             currentUserId={appUser?.id}
             onDeleteComment={handleDeleteComment}
             commentDeleting={commentDeleting}
+            onEditComment={handleEditComment}
           />
           <TicketAttachmentsCard
             attachments={attachments}
