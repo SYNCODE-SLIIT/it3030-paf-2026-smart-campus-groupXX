@@ -152,6 +152,29 @@ public class TicketService {
     }
 
     @Transactional
+    public void deleteTicket(UserEntity user, String ticketRef) {
+        TicketEntity ticket = getTicketEntity(ticketRef);
+
+        if (isAdmin(user)) {
+            if (!isTerminalStatus(ticket.getStatus())) {
+                throw new BadRequestException("Admins can only delete resolved, closed, or rejected tickets.");
+            }
+        } else {
+            if (!ticket.getReportedBy().getId().equals(user.getId())) {
+                throw new ForbiddenException("Only the ticket reporter or admin can delete tickets.");
+            }
+            if (ticket.getStatus() != TicketStatus.OPEN) {
+                throw new BadRequestException("Tickets can only be deleted by the reporter while open.");
+            }
+        }
+
+        for (String fileUrl : ticketAttachmentRepository.findFileUrlsByTicketId(ticket.getId())) {
+            ticketAttachmentStorageClient.deleteByPublicUrl(fileUrl);
+        }
+        ticketRepository.delete(ticket);
+    }
+
+    @Transactional
     public TicketResponse updateStatus(UserEntity manager, String ticketRef, TicketStatusUpdateRequest request) {
         if (request.assignedTo() != null) {
             throw new BadRequestException("Ticket assignment must use the assignment endpoint.");
@@ -240,10 +263,30 @@ public class TicketService {
     @Transactional(readOnly = true)
     public List<TicketCommentResponse> listComments(UserEntity user, String ticketRef) {
         TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
-        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId())
+        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAscIdAsc(ticket.getId())
                 .stream()
                 .map(this::toCommentResponse)
                 .toList();
+    }
+
+    @Transactional
+    public void deleteComment(UserEntity user, String ticketRef, UUID commentId) {
+        TicketEntity ticket = requireAccessibleTicket(user, ticketRef);
+        TicketCommentEntity comment = ticketCommentRepository.findByIdAndTicketId(commentId, ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket comment not found."));
+
+        if (!isAdmin(user) && !comment.getUser().getId().equals(user.getId())) {
+            throw new ForbiddenException("You can only delete your own comments.");
+        }
+
+        TicketCommentEntity latestComment = ticketCommentRepository
+                .findFirstByTicketIdOrderByCreatedAtDescIdDesc(ticket.getId())
+                .orElseThrow(() -> new NotFoundException("Ticket comment not found."));
+        if (!latestComment.getId().equals(comment.getId())) {
+            throw new BadRequestException("Only the latest ticket comment can be deleted.");
+        }
+
+        ticketCommentRepository.delete(comment);
     }
 
     @Transactional(readOnly = true)
@@ -404,6 +447,12 @@ public class TicketService {
     private boolean isAssignedTo(TicketEntity ticket, UserEntity user) {
         return ticket.getAssignedTo() != null
                 && ticket.getAssignedTo().getId().equals(user.getId());
+    }
+
+    private boolean isTerminalStatus(TicketStatus status) {
+        return status == TicketStatus.RESOLVED
+                || status == TicketStatus.CLOSED
+                || status == TicketStatus.REJECTED;
     }
 
     private boolean isAdmin(UserEntity user) {

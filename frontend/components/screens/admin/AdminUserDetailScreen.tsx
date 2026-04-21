@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AuditLogTimeline } from '@/components/screens/admin/AuditLogTimeline';
+import { useToast } from '@/components/providers/ToastProvider';
 import { ProfileFields } from '@/components/screens/admin/ProfileFields';
 import { RoleRadioGroup } from '@/components/screens/admin/RoleRadioGroup';
 import { Alert, Avatar, Button, Card, Chip, Divider, Input, Select, Skeleton } from '@/components/ui';
@@ -49,12 +50,6 @@ import {
   getUserTypeChipColor,
   getUserTypeLabel,
 } from '@/lib/user-display';
-
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 type ConfirmAction = 'reinvite' | 'delete' | null;
 
@@ -297,12 +292,12 @@ function ConfirmMessage({
 export function AdminUserDetailScreen({ userId }: { userId: string }) {
   const router = useRouter();
   const { session, appUser } = useAuth();
+  const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
   const [user, setUser] = React.useState<UserResponse | null>(null);
   const [loadingUser, setLoadingUser] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [accountStatus, setAccountStatus] = React.useState<AccountStatus>('INVITED');
   const [managerRole, setManagerRole] = React.useState<ManagerRole | ''>('');
   const [studentForm, setStudentForm] = React.useState(createEmptyStudentForm);
@@ -417,21 +412,21 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
     startCopyTransition(async () => {
       try {
         await navigator.clipboard.writeText(user.lastInviteReference ?? '');
-        setNotice({ variant: 'success', title: 'Copied', message: 'Access link copied to clipboard.' });
+        showToast('success', 'Copied', 'Access link copied to clipboard.');
       } catch {
-        setNotice({ variant: 'error', title: 'Copy failed', message: 'Could not copy the access link.' });
+        showToast('error', 'Copy failed', 'Could not copy the access link.');
       }
     });
   }
 
   async function handleResendInvite() {
     if (!accessToken || !user) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
     if (user.accountStatus === 'SUSPENDED') {
-      setNotice({ variant: 'warning', title: 'Action blocked', message: 'Suspended users cannot receive new links.' });
+      showToast('warning', 'Action blocked', 'Suspended users cannot receive new links.');
       return;
     }
 
@@ -441,9 +436,9 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         const refreshed = await getUser(accessToken, user.id);
         setUser(refreshed);
         void loadActivity(0, false);
-        setNotice({ variant: 'success', title: 'Access link generated', message: 'A fresh access link is ready.' });
+        showToast('success', 'Access link generated', 'A fresh access link is ready.');
       } catch (error) {
-        setNotice({ variant: 'error', title: 'Link generation failed', message: getErrorMessage(error, 'We could not generate a new access link.') });
+        showToast('error', 'Link generation failed', getErrorMessage(error, 'We could not generate a new access link.'));
       } finally {
         setConfirmAction(null);
       }
@@ -452,7 +447,7 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
 
   async function handleSave() {
     if (!accessToken || !user) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
@@ -486,31 +481,31 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         setUser(updated);
         void loadActivity(0, false);
         setIsEditing(false);
-        setNotice({ variant: 'success', title: 'Saved', message: 'User profile and access details were updated.' });
+        showToast('success', 'Saved', 'User profile and access details were updated.');
       } catch (error) {
-        setNotice({ variant: 'error', title: 'Save failed', message: getErrorMessage(error, 'We could not save this user.') });
+        showToast('error', 'Save failed', getErrorMessage(error, 'We could not save this user.'));
       }
     });
   }
 
   async function handleDelete() {
     if (!accessToken || !user) {
-      setNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
+      showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
     if (appUser?.id === user.id) {
-      setNotice({ variant: 'warning', title: 'Action blocked', message: 'You cannot delete your own account.' });
+      showToast('warning', 'Action blocked', 'You cannot delete your own account.');
       return;
     }
 
     startDeleteTransition(async () => {
       try {
         await deleteUser(accessToken, user.id);
-        setNotice({ variant: 'success', title: 'User deleted', message: `${user.email} was removed.` });
+        showToast('success', 'User deleted', `${user.email} was removed.`);
         router.push(detailListPath(user));
       } catch (error) {
-        setNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete this user.') });
+        showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete this user.'));
       } finally {
         setConfirmAction(null);
       }
@@ -744,11 +739,6 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         </div>
       </div>
 
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title}>
-          {notice.message}
-        </Alert>
-      )}
 
       <Card>
         <div className="admin-summary-card">

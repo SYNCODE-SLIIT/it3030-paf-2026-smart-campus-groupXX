@@ -5,16 +5,11 @@ import { useRouter } from 'next/navigation';
 import { TicketPlus } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Skeleton } from '@/components/ui';
 import { SubmitTicketModal, TicketCard } from '@/components/tickets';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
-
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 const PRIORITY_ORDER: TicketPriority[] = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
 
@@ -98,13 +93,13 @@ function StatusSection({ label, color, tickets, onView }: StatusSectionProps) {
 
 export function StudentTicketsScreen() {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
   const [tickets, setTickets] = React.useState<TicketSummaryResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
 
   const reload = React.useCallback(async () => {
@@ -181,12 +176,6 @@ export function StudentTicketsScreen() {
         </Button>
       </div>
 
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)}>
-          {notice.message}
-        </Alert>
-      )}
-
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
         <Card>
@@ -256,7 +245,7 @@ export function StudentTicketsScreen() {
         onClose={() => setModalOpen(false)}
         onSuccess={() => {
           void reload();
-          setNotice({ variant: 'success', title: 'Ticket submitted', message: 'Your support ticket has been created.' });
+          showToast('success', 'Ticket submitted', 'Your support ticket has been created.');
         }}
       />
     </div>

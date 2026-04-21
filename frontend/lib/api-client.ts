@@ -708,6 +708,10 @@ export async function updateTicket(
   return request<TicketResponse>(ticketApiPath(ticketRef), { method: 'PATCH', accessToken, body: payload });
 }
 
+export async function deleteTicket(accessToken: string, ticketRef: string): Promise<void> {
+  return request<void>(ticketApiPath(ticketRef), { method: 'DELETE', accessToken });
+}
+
 export async function listTicketComments(
   accessToken: string,
   ticketRef: string,
@@ -721,6 +725,14 @@ export async function addTicketComment(
   payload: AddCommentRequest,
 ): Promise<TicketCommentResponse> {
   return request<TicketCommentResponse>(`${ticketApiPath(ticketRef)}/comments`, { method: 'POST', accessToken, body: payload });
+}
+
+export async function deleteTicketComment(
+  accessToken: string,
+  ticketRef: string,
+  commentId: string,
+): Promise<void> {
+  return request<void>(`${ticketApiPath(ticketRef)}/comments/${commentId}`, { method: 'DELETE', accessToken });
 }
 
 export async function listTicketAttachments(

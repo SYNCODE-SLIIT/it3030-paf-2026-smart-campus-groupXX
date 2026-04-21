@@ -2,13 +2,16 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Dialog, Skeleton, Textarea } from '@/components/ui';
 import {
   addTicketComment,
   assignTicket,
+  deleteTicket,
+  deleteTicketComment,
   getErrorMessage,
   getTicket,
   getTicketHistory,
@@ -36,14 +39,9 @@ import {
   TicketHistoryCard,
 } from '@/components/tickets/detail';
 
-type NoticeState = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
-
 export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
   const { session, appUser } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
@@ -55,7 +53,6 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
 
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<NoticeState>(null);
 
   const [assigning, setAssigning] = React.useState(false);
 
@@ -68,6 +65,10 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
 
   const [commentText, setCommentText] = React.useState('');
   const [commentSubmitting, setCommentSubmitting] = React.useState(false);
+  const [commentDeleting, setCommentDeleting] = React.useState<string | null>(null);
+
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!accessToken) { setLoading(false); setLoadError('Your session is unavailable.'); return; }
@@ -101,9 +102,9 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
     try {
       const updated = await assignTicket(accessToken, ticketRef, { assignedTo: userId });
       setTicket(updated);
-      setNotice({ variant: 'success', title: 'Assigned', message: 'Ticket assigned successfully.' });
+      showToast('success', 'Assigned', 'Ticket assigned successfully.');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Assignment failed', message: getErrorMessage(error, 'Could not assign the ticket.') });
+      showToast('error', 'Assignment failed', getErrorMessage(error, 'Could not assign the ticket.'));
     } finally {
       setAssigning(false);
     }
@@ -127,9 +128,9 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
       setRejectionReason('');
       setResolveModalOpen(false);
       setRejectModalOpen(false);
-      setNotice({ variant: 'success', title: 'Status updated', message: `Ticket is now ${newStatus.replace('_', ' ').toLowerCase()}.` });
+      showToast('success', 'Status updated', `Ticket is now ${newStatus.replace('_', ' ').toLowerCase()}.`);
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Update failed', message: getErrorMessage(error, 'Could not update status.') });
+      showToast('error', 'Update failed', getErrorMessage(error, 'Could not update status.'));
     } finally {
       setStatusSubmitting(false);
     }
@@ -144,9 +145,35 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
       setComments((prev) => [...prev, newComment]);
       setCommentText('');
     } catch (error) {
-      setNotice({ variant: 'error', title: 'Comment failed', message: getErrorMessage(error, 'Could not post the comment.') });
+      showToast('error', 'Comment failed', getErrorMessage(error, 'Could not post the comment.'));
     } finally {
       setCommentSubmitting(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    if (!accessToken) return;
+    setCommentDeleting(commentId);
+    try {
+      await deleteTicketComment(accessToken, ticketRef, commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the comment.'));
+    } finally {
+      setCommentDeleting(null);
+    }
+  }
+
+  async function handleDeleteTicket() {
+    if (!accessToken) return;
+    setDeleting(true);
+    try {
+      await deleteTicket(accessToken, ticketRef);
+      router.push('/admin/tickets');
+    } catch (error) {
+      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the ticket.'));
+      setDeleting(false);
+      setDeleteModalOpen(false);
     }
   }
 
@@ -178,6 +205,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
   }
 
   const isClosed = ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
+  const isDone = ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' || ticket.status === 'REJECTED';
   const isAssignedToMe = Boolean(appUser && ticket.assignedToId === appUser.id);
   const canManageStatus = isAssignedToMe && !isClosed;
   const canComment = ticket.status === 'IN_PROGRESS';
@@ -196,11 +224,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
         Back to Tickets
       </Button>
 
-      {notice && (
-        <Alert variant={notice.variant} title={notice.title} dismissible onDismiss={() => setNotice(null)} style={{ marginBottom: 20 }}>
-          {notice.message}
-        </Alert>
-      )}
+
 
       {/* Hero — full width */}
       <div style={{ marginBottom: 20 }}>
@@ -246,6 +270,9 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
             onCommentChange={setCommentText}
             onCommentSubmit={handleAddComment}
             formIdPrefix="admin"
+            canDeleteAny
+            onDeleteComment={handleDeleteComment}
+            commentDeleting={commentDeleting}
           />
           <TicketAttachmentsCard attachments={attachments} />
         </div>
@@ -261,6 +288,22 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
               onClose={() => { void handleStatusChange('CLOSED'); }}
               onRejectOpen={() => setRejectModalOpen(true)}
             />
+          )}
+          {isDone && (
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px' }}>
+              <p style={{ margin: '0 0 10px', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                Danger Zone
+              </p>
+              <Button
+                variant="danger"
+                size="sm"
+                iconLeft={<Trash2 size={13} />}
+                style={{ width: '100%' }}
+                onClick={() => setDeleteModalOpen(true)}
+              >
+                Delete Ticket
+              </Button>
+            </div>
           )}
           <TicketDetailsCard ticket={ticket} />
           <TicketHistoryCard history={history} />
@@ -342,6 +385,23 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
               onClick={() => { void handleStatusChange('REJECTED'); }}
             >
               Confirm Reject
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Delete ticket modal */}
+      <Dialog open={deleteModalOpen} onClose={() => { if (!deleting) setDeleteModalOpen(false); }} title="Delete Ticket" size="sm">
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-body)' }}>
+            This will permanently delete ticket <strong>{ticketRef}</strong> and all its attachments. This action cannot be undone.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button variant="ghost" size="sm" onClick={() => setDeleteModalOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" loading={deleting} onClick={() => { void handleDeleteTicket(); }}>
+              Delete Ticket
             </Button>
           </div>
         </div>

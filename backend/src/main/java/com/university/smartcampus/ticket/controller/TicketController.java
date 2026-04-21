@@ -77,6 +77,13 @@ public class TicketController {
         return ticketService.getTicket(user, ticketRef);
     }
 
+    @DeleteMapping("/{ticketRef}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTicket(@PathVariable String ticketRef, Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        ticketService.deleteTicket(user, ticketRef);
+    }
+
     @PatchMapping("/{ticketRef}")
     public TicketResponse updateTicket(
             @PathVariable String ticketRef,
@@ -118,6 +125,16 @@ public class TicketController {
             Authentication authentication) {
         UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
         return ticketService.addComment(user, ticketRef, request);
+    }
+
+    @DeleteMapping("/{ticketRef}/comments/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteComment(
+            @PathVariable String ticketRef,
+            @PathVariable UUID commentId,
+            Authentication authentication) {
+        UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        ticketService.deleteComment(user, ticketRef, commentId);
     }
 
     @GetMapping("/{ticketRef}/attachments")
