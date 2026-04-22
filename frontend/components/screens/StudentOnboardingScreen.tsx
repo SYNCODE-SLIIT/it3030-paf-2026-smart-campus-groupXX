@@ -1,7 +1,17 @@
 'use client';
 
 import React from 'react';
-import { ImageUp, Mail, MessageSquare, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  GraduationCap,
+  ImageUp,
+  Mail,
+  MessageSquare,
+  UserRound,
+  X,
+} from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Avatar, Button, Chip, Input, Select, Skeleton, Toggle } from '@/components/ui';
@@ -134,6 +144,8 @@ interface OnboardingFormState {
   smsNotificationsEnabled: boolean;
 }
 
+type OnboardingStep = 'personal' | 'academic';
+
 function toFormState(profile: UserResponse['studentProfile']): OnboardingFormState {
   const parsedPhone = parsePhoneForForm(profile?.phoneNumber ?? '');
 
@@ -159,6 +171,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
   const [formState, setFormState] = React.useState<OnboardingFormState>(() =>
     toFormState(resolvedUser?.studentProfile ?? null),
   );
+  const [currentStep, setCurrentStep] = React.useState<OnboardingStep>('personal');
   const [loadingState, setLoadingState] = React.useState(true);
   const [alert, setAlert] = React.useState<{
     variant: 'error' | 'success' | 'info' | 'warning' | 'neutral';
@@ -297,25 +310,14 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!session?.access_token) {
+  function validatePersonalInfo() {
+    if (!formState.firstName.trim() || !formState.lastName.trim()) {
       setAlert({
         variant: 'error',
-        title: 'Session expired',
-        message: 'Please sign in again before completing onboarding.',
+        title: 'Personal details required',
+        message: 'Enter your first and last name before continuing.',
       });
-      return;
-    }
-
-    if (!formState.firstName || !formState.lastName) {
-      setAlert({
-        variant: 'error',
-        title: 'Missing required fields',
-        message: 'Please complete all required fields before submitting onboarding.',
-      });
-      return;
+      return false;
     }
 
     const phoneValidationError = getPhoneValidationError(formState.phoneCountryCode, formState.phoneNumber);
@@ -326,9 +328,13 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
         title: 'Invalid phone number',
         message: phoneValidationError,
       });
-      return;
+      return false;
     }
 
+    return true;
+  }
+
+  function validateAcademicInfo() {
     const facultyName = formState.facultyName;
     const programName = formState.programName;
     const academicYear = formState.academicYear;
@@ -338,10 +344,58 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       setAlert({
         variant: 'error',
         title: 'Academic details required',
-        message: 'Faculty, program, academic year, and semester are required for student onboarding.',
+        message: 'Choose your faculty, program, academic year, and semester before completing onboarding.',
+      });
+      return null;
+    }
+
+    return { facultyName, programName, academicYear, semester };
+  }
+
+  function handleNextStep() {
+    if (!validatePersonalInfo()) {
+      return;
+    }
+
+    setAlert(null);
+    setCurrentStep('academic');
+  }
+
+  function handleBackStep() {
+    setAlert(null);
+    setCurrentStep('personal');
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (currentStep === 'personal') {
+      handleNextStep();
+      return;
+    }
+
+    if (!session?.access_token) {
+      setAlert({
+        variant: 'error',
+        title: 'Session expired',
+        message: 'Please sign in again before completing onboarding.',
       });
       return;
     }
+
+    if (!validatePersonalInfo()) {
+      setCurrentStep('personal');
+      return;
+    }
+
+    const academicInfo = validateAcademicInfo();
+
+    if (!academicInfo) {
+      setCurrentStep('academic');
+      return;
+    }
+
+    const { facultyName, programName, academicYear, semester } = academicInfo;
 
     startSubmitTransition(async () => {
       let submitStep: 'image' | 'onboarding' = 'onboarding';
@@ -422,6 +476,10 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       ? `${selectedPhoneCountry.minNationalDigits} digits`
       : `${selectedPhoneCountry.minNationalDigits}-${selectedPhoneCountry.maxNationalDigits} digits`;
   const heroImageUrl = '/onboarding-hero.jpg';
+  const isPersonalStep = currentStep === 'personal';
+  const currentStepNumber = isPersonalStep ? 1 : 2;
+  const profileInitials =
+    `${formState.firstName?.[0] ?? resolvedUser.email[0] ?? 'S'}${formState.lastName?.[0] ?? ''}`.toUpperCase();
 
   return (
     <div className="onboarding-page">
@@ -1006,28 +1064,583 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
             font-size: 21px;
           }
         }
+
+        .onboarding-layout {
+          grid-template-columns: minmax(0, 1fr) minmax(250px, 310px);
+          width: min(100%, 1240px);
+          height: auto;
+          min-height: min(680px, calc(100dvh - 26px));
+          max-height: none;
+          overflow: hidden;
+        }
+
+        .onboarding-form-panel {
+          order: 1;
+          padding: clamp(18px, 2.4vw, 34px);
+          overflow-y: auto;
+        }
+
+        .onboarding-form-content {
+          max-width: 880px;
+          gap: 18px;
+        }
+
+        .onboarding-hero {
+          order: 2;
+          min-height: 100%;
+          border-right: none;
+          border-left: 1px solid rgba(255,255,255,.07);
+        }
+
+        .onboarding-hero-copy {
+          inset: auto 20px 20px;
+          max-width: none;
+        }
+
+        .onboarding-hero-heading {
+          font-size: clamp(26px, 2.5vw, 34px);
+          letter-spacing: 0;
+        }
+
+        .onboarding-hero-desc,
+        .onboarding-title,
+        .onboarding-section-title,
+        .onboarding-profile-title,
+        .onboarding-notice-title,
+        .onboarding-toggle-label {
+          letter-spacing: 0;
+        }
+
+        .onboarding-header {
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: end;
+          gap: 12px;
+        }
+
+        .onboarding-header-copy {
+          display: grid;
+          gap: 8px;
+        }
+
+        .onboarding-title {
+          font-size: clamp(30px, 4vw, 46px);
+          line-height: 1.04;
+        }
+
+        .onboarding-header-text {
+          margin: 0;
+          color: var(--text-muted);
+          font-size: 14px;
+          line-height: 1.55;
+          max-width: 620px;
+        }
+
+        .onboarding-step-pill {
+          justify-self: end;
+          min-width: 96px;
+          height: 40px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(238,202,68,.22);
+          color: var(--yellow-300);
+          background: rgba(238,202,68,.08);
+          font-family: var(--font-mono);
+          font-size: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: .12em;
+        }
+
+        .onboarding-stepper {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+
+        .onboarding-step {
+          border: 1px solid rgba(255,255,255,.1);
+          background: rgba(255,255,255,.035);
+          border-radius: 12px;
+          padding: 12px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+
+        .onboarding-step.active {
+          border-color: rgba(238,202,68,.42);
+          background: rgba(238,202,68,.1);
+        }
+
+        .onboarding-step.complete {
+          border-color: rgba(20,164,87,.34);
+          background: rgba(20,164,87,.09);
+        }
+
+        .onboarding-step-icon {
+          width: 30px;
+          height: 30px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--yellow-900);
+          background: var(--yellow-400);
+          flex-shrink: 0;
+        }
+
+        .onboarding-step.complete .onboarding-step-icon {
+          color: #fff;
+          background: var(--green-500);
+        }
+
+        .onboarding-step-copy {
+          min-width: 0;
+        }
+
+        .onboarding-step-copy p {
+          margin: 0;
+        }
+
+        .onboarding-step-label {
+          color: var(--text-h);
+          font-weight: 800;
+          font-size: 13px;
+        }
+
+        .onboarding-step-caption {
+          color: var(--text-muted);
+          font-size: 12px;
+          line-height: 1.35;
+        }
+
+        .onboarding-progress-track {
+          height: 6px;
+          border-radius: 999px;
+          overflow: hidden;
+          background: rgba(255,255,255,.08);
+        }
+
+        .onboarding-progress-fill {
+          height: 100%;
+          width: 50%;
+          border-radius: inherit;
+          background: linear-gradient(90deg, var(--yellow-400), var(--green-500));
+          transition: width .2s ease;
+        }
+
+        .onboarding-progress-fill.complete {
+          width: 100%;
+        }
+
+        .onboarding-step-card {
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 16px;
+          background: rgba(13,13,14,.74);
+          padding: clamp(16px, 2vw, 22px);
+          display: grid;
+          gap: 18px;
+          box-shadow: 0 16px 34px rgba(0,0,0,.24);
+        }
+
+        .onboarding-personal-card {
+          gap: 12px;
+          padding: clamp(12px, 1.45vw, 18px);
+        }
+
+        .onboarding-step-heading {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 14px;
+        }
+
+        .onboarding-step-heading h2 {
+          margin: 0;
+          color: var(--text-h);
+          font-family: var(--font-display);
+          font-size: clamp(22px, 2.5vw, 30px);
+          line-height: 1.08;
+          font-weight: 850;
+          letter-spacing: 0;
+        }
+
+        .onboarding-step-heading p {
+          margin: 6px 0 0;
+          color: var(--text-muted);
+          font-size: 13.5px;
+          line-height: 1.55;
+          max-width: 620px;
+        }
+
+        .onboarding-personal-card .onboarding-step-heading p {
+          margin-top: 4px;
+          font-size: 12.5px;
+          line-height: 1.4;
+        }
+
+        .onboarding-profile-panel {
+          padding: 14px;
+          background: rgba(255,255,255,.035);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 14px;
+          box-shadow: none;
+        }
+
+        .onboarding-personal-card .onboarding-profile-panel {
+          padding: 10px 12px;
+          gap: 10px;
+        }
+
+        .onboarding-personal-card .onboarding-profile-main {
+          gap: 10px;
+        }
+
+        .onboarding-personal-card .onboarding-profile-title {
+          font-size: 15px;
+          line-height: 1.15;
+        }
+
+        .onboarding-personal-card .onboarding-profile-subtitle {
+          font-size: 12px;
+          line-height: 1.35;
+        }
+
+        .onboarding-grid {
+          gap: 14px;
+        }
+
+        .onboarding-personal-grid {
+          gap: 10px;
+        }
+
+        .onboarding-phone-row {
+          align-items: flex-start;
+        }
+
+        .onboarding-phone-country {
+          min-width: 168px;
+        }
+
+        .onboarding-notice-panel {
+          padding: 14px 16px;
+          background: rgba(255,255,255,.035);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 14px;
+          box-shadow: none;
+        }
+
+        .onboarding-compact-notifications {
+          padding: 10px 12px;
+          grid-template-columns: minmax(140px, .75fr) minmax(260px, 1fr);
+          align-items: center;
+          gap: 10px;
+        }
+
+        .onboarding-notice-heading {
+          display: grid;
+          gap: 2px;
+          min-width: 0;
+        }
+
+        .onboarding-compact-notifications .onboarding-notice-title {
+          font-size: 15px;
+          line-height: 1.15;
+        }
+
+        .onboarding-compact-notifications .onboarding-notice-subtitle {
+          font-size: 12px;
+          line-height: 1.35;
+        }
+
+        .onboarding-notification-options {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+
+        .onboarding-compact-notifications .onboarding-toggle-row {
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 12px;
+          padding: 9px 10px;
+          background: rgba(255,255,255,.035);
+        }
+
+        .onboarding-compact-notifications .onboarding-toggle-row:last-child {
+          padding-bottom: 9px;
+        }
+
+        .onboarding-compact-notifications .onboarding-toggle-copy {
+          gap: 8px;
+        }
+
+        .onboarding-compact-notifications .onboarding-toggle-label {
+          font-size: 13px;
+        }
+
+        .onboarding-actions {
+          display: grid;
+          grid-template-columns: auto minmax(180px, 1fr);
+          align-items: center;
+          gap: 12px;
+          margin-top: 4px;
+        }
+
+        .onboarding-actions.personal {
+          grid-template-columns: minmax(180px, 1fr);
+        }
+
+        .onboarding-actions.personal .onboarding-primary-action {
+          justify-self: end;
+          width: min(100%, 280px);
+        }
+
+        .onboarding-primary-action {
+          justify-self: end;
+          width: min(100%, 300px);
+        }
+
+        .onboarding-submit-status {
+          grid-column: 1 / -1;
+        }
+
+        .onboarding-summary {
+          display: grid;
+          gap: 12px;
+        }
+
+        .onboarding-summary-card {
+          border: 1px solid rgba(255,255,255,.1);
+          background: rgba(12,12,13,.66);
+          border-radius: 14px;
+          padding: 14px;
+          display: grid;
+          gap: 10px;
+        }
+
+        .onboarding-summary-title {
+          margin: 0;
+          color: var(--text-h);
+          font-family: var(--font-display);
+          font-size: 16px;
+          font-weight: 800;
+          letter-spacing: 0;
+        }
+
+        .onboarding-summary-text {
+          margin: 0;
+          color: rgba(255,255,255,.72);
+          font-size: 12.5px;
+          line-height: 1.55;
+        }
+
+        .onboarding-summary-list {
+          display: grid;
+          gap: 9px;
+          margin: 0;
+          padding: 0;
+          list-style: none;
+        }
+
+        .onboarding-summary-list li {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          color: rgba(255,255,255,.72);
+          font-size: 12.5px;
+        }
+
+        @media (prefers-color-scheme: light) {
+          .onboarding-step,
+          .onboarding-step-card,
+          .onboarding-profile-panel,
+          .onboarding-notice-panel,
+          .onboarding-summary-card {
+            border-color: rgba(20,18,12,.1);
+            background: rgba(255,255,255,.82);
+          }
+
+          .onboarding-step.active {
+            border-color: rgba(176,140,20,.36);
+            background: rgba(238,202,68,.14);
+          }
+
+          .onboarding-step.complete {
+            border-color: rgba(20,164,87,.28);
+            background: rgba(20,164,87,.1);
+          }
+
+          .onboarding-progress-track {
+            background: rgba(20,18,12,.1);
+          }
+
+          .onboarding-summary-text,
+          .onboarding-summary-list li {
+            color: var(--text-body);
+          }
+        }
+
+        @media (max-width: 1080px) {
+          .onboarding-layout {
+            grid-template-columns: 1fr;
+            width: min(100%, 820px);
+          }
+
+          .onboarding-hero {
+            display: none;
+          }
+
+          .onboarding-form-panel {
+            overflow-y: visible;
+          }
+        }
+
+        @media (max-width: 720px) {
+          .onboarding-header {
+            grid-template-columns: 1fr;
+          }
+
+          .onboarding-step-pill {
+            justify-self: start;
+          }
+
+          .onboarding-stepper,
+          .onboarding-grid,
+          .onboarding-actions,
+          .onboarding-actions.personal {
+            grid-template-columns: 1fr;
+          }
+
+          .onboarding-actions.personal .onboarding-primary-action,
+          .onboarding-primary-action {
+            width: 100%;
+            justify-self: stretch;
+          }
+
+          .onboarding-phone-row {
+            display: grid;
+            grid-template-columns: 1fr;
+          }
+
+          .onboarding-phone-country {
+            min-width: 0;
+            width: 100%;
+          }
+
+          .onboarding-compact-notifications {
+            grid-template-columns: 1fr;
+          }
+
+          .onboarding-notification-options {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-height: 800px) and (min-width: 721px) {
+          .onboarding-layout {
+            min-height: min(610px, calc(100dvh - 18px));
+          }
+
+          .onboarding-form-panel {
+            padding: 14px 18px;
+          }
+
+          .onboarding-form-content {
+            gap: 10px;
+          }
+
+          .onboarding-header {
+            gap: 8px;
+          }
+
+          .onboarding-title {
+            font-size: clamp(26px, 3vw, 34px);
+          }
+
+          .onboarding-header-text {
+            display: none;
+          }
+
+          .onboarding-step {
+            padding: 8px 10px;
+          }
+
+          .onboarding-step-caption {
+            display: none;
+          }
+
+          .onboarding-progress-track {
+            height: 5px;
+          }
+
+          .onboarding-step-card,
+          .onboarding-personal-card {
+            padding: 12px;
+            gap: 9px;
+          }
+
+          .onboarding-step-heading h2 {
+            font-size: 22px;
+          }
+
+          .onboarding-personal-card .onboarding-step-heading p {
+            display: none;
+          }
+
+          .onboarding-personal-card .onboarding-profile-panel,
+          .onboarding-compact-notifications {
+            padding: 8px 10px;
+          }
+
+          .onboarding-personal-grid {
+            gap: 8px;
+          }
+
+          .onboarding-phone-hint {
+            margin-top: 3px;
+            font-size: 11px;
+          }
+
+          .onboarding-actions {
+            margin-top: 0;
+          }
+        }
+
+        @media (max-height: 680px) and (min-width: 721px) {
+          .onboarding-hero {
+            display: none;
+          }
+
+          .onboarding-layout {
+            grid-template-columns: 1fr;
+            width: min(100%, 900px);
+          }
+
+          .onboarding-form-panel {
+            overflow-y: visible;
+          }
+        }
       `}</style>
 
       <div className="onboarding-layout">
-        <aside className="onboarding-hero" aria-hidden="true" style={{ backgroundImage: `url(${heroImageUrl})` }}>
-          <div className="onboarding-hero-copy">
-            <p className="onboarding-hero-heading">Profile Details</p>
-            <div className="onboarding-hero-rule" />
-            <p className="onboarding-hero-desc">
-              Finalize your identity within the academic portal. These details tailor your workspace to your
-              curriculum and update preferences.
-            </p>
-          </div>
-        </aside>
-
         <section className="onboarding-form-panel">
           <div className="onboarding-form-content">
             <header className="onboarding-header">
-              <p className="onboarding-kicker">Student Identification</p>
-              <h1 className="onboarding-title">Complete Profile</h1>
-              <div className="onboarding-meta">
-                <Chip color="glass">{resolvedUser.email}</Chip>
+              <div className="onboarding-header-copy">
+                <p className="onboarding-kicker">Student onboarding</p>
+                <h1 className="onboarding-title">Complete your profile</h1>
+                <p className="onboarding-header-text">
+                  Add the details your academic workspace needs. You can review personal details first, then confirm
+                  your academic placement.
+                </p>
+                <div className="onboarding-meta">
+                  <Chip color="glass">{resolvedUser.email}</Chip>
+                </div>
               </div>
+              <div className="onboarding-step-pill">{`Step ${currentStepNumber} of 2`}</div>
             </header>
 
             {alert && <Alert variant={alert.variant} title={alert.title}>{alert.message}</Alert>}
@@ -1035,190 +1648,267 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
             {loadingState ? (
               <div className="onboarding-panel" style={{ padding: 22, display: 'grid', gap: 12 }}>
                 <Skeleton variant="line" height={24} width="32%" />
-                <Skeleton variant="rect" height={96} />
-                <Skeleton variant="rect" height={164} />
-                <Skeleton variant="rect" height={210} />
+                <Skeleton variant="rect" height={92} />
+                <Skeleton variant="rect" height={240} />
+                <Skeleton variant="line" height={44} width="40%" />
               </div>
             ) : (
               <form className="onboarding-form" onSubmit={handleSubmit}>
-                <div className="onboarding-panel onboarding-profile-panel">
-                  <div className="onboarding-profile-main">
-                    <Avatar
-                      size="lg"
-                      src={(imagePreviewUrl ?? formState.profileImageUrl) || undefined}
-                      initials={`${formState.firstName?.[0] ?? resolvedUser.email[0] ?? 'S'}${formState.lastName?.[0] ?? ''}`.toUpperCase()}
-                    />
-                    <div>
-                      <p className="onboarding-profile-title">Profile Portrait</p>
-                      <p className="onboarding-profile-subtitle">Recommended size 400x400px. JPG, PNG, or WebP.</p>
+                <div className="onboarding-stepper" aria-label="Onboarding progress">
+                  <div
+                    className={`onboarding-step ${isPersonalStep ? 'active' : 'complete'}`}
+                    aria-current={isPersonalStep ? 'step' : undefined}
+                  >
+                    <span className="onboarding-step-icon">
+                      {isPersonalStep ? <UserRound size={16} /> : <CheckCircle2 size={17} />}
+                    </span>
+                    <div className="onboarding-step-copy">
+                      <p className="onboarding-step-label">Personal info</p>
+                      <p className="onboarding-step-caption">Identity, phone, and notifications</p>
                     </div>
                   </div>
-                  <div className="onboarding-profile-actions">
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                      aria-label="Choose profile image"
-                      onChange={handleImageChange}
-                      style={{ display: 'none' }}
-                    />
-                    <Button
-                      type="button"
-                      variant="subtle"
-                      size="sm"
-                      iconLeft={<ImageUp size={14} />}
-                      disabled={isSubmitting}
-                      onClick={() => imageInputRef.current?.click()}
-                    >
-                      {selectedImageFile ? 'Replace Image' : 'Choose Image'}
-                    </Button>
-                    {(selectedImageFile || imagePreviewUrl) && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        iconLeft={<X size={14} />}
-                        disabled={isSubmitting}
-                        onClick={handleRemoveImage}
-                      >
-                        Remove
-                      </Button>
-                    )}
+                  <div className={`onboarding-step ${!isPersonalStep ? 'active' : ''}`} aria-current={!isPersonalStep ? 'step' : undefined}>
+                    <span className="onboarding-step-icon">
+                      <GraduationCap size={17} />
+                    </span>
+                    <div className="onboarding-step-copy">
+                      <p className="onboarding-step-label">Academic info</p>
+                      <p className="onboarding-step-caption">Faculty, program, year, and semester</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="onboarding-grid">
-                  <Input
-                    label="First Name"
-                    placeholder="e.g. Julian"
-                    value={formState.firstName}
-                    onChange={(event) => setField('firstName', event.target.value)}
-                    required
-                  />
-                  <Input
-                    label="Last Name"
-                    placeholder="e.g. Ashford"
-                    value={formState.lastName}
-                    onChange={(event) => setField('lastName', event.target.value)}
-                    required
-                  />
+                <div className="onboarding-progress-track" aria-hidden="true">
+                  <div className={`onboarding-progress-fill ${!isPersonalStep ? 'complete' : ''}`} />
+                </div>
 
-                  <div className="onboarding-grid-full onboarding-phone-stack">
-                    <p className="onboarding-phone-label">Phone Number</p>
-                    <div className="onboarding-phone-row">
-                      <select
-                        className="onboarding-phone-country"
-                        value={formState.phoneCountryCode}
-                        onChange={(event) => setField('phoneCountryCode', event.target.value as PhoneCountryCode)}
-                        aria-label="Phone country code"
-                        disabled={isSubmitting}
-                      >
-                        {PHONE_COUNTRIES.map((country) => (
-                          <option key={country.code} value={country.code}>
-                            {`${country.flag} ${country.dialCode}`}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="tel"
-                        className="onboarding-phone-input"
-                        value={formState.phoneNumber}
-                        onChange={(event) => setField('phoneNumber', event.target.value.replace(/\D/g, ''))}
-                        placeholder="Enter phone number"
-                        inputMode="numeric"
+                {isPersonalStep ? (
+                  <section className="onboarding-step-card onboarding-personal-card" aria-labelledby="personal-info-title">
+                    <div className="onboarding-step-heading">
+                      <div>
+                        <h2 id="personal-info-title">Personal information</h2>
+                        <p>Confirm your identity and contact preferences.</p>
+                      </div>
+                    </div>
+
+                    <div className="onboarding-profile-panel">
+                      <div className="onboarding-profile-main">
+                        <Avatar
+                          size="lg"
+                          src={(imagePreviewUrl ?? formState.profileImageUrl) || undefined}
+                          initials={profileInitials}
+                        />
+                        <div>
+                          <p className="onboarding-profile-title">Profile portrait</p>
+                          <p className="onboarding-profile-subtitle">JPG, PNG, or WebP. 2 MB max.</p>
+                        </div>
+                      </div>
+                      <div className="onboarding-profile-actions">
+                        <input
+                          ref={imageInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                          aria-label="Choose profile image"
+                          onChange={handleImageChange}
+                          style={{ display: 'none' }}
+                        />
+                        <Button
+                          type="button"
+                          variant="subtle"
+                          size="sm"
+                          iconLeft={<ImageUp size={14} />}
+                          disabled={isSubmitting}
+                          onClick={() => imageInputRef.current?.click()}
+                        >
+                          {selectedImageFile ? 'Replace Image' : 'Choose Image'}
+                        </Button>
+                        {(selectedImageFile || imagePreviewUrl) && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            iconLeft={<X size={14} />}
+                            disabled={isSubmitting}
+                            onClick={handleRemoveImage}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="onboarding-grid onboarding-personal-grid">
+                      <Input
+                        label="First Name"
+                        placeholder="e.g. Julian"
+                        value={formState.firstName}
+                        onChange={(event) => setField('firstName', event.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Last Name"
+                        placeholder="e.g. Ashford"
+                        value={formState.lastName}
+                        onChange={(event) => setField('lastName', event.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Preferred Name"
+                        placeholder="Optional"
+                        value={formState.preferredName}
+                        onChange={(event) => setField('preferredName', event.target.value)}
+                      />
+
+                      <div className="onboarding-phone-stack">
+                        <p className="onboarding-phone-label">Phone Number</p>
+                        <div className="onboarding-phone-row">
+                          <select
+                            className="onboarding-phone-country"
+                            value={formState.phoneCountryCode}
+                            onChange={(event) => setField('phoneCountryCode', event.target.value as PhoneCountryCode)}
+                            aria-label="Phone country code"
+                            disabled={isSubmitting}
+                          >
+                            {PHONE_COUNTRIES.map((country) => (
+                              <option key={country.code} value={country.code}>
+                                {`${country.code} ${country.dialCode}`}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="tel"
+                            className="onboarding-phone-input"
+                            value={formState.phoneNumber}
+                            onChange={(event) => setField('phoneNumber', event.target.value.replace(/\D/g, ''))}
+                            placeholder="Enter phone number"
+                            inputMode="numeric"
+                            required
+                          />
+                        </div>
+                        <p className="onboarding-phone-hint">
+                          {`${selectedPhoneCountry.name}: ${phoneDigitsHint} after ${selectedPhoneCountry.dialCode}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <section className="onboarding-notice-panel onboarding-compact-notifications" aria-label="Notification preferences">
+                      <div className="onboarding-notice-heading">
+                        <p className="onboarding-notice-title">Notifications</p>
+                        <p className="onboarding-notice-subtitle">Choose the channels you want enabled.</p>
+                      </div>
+
+                      <div className="onboarding-notification-options">
+                        <div className="onboarding-toggle-row">
+                          <div className="onboarding-toggle-copy">
+                            <Mail size={17} color="#f2ca50" />
+                            <p className="onboarding-toggle-label">Email</p>
+                          </div>
+                          <Toggle
+                            ariaLabel="Email notifications"
+                            label={undefined}
+                            checked={formState.emailNotificationsEnabled}
+                            onChange={(checked) => setField('emailNotificationsEnabled', checked)}
+                            disabled={isSubmitting}
+                          />
+                        </div>
+
+                        <div className="onboarding-toggle-row">
+                          <div className="onboarding-toggle-copy">
+                            <MessageSquare size={17} color="#f2ca50" />
+                            <p className="onboarding-toggle-label">SMS</p>
+                          </div>
+                          <Toggle
+                            ariaLabel="SMS notifications"
+                            label={undefined}
+                            checked={formState.smsNotificationsEnabled}
+                            onChange={(checked) => setField('smsNotificationsEnabled', checked)}
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                      </div>
+                    </section>
+                  </section>
+                ) : (
+                  <section className="onboarding-step-card" aria-labelledby="academic-info-title">
+                    <div className="onboarding-step-heading">
+                      <div>
+                        <h2 id="academic-info-title">Academic information</h2>
+                        <p>Select the placement details used for advising, course access, and semester records.</p>
+                      </div>
+                    </div>
+
+                    <div className="onboarding-grid">
+                      <Select
+                        label="Faculty / School"
+                        value={formState.facultyName}
+                        onChange={(event) => handleFacultyChange(event.target.value as StudentFaculty | '')}
+                        options={facultyOptions}
+                        placeholder="Choose faculty"
+                        required
+                      />
+                      <Select
+                        label="Academic Program"
+                        value={formState.programName}
+                        onChange={(event) => setField('programName', event.target.value as StudentProgram | '')}
+                        options={programOptions}
+                        placeholder="Choose program"
+                        disabled={!formState.facultyName}
+                        required
+                      />
+                      <Select
+                        label="Academic Year"
+                        value={formState.academicYear}
+                        onChange={(event) => setField('academicYear', event.target.value as AcademicYear | '')}
+                        options={academicYearOptions}
+                        placeholder="Choose year"
+                        required
+                      />
+                      <Select
+                        label="Semester"
+                        value={formState.semester}
+                        onChange={(event) => setField('semester', event.target.value as Semester | '')}
+                        options={semesterOptions}
+                        placeholder="Choose semester"
                         required
                       />
                     </div>
-                    <p className="onboarding-phone-hint">
-                      {`${selectedPhoneCountry.flag} ${selectedPhoneCountry.name}: ${phoneDigitsHint} after ${selectedPhoneCountry.dialCode}`}
-                    </p>
-                  </div>
-                </div>
+                  </section>
+                )}
 
-                <section className="onboarding-section">
-                  <h2 className="onboarding-section-title">Academic Placement</h2>
-                  <div className="onboarding-grid">
-                    <Select
-                      label="Faculty / School"
-                      value={formState.facultyName}
-                      onChange={(event) => handleFacultyChange(event.target.value as StudentFaculty | '')}
-                      options={facultyOptions}
-                      placeholder="Choose faculty"
-                      required
-                    />
-                    <Select
-                      label="Academic Program"
-                      value={formState.programName}
-                      onChange={(event) => setField('programName', event.target.value as StudentProgram | '')}
-                      options={programOptions}
-                      placeholder="Choose program"
-                      disabled={!formState.facultyName}
-                      required
-                    />
-                    <Select
-                      label="Academic Year"
-                      value={formState.academicYear}
-                      onChange={(event) => setField('academicYear', event.target.value as AcademicYear | '')}
-                      options={academicYearOptions}
-                      placeholder="Choose year"
-                      required
-                    />
-                    <Select
-                      label="Semester"
-                      value={formState.semester}
-                      onChange={(event) => setField('semester', event.target.value as Semester | '')}
-                      options={semesterOptions}
-                      placeholder="Choose semester"
-                      required
-                    />
-                  </div>
-                </section>
-
-                <section className="onboarding-panel onboarding-notice-panel">
-                  <h2 className="onboarding-notice-title">Notifications</h2>
-                  <p className="onboarding-notice-subtitle">Stay updated with academic deadlines and account alerts.</p>
-
-                  <div className="onboarding-toggle-row">
-                    <div className="onboarding-toggle-copy">
-                      <Mail size={17} color="#f2ca50" />
-                      <div>
-                        <p className="onboarding-toggle-label">Email Notifications</p>
-                        <p className="onboarding-toggle-hint">Official correspondence and records.</p>
-                      </div>
-                    </div>
-                    <Toggle
-                      ariaLabel="Email notifications"
-                      label={undefined}
-                      checked={formState.emailNotificationsEnabled}
-                      onChange={(checked) => setField('emailNotificationsEnabled', checked)}
-                    />
-                  </div>
-
-                  <div className="onboarding-toggle-row">
-                    <div className="onboarding-toggle-copy">
-                      <MessageSquare size={17} color="#f2ca50" />
-                      <div>
-                        <p className="onboarding-toggle-label">SMS Notifications</p>
-                        <p className="onboarding-toggle-hint">Immediate security and urgent reminder alerts.</p>
-                      </div>
-                    </div>
-                    <Toggle
-                      ariaLabel="SMS notifications"
-                      label={undefined}
-                      checked={formState.smsNotificationsEnabled}
-                      onChange={(checked) => setField('smsNotificationsEnabled', checked)}
-                    />
-                  </div>
-                </section>
-
-                <div className="onboarding-submit-row">
+                <div className={`onboarding-actions ${isPersonalStep ? 'personal' : ''}`}>
                   {submitStage && <p className="onboarding-submit-status">{submitStage}</p>}
+                  {!isPersonalStep && (
+                    <Button
+                      type="button"
+                      variant="subtle"
+                      size="lg"
+                      iconLeft={<ArrowLeft size={16} />}
+                      disabled={isSubmitting}
+                      onClick={handleBackStep}
+                    >
+                      Back
+                    </Button>
+                  )}
+                  {isPersonalStep ? (
+                    <Button
+                      type="button"
+                      variant="glass"
+                      size="lg"
+                      iconRight={<ArrowRight size={16} />}
+                      className="onboarding-primary-action"
+                      disabled={isSubmitting}
+                      onClick={handleNextStep}
+                    >
+                      Next
+                    </Button>
+                  ) : (
                   <Button
                     type="submit"
                     variant="glass"
                     size="lg"
                     loading={isSubmitting}
-                    fullWidth
+                    iconLeft={<CheckCircle2 size={16} />}
+                    className="onboarding-primary-action"
                     style={{
                       height: 58,
                       fontSize: 13,
@@ -1228,11 +1918,30 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                   >
                     Complete Onboarding
                   </Button>
+                  )}
                 </div>
               </form>
             )}
           </div>
         </section>
+
+        <aside className="onboarding-hero" aria-hidden="true" style={{ backgroundImage: `url(${heroImageUrl})` }}>
+          <div className="onboarding-hero-copy">
+            <p className="onboarding-hero-heading">Profile Details</p>
+            <div className="onboarding-hero-rule" />
+            <p className="onboarding-hero-desc">
+              Your student profile connects identity, academic placement, and campus notifications.
+            </p>
+            <div className="onboarding-summary-card">
+              <p className="onboarding-summary-title">Onboarding checklist</p>
+              <ul className="onboarding-summary-list">
+                <li><CheckCircle2 size={15} /> Personal contact details</li>
+                <li><GraduationCap size={15} /> Academic placement</li>
+                <li><Mail size={15} /> Notification preferences</li>
+              </ul>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
