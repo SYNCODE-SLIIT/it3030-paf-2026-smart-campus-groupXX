@@ -6,7 +6,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Navbar, type NavItem } from '@/components/layout/Navbar';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getUserHomePath } from '@/lib/auth-routing';
+import { triggerRouteProgress } from '@/lib/route-progress';
 import { getUserDisplayName, getUserInitials } from '@/lib/user-display';
+
+function navigateWithProgress(router: ReturnType<typeof useRouter>, href: string) {
+  triggerRouteProgress();
+  router.push(href);
+}
 
 export function MarketingNavbar() {
   const pathname = usePathname();
@@ -50,11 +56,11 @@ export function MarketingNavbar() {
             }
           : null
       }
-      onLogin={() => router.push('/login')}
+      onLogin={() => navigateWithProgress(router, '/login')}
       onLogout={() => {
-        void signOut().then(() => router.push('/login?reason=signed_out'));
+        void signOut().then(() => navigateWithProgress(router, '/login?reason=signed_out'));
       }}
-      onNavigate={(href) => router.push(href)}
+      onNavigate={(href) => navigateWithProgress(router, href)}
       hideAuthActions={pathname === '/login'}
     />
   );

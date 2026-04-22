@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { AuthHashRedirector } from '@/components/auth/AuthHashRedirector';
 import { ToastProvider } from '@/components/providers/ToastProvider';
+import { RouteProgressBar } from '@/components/layout/RouteProgressBar';
 import { getInitialServerAppUser } from '@/lib/server-auth';
 
 const openSans = Open_Sans({
@@ -42,6 +43,7 @@ export default async function RootLayout({
         suppressHydrationWarning
         className={`${openSans.variable} ${poppins.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <RouteProgressBar />
         <AuthProvider initialAppUser={initialAppUser}>
           <ToastProvider>
             <AuthHashRedirector />

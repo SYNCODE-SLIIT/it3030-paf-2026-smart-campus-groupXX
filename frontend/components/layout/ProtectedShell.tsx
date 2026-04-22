@@ -28,6 +28,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import type { UserResponse } from '@/lib/api-types';
 import { getManagerDashboardPath } from '@/lib/auth-routing';
 import { filterSectionsByRole } from '@/lib/nav-rbac';
+import { triggerRouteProgress } from '@/lib/route-progress';
 import { getUserDisplayName, getUserInitials, getUserTypeLabel } from '@/lib/user-display';
 import type { WorkspaceKind } from '@/lib/workspace';
 
@@ -317,13 +318,18 @@ export function ProtectedShell({
   const notificationState = useNotifications(session?.access_token ?? null);
   const refreshNotifications = notificationState.refreshNotifications;
 
+  const navigateTo = React.useCallback((href: string) => {
+    triggerRouteProgress();
+    router.push(href);
+  }, [router]);
+
   const handleSignOut = React.useCallback(() => {
     void signOut()
       .catch(() => undefined)
       .finally(() => {
-        router.push('/auth/logout?reason=signed_out');
+        navigateTo('/auth/logout?reason=signed_out');
       });
-  }, [router, signOut]);
+  }, [navigateTo, signOut]);
 
   const resolvedSections = React.useMemo<NavSection[]>(() => {
     return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace, user), user);
@@ -397,7 +403,7 @@ export function ProtectedShell({
       onNavigate={async (notification) => {
         await notificationState.markRead(notification);
         if (notification.actionUrl) {
-          router.push(notification.actionUrl);
+          navigateTo(notification.actionUrl);
         }
       }}
     />
@@ -429,7 +435,7 @@ export function ProtectedShell({
             src: userDisplay?.src,
           }}
           onLogout={handleSignOut}
-          onNavigate={(href) => router.push(href)}
+          onNavigate={navigateTo}
           rightAccessory={notificationBell('below')}
         />
         <main style={{ padding: '96px 24px 40px' }}>{children}</main>
@@ -467,7 +473,7 @@ export function ProtectedShell({
         notificationAccessory={notificationBell('above', 'left', true)}
         onNavigate={(item) => {
           if (item.href) {
-            router.push(item.href);
+            navigateTo(item.href);
           }
         }}
         onLogout={handleSignOut}
