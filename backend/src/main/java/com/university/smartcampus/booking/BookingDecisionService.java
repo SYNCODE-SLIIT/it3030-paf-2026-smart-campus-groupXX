@@ -12,6 +12,7 @@ import com.university.smartcampus.booking.BookingDtos.BookingDecisionRequest;
 import com.university.smartcampus.booking.BookingDtos.CancelBookingRequest;
 import com.university.smartcampus.booking.BookingDtos.BookingResponse;
 import com.university.smartcampus.common.exception.BadRequestException;
+import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.user.entity.UserEntity;
 
 @Service
@@ -20,14 +21,14 @@ public class BookingDecisionService {
     private final BookingRepository bookingRepository;
     private final BookingValidator bookingValidator;
     private final BookingService bookingService;
-    private final BookingNotificationService notificationService;
+    private final NotificationService notificationService;
     private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
 
     public BookingDecisionService(
         BookingRepository bookingRepository,
         BookingValidator bookingValidator,
         BookingService bookingService,
-        BookingNotificationService notificationService,
+        NotificationService notificationService,
         BookingResourceAvailabilityService bookingResourceAvailabilityService
     ) {
         this.bookingRepository = bookingRepository;
@@ -54,7 +55,7 @@ public class BookingDecisionService {
         booking.setDecidedAt(bookingValidator.currentInstant());
         booking.setRejectionReason(null);
         BookingEntity saved = bookingRepository.save(booking);
-        notificationService.notifyBookingApproved(saved);
+        notificationService.notifyBookingApproved(saved, approver);
         return bookingService.toResponse(saved);
     }
 
@@ -72,12 +73,12 @@ public class BookingDecisionService {
         booking.setDecidedAt(bookingValidator.currentInstant());
         booking.setRejectionReason(reason);
         BookingEntity saved = bookingRepository.save(booking);
-        notificationService.notifyBookingRejected(saved);
+        notificationService.notifyBookingRejected(saved, approver);
         return bookingService.toResponse(saved);
     }
 
     @Transactional
-    public BookingResponse cancelApprovedBooking(UUID bookingId, CancelBookingRequest request) {
+    public BookingResponse cancelApprovedBooking(UUID bookingId, UserEntity actor, CancelBookingRequest request) {
         BookingEntity booking = bookingService.requireBooking(bookingId);
         if (booking.getStatus() != BookingStatus.APPROVED) {
             throw new BadRequestException("Only approved bookings can be cancelled through this action.");
@@ -86,7 +87,7 @@ public class BookingDecisionService {
         booking.setCancellationReason(normalizeReason(request == null ? null : request.reason()));
         booking.setCancelledAt(bookingValidator.currentInstant());
         BookingEntity saved = bookingRepository.save(booking);
-        notificationService.notifyBookingCancelled(saved);
+        notificationService.notifyBookingCancelledByStaff(saved, actor);
         return bookingService.toResponse(saved);
     }
 

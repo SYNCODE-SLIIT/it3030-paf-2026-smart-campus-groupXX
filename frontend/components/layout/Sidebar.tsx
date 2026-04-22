@@ -32,6 +32,7 @@ export interface SidebarProps {
   activePath?: string;
   user?: { name: string; role?: string; initials?: string; src?: string };
   notificationCount?: number;
+  notificationAccessory?: React.ReactNode;
   onNavigate?: (item: NavItem) => void;
   onLogout?: () => void;
   profileDropdownItems?: DropdownMenuItem[];
@@ -158,6 +159,7 @@ export function Sidebar({
   activePath = 'Dashboard',
   user = { name: 'Alex Rivera', role: 'BSc Computer Science', initials: 'AR' },
   notificationCount = 0,
+  notificationAccessory,
   onNavigate,
   onLogout,
   profileDropdownItems,
@@ -278,79 +280,94 @@ export function Sidebar({
           <div style={{ height: 1, background: 'var(--border)', margin: '0 4px 10px', borderRadius: 1 }} />
 
           <div ref={profileRef} style={{ position: 'relative' }}>
-            <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                padding: '7px 10px',
-                borderRadius: 12,
-                border: '1px solid var(--border)',
-                background: dropdownOpen ? 'rgba(238,202,68,.07)' : 'var(--surface)',
-                cursor: 'pointer',
-                transition: 'background .15s',
-                boxShadow: '0 1px 4px rgba(0,0,0,.06)',
-              }}
-            >
-              {/* Bell */}
-              <div style={{ position: 'relative', flexShrink: 0, marginRight: 10 }}>
-                <span
-                  onMouseEnter={() => setBellHovered(true)}
-                  onMouseLeave={() => setBellHovered(false)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: bellHovered ? 'var(--text-h)' : 'var(--text-muted)',
-                    transition: 'color .15s',
-                  }}
-                >
-                  <Bell size={15} strokeWidth={2.2} />
-                </span>
-                {notificationCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: -5, right: -5,
-                    minWidth: 14, height: 14, borderRadius: 100,
-                    background: 'var(--yellow-400)', color: 'var(--yellow-900)',
-                    fontFamily: 'var(--font-mono)', fontSize: 7, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '0 3px',
-                    boxShadow: '0 0 0 1.5px var(--surface)',
-                  }}>
-                    {notificationCount > 99 ? '99+' : notificationCount}
-                  </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div
+                onClickCapture={() => setDropdownOpen(false)}
+                style={{ position: 'relative', flexShrink: 0 }}
+              >
+                {notificationAccessory ?? (
+                  <button
+                    type="button"
+                    aria-label="Notifications"
+                    onMouseEnter={() => setBellHovered(true)}
+                    onMouseLeave={() => setBellHovered(false)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: bellHovered ? 'var(--text-h)' : 'var(--text-muted)',
+                      cursor: 'default',
+                      transition: 'color .15s',
+                      boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+                    }}
+                  >
+                    <Bell size={15} strokeWidth={2.2} />
+                    {notificationCount > 0 && (
+                      <span style={{
+                        position: 'absolute', top: -5, right: -5,
+                        minWidth: 14, height: 14, borderRadius: 100,
+                        background: 'var(--yellow-400)', color: 'var(--yellow-900)',
+                        fontFamily: 'var(--font-mono)', fontSize: 7, fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '0 3px',
+                        boxShadow: '0 0 0 1.5px var(--surface)',
+                      }}>
+                        {notificationCount > 99 ? '99+' : notificationCount}
+                      </span>
+                    )}
+                  </button>
                 )}
               </div>
 
-              {/* Vertical divider */}
-              <div style={{ width: 1, height: 20, background: 'var(--border)', marginRight: 10, flexShrink: 0 }} />
+              <button
+                onClick={() => setDropdownOpen((v) => !v)}
+                style={{
+                  minWidth: 0,
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '7px 10px',
+                  borderRadius: 12,
+                  border: '1px solid var(--border)',
+                  background: dropdownOpen ? 'rgba(238,202,68,.07)' : 'var(--surface)',
+                  cursor: 'pointer',
+                  transition: 'background .15s',
+                  boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+                }}
+              >
+                {/* Name */}
+                <span style={{
+                  flex: 1,
+                  fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 11.5,
+                  color: 'var(--text-h)', textAlign: 'left',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {user.name}
+                </span>
 
-              {/* Name */}
-              <span style={{
-                flex: 1,
-                fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 11.5,
-                color: 'var(--text-h)', textAlign: 'left',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {user.name}
-              </span>
+                {/* Chevron */}
+                <span style={{
+                  color: 'var(--text-muted)', flexShrink: 0, marginLeft: 4, marginRight: 8,
+                  transform: dropdownOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+                  transition: 'transform .2s ease',
+                  display: 'flex',
+                }}>
+                  <ChevronUp size={13} strokeWidth={2.5} />
+                </span>
 
-              {/* Chevron */}
-              <span style={{
-                color: 'var(--text-muted)', flexShrink: 0, marginLeft: 4, marginRight: 8,
-                transform: dropdownOpen ? 'rotate(0deg)' : 'rotate(180deg)',
-                transition: 'transform .2s ease',
-                display: 'flex',
-              }}>
-                <ChevronUp size={13} strokeWidth={2.5} />
-              </span>
-
-              {/* Avatar */}
-              <Avatar
-                initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
-                src={user.src}
-                size="sm"
-              />
-            </button>
+                {/* Avatar */}
+                <Avatar
+                  initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
+                  src={user.src}
+                  size="sm"
+                />
+              </button>
+            </div>
 
             <DropdownMenu items={resolvedProfileDropdownItems} open={dropdownOpen} direction="up" />
           </div>

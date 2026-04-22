@@ -9,7 +9,6 @@ import java.util.UUID;
 import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.AppEnums.CheckInStatus;
 import com.university.smartcampus.AppEnums.ModificationStatus;
-import com.university.smartcampus.AppEnums.NotificationType;
 import com.university.smartcampus.AppEnums.RecurrencePattern;
 import com.university.smartcampus.resource.ResourceDtos;
 
@@ -136,16 +135,4 @@ public final class BookingDtos {
     ) {
     }
 
-    // Notification DTOs
-    public record BookingNotificationResponse(
-        UUID id,
-        UUID bookingId,
-        NotificationType notificationType,
-        Instant sentAt,
-        Instant readAt,
-        boolean emailSent,
-        boolean smsSent
-    ) {
-    }
 }
-

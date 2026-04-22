@@ -89,6 +89,47 @@ class FlywayMigrationTest extends AbstractPostgresIntegrationTest {
         assertThat(isNullable("tickets", "location_id")).isTrue();
     }
 
+    @Test
+    void createsUnifiedNotificationTablesAndRetiresLegacyBookingNotifications() {
+        Integer tableCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from information_schema.tables
+                        where table_schema = 'public'
+                          and table_name in (
+                            'notification_events',
+                            'notification_recipients',
+                            'notification_event_links',
+                            'notification_preferences',
+                            'notification_delivery_attempts'
+                          )
+                        """,
+                Integer.class);
+
+        assertThat(tableCount).isEqualTo(5);
+        assertThat(tableExists("booking_notifications")).isFalse();
+        assertThat(columnType("notification_recipients", "read_at")).isEqualTo("timestamptz");
+        assertThat(columnType("notification_delivery_attempts", "status")).isEqualTo("varchar");
+
+        Integer constraintCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from pg_constraint
+                        where connamespace = 'public'::regnamespace
+                          and conrelid in (
+                            'public.notification_event_links'::regclass,
+                            'public.notification_recipients'::regclass
+                          )
+                          and conname in (
+                            'chk_notification_event_links_one_target',
+                            'uq_notification_recipients_event_user'
+                          )
+                        """,
+                Integer.class);
+
+        assertThat(constraintCount).isEqualTo(2);
+    }
+
     private String columnType(String tableName, String columnName) {
         return jdbcTemplate.queryForObject(
                 """
@@ -116,5 +157,18 @@ class FlywayMigrationTest extends AbstractPostgresIntegrationTest {
                 tableName,
                 columnName);
         return "YES".equals(nullable);
+    }
+
+    private boolean tableExists(String tableName) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from information_schema.tables
+                        where table_schema = 'public'
+                          and table_name = ?
+                        """,
+                Integer.class,
+                tableName);
+        return count != null && count > 0;
     }
 }

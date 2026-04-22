@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.common.exception.BadRequestException;
+import com.university.smartcampus.notification.NotificationService;
 
 @Service
 public class BookingResourceAvailabilityService {
@@ -16,12 +17,12 @@ public class BookingResourceAvailabilityService {
     private static final String UNAVAILABLE_REASON = "Booking cancelled because the resource is no longer available for booking.";
 
     private final BookingRepository bookingRepository;
-    private final BookingNotificationService notificationService;
+    private final NotificationService notificationService;
     private final BookingValidator bookingValidator;
 
     public BookingResourceAvailabilityService(
         BookingRepository bookingRepository,
-        BookingNotificationService notificationService,
+        NotificationService notificationService,
         BookingValidator bookingValidator
     ) {
         this.bookingRepository = bookingRepository;
@@ -64,7 +65,7 @@ public class BookingResourceAvailabilityService {
         booking.setCancellationReason(UNAVAILABLE_REASON);
         booking.setCancelledAt(now);
         BookingEntity saved = bookingRepository.save(booking);
-        notificationService.notifyBookingCancelled(saved);
+        notificationService.notifyBookingAutoCancelled(saved);
         return true;
     }
 

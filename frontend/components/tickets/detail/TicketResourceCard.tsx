@@ -52,7 +52,7 @@ export function TicketResourceCard({
   const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   const locationLabel =
-    resource.locationDetails?.name ?? resource.location ?? '—';
+    resource.locationDetails?.locationName ?? resource.location ?? '—';
 
   function handleConfirm() {
     setConfirmOpen(false);

@@ -16,6 +16,7 @@ import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.resource.ResourceEntity;
 import com.university.smartcampus.resource.ResourceService;
 import com.university.smartcampus.user.entity.FacultyEntity;
@@ -35,17 +36,20 @@ public class BookingService {
     private final ResourceService resourceService;
     private final BookingValidator bookingValidator;
     private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
+    private final NotificationService notificationService;
 
     public BookingService(
         BookingRepository bookingRepository,
         ResourceService resourceService,
         BookingValidator bookingValidator,
-        BookingResourceAvailabilityService bookingResourceAvailabilityService
+        BookingResourceAvailabilityService bookingResourceAvailabilityService,
+        NotificationService notificationService
     ) {
         this.bookingRepository = bookingRepository;
         this.resourceService = resourceService;
         this.bookingValidator = bookingValidator;
         this.bookingResourceAvailabilityService = bookingResourceAvailabilityService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -79,6 +83,7 @@ public class BookingService {
         booking.setStatus(BookingStatus.PENDING);
 
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingCreated(saved);
         return toResponse(saved);
     }
 
@@ -215,6 +220,7 @@ public class BookingService {
         booking.setCancelledAt(bookingValidator.currentInstant());
 
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingCancelledByRequester(saved, requester);
         return toResponse(saved);
     }
 

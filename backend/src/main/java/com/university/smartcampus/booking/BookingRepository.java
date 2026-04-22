@@ -41,6 +41,20 @@ public interface BookingRepository extends JpaRepository<BookingEntity, UUID>, J
         Instant startTime
     );
 
+    @EntityGraph(attributePaths = { "resource", "requester" })
+    List<BookingEntity> findAllByResourceIdAndStatusInAndStartTimeAfterOrderByStartTimeAsc(
+        UUID resourceId,
+        List<BookingStatus> statuses,
+        Instant startTime
+    );
+
+    @EntityGraph(attributePaths = { "resource", "requester" })
+    List<BookingEntity> findAllByStatusAndStartTimeBetweenOrderByStartTimeAsc(
+        BookingStatus status,
+        Instant startTime,
+        Instant endTime
+    );
+
     @Override
     @EntityGraph(attributePaths = { "resource", "requester" })
     java.util.Optional<BookingEntity> findById(UUID id);

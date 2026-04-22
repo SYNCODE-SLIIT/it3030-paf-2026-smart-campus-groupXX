@@ -18,6 +18,7 @@ import com.university.smartcampus.common.dto.ApiDtos.MessageResponse;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ConflictException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
 import com.university.smartcampus.resource.ResourceDtos.LocationOption;
 import com.university.smartcampus.resource.ResourceDtos.ManagedByRoleOption;
@@ -26,6 +27,7 @@ import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
 import com.university.smartcampus.resource.ResourceDtos.ResourceSummary;
 import com.university.smartcampus.resource.ResourceDtos.ResourceTypeOption;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
+import com.university.smartcampus.user.entity.UserEntity;
 
 @Service
 public class ResourceService {
@@ -46,23 +48,31 @@ public class ResourceService {
     private final LocationRepository locationRepository;
     private final ResourceFeatureRepository resourceFeatureRepository;
     private final ResourceMapper resourceMapper;
+    private final NotificationService notificationService;
 
     public ResourceService(
         ResourceRepository resourceRepository,
         ResourceTypeRepository resourceTypeRepository,
         LocationRepository locationRepository,
         ResourceFeatureRepository resourceFeatureRepository,
-        ResourceMapper resourceMapper
+        ResourceMapper resourceMapper,
+        NotificationService notificationService
     ) {
         this.resourceRepository = resourceRepository;
         this.resourceTypeRepository = resourceTypeRepository;
         this.locationRepository = locationRepository;
         this.resourceFeatureRepository = resourceFeatureRepository;
         this.resourceMapper = resourceMapper;
+        this.notificationService = notificationService;
     }
 
     @Transactional
     public ResourceResponse createResource(CreateResourceRequest request) {
+        return createResource(request, null);
+    }
+
+    @Transactional
+    public ResourceResponse createResource(CreateResourceRequest request, UserEntity actor) {
         String normalizedCode = normalizeRequiredCode(request.code());
         String normalizedName = normalizeRequiredName(request.name());
         ensureCodeAvailable(normalizedCode, null);
@@ -79,7 +89,9 @@ public class ResourceService {
         resource.setManagedByRole(normalizeManagedByRole(request.managedByRole()));
         resource.setFeatures(resolveFeatures(request.featureCodes()));
         syncLegacyCompatibilityFields(resource, resourceType, location);
-        return resourceMapper.toResourceResponse(resourceRepository.save(resource));
+        ResourceEntity saved = resourceRepository.save(resource);
+        notificationService.notifyResourceCreated(saved, actor);
+        return resourceMapper.toResourceResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -171,7 +183,13 @@ public class ResourceService {
 
     @Transactional
     public ResourceResponse updateResource(UUID id, UpdateResourceRequest request) {
+        return updateResource(id, request, null);
+    }
+
+    @Transactional
+    public ResourceResponse updateResource(UUID id, UpdateResourceRequest request, UserEntity actor) {
         ResourceEntity resource = getResourceEntity(id);
+        ResourceStatus oldStatus = resource.getStatus();
         String normalizedName = null;
         ResourceType nextResourceType = resource.getResourceType();
         Location nextLocation = resource.getLocationEntity();
@@ -202,13 +220,22 @@ public class ResourceService {
         }
         syncLegacyCompatibilityFields(resource, nextResourceType, nextLocation);
 
+        notificationService.notifyResourceUpdated(resource, actor);
+        notificationService.notifyResourceStatusChanged(resource, oldStatus, actor);
         return resourceMapper.toResourceResponse(resource);
     }
 
     @Transactional
     public MessageResponse deleteResource(UUID id) {
+        return deleteResource(id, null);
+    }
+
+    @Transactional
+    public MessageResponse deleteResource(UUID id, UserEntity actor) {
         ResourceEntity resource = getResourceEntity(id);
+        ResourceStatus oldStatus = resource.getStatus();
         resource.setStatus(ResourceStatus.INACTIVE);
+        notificationService.notifyResourceStatusChanged(resource, oldStatus, actor);
         return new MessageResponse("Resource removed.");
     }
 

@@ -67,7 +67,7 @@ public class AdminBookingController {
         @RequestBody(required = false) CancelBookingRequest request,
         Authentication authentication
     ) {
-        currentUserService.requireAdminOrBookingManager(authentication);
-        return bookingDecisionService.cancelApprovedBooking(id, request);
+        UserEntity actor = currentUserService.requireAdminOrBookingManager(authentication);
+        return bookingDecisionService.cancelApprovedBooking(id, actor, request);
     }
 }

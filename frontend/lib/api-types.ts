@@ -23,14 +23,11 @@ export type CheckInStatus = 'PENDING' | 'CHECKED_IN' | 'NO_SHOW';
 
 export type ModificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
-export type NotificationType =
-  | 'BOOKING_APPROVED'
-  | 'BOOKING_REJECTED'
-  | 'BOOKING_CANCELLED'
-  | 'BOOKING_REMINDER_24H'
-  | 'BOOKING_REMINDER_1H'
-  | 'MODIFICATION_APPROVED'
-  | 'MODIFICATION_REJECTED';
+export type NotificationDomain = 'TICKET' | 'BOOKING' | 'CATALOG' | 'SYSTEM';
+
+export type NotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'ACTION_REQUIRED' | 'CRITICAL';
+
+export type NotificationDeliveryStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
 
 export type ResourceCategory =
   | 'SPACES'
@@ -464,14 +461,67 @@ export interface CheckInResponse {
   checkedInAt: string | null;
 }
 
-export interface BookingNotificationResponse {
+export interface NotificationLinkResponse {
+  ticketId: string | null;
+  ticketCommentId: string | null;
+  bookingId: string | null;
+  bookingModificationId: string | null;
+  resourceId: string | null;
+  locationId: string | null;
+  buildingId: string | null;
+  resourceTypeId: string | null;
+  userId: string | null;
+}
+
+export interface NotificationResponse {
   id: string;
-  bookingId: string;
-  notificationType: NotificationType;
-  sentAt: string;
+  eventId: string;
+  domain: NotificationDomain;
+  type: string;
+  severity: NotificationSeverity;
+  title: string;
+  body: string | null;
+  actorUserId: string | null;
+  actorEmail: string | null;
+  actionUrl: string | null;
+  createdAt: string;
   readAt: string | null;
-  emailSent: boolean;
-  smsSent: boolean;
+  archivedAt: string | null;
+  emailDeliveryStatus: NotificationDeliveryStatus | null;
+  links: NotificationLinkResponse[];
+}
+
+export interface NotificationUnreadCountResponse {
+  unreadCount: number;
+}
+
+export interface NotificationPreferencesResponse {
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+}
+
+export interface UpdateNotificationPreferencesRequest {
+  inAppEnabled?: boolean;
+  emailEnabled?: boolean;
+}
+
+export interface NotificationDeliveryResponse {
+  id: string;
+  recipientId: string;
+  eventId: string;
+  recipientUserId: string;
+  recipientEmail: string;
+  domain: NotificationDomain;
+  type: string;
+  severity: NotificationSeverity;
+  title: string;
+  status: NotificationDeliveryStatus;
+  attemptCount: number;
+  nextAttemptAt: string | null;
+  sentAt: string | null;
+  failedAt: string | null;
+  failureReason: string | null;
+  createdAt: string;
 }
 
 export interface ErrorResponse {

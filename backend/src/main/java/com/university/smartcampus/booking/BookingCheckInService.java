@@ -12,6 +12,7 @@ import com.university.smartcampus.AppEnums.CheckInStatus;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.user.entity.UserEntity;
 
 @Service
@@ -20,15 +21,18 @@ public class BookingCheckInService {
     private final BookingRepository bookingRepository;
     private final BookingValidator bookingValidator;
     private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
+    private final NotificationService notificationService;
 
     public BookingCheckInService(
         BookingRepository bookingRepository,
         BookingValidator bookingValidator,
-        BookingResourceAvailabilityService bookingResourceAvailabilityService
+        BookingResourceAvailabilityService bookingResourceAvailabilityService,
+        NotificationService notificationService
     ) {
         this.bookingRepository = bookingRepository;
         this.bookingValidator = bookingValidator;
         this.bookingResourceAvailabilityService = bookingResourceAvailabilityService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -58,7 +62,7 @@ public class BookingCheckInService {
         booking.setCheckInStatus(CheckInStatus.CHECKED_IN);
         booking.setCheckedInAt(now);
         booking.setStatus(BookingStatus.CHECKED_IN);
-        
+
         BookingEntity saved = bookingRepository.save(booking);
         return new BookingDtos.CheckInResponse(
             saved.getId(),
@@ -85,8 +89,9 @@ public class BookingCheckInService {
 
         booking.setCheckInStatus(CheckInStatus.NO_SHOW);
         booking.setStatus(BookingStatus.NO_SHOW);
-        
+
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingNoShow(saved);
         return new BookingDtos.CheckInResponse(
             saved.getId(),
             saved.getCheckInStatus(),
@@ -111,8 +116,9 @@ public class BookingCheckInService {
         }
 
         booking.setStatus(BookingStatus.COMPLETED);
-        
+
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingCompleted(saved);
         return new BookingDtos.CheckInResponse(
             saved.getId(),
             saved.getCheckInStatus(),
@@ -124,7 +130,7 @@ public class BookingCheckInService {
     public BookingDtos.CheckInResponse getCheckInStatus(UUID bookingId) {
         BookingEntity booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new NotFoundException("Booking not found."));
-        
+
         return new BookingDtos.CheckInResponse(
             booking.getId(),
             booking.getCheckInStatus(),

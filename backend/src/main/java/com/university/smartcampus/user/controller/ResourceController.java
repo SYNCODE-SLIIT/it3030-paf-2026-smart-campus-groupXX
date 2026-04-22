@@ -28,6 +28,7 @@ import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
 import com.university.smartcampus.resource.ResourceDtos.ResourceTypeOption;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
 import com.university.smartcampus.resource.ResourceService;
+import com.university.smartcampus.user.entity.UserEntity;
 
 import jakarta.validation.Valid;
 
@@ -88,8 +89,8 @@ public class ResourceController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ResourceResponse createResource(@Valid @RequestBody CreateResourceRequest request, Authentication authentication) {
-        currentUserService.requireAdminOrCatalogManager(authentication);
-        return resourceService.createResource(request);
+        UserEntity actor = currentUserService.requireAdminOrCatalogManager(authentication);
+        return resourceService.createResource(request, actor);
     }
 
     @PatchMapping("/{id}")
@@ -98,13 +99,13 @@ public class ResourceController {
         @Valid @RequestBody UpdateResourceRequest request,
         Authentication authentication
     ) {
-        currentUserService.requireAdminOrCatalogManager(authentication);
-        return resourceService.updateResource(id, request);
+        UserEntity actor = currentUserService.requireAdminOrCatalogManager(authentication);
+        return resourceService.updateResource(id, request, actor);
     }
 
     @DeleteMapping("/{id}")
     public MessageResponse deleteResource(@PathVariable UUID id, Authentication authentication) {
-        currentUserService.requireAdminOrCatalogManager(authentication);
-        return resourceService.deleteResource(id);
+        UserEntity actor = currentUserService.requireAdminOrCatalogManager(authentication);
+        return resourceService.deleteResource(id, actor);
     }
 }

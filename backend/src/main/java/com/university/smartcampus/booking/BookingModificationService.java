@@ -1,6 +1,5 @@
 package com.university.smartcampus.booking;
 
-
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -12,6 +11,7 @@ import com.university.smartcampus.AppEnums.ModificationStatus;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.user.entity.UserEntity;
 
 @Service
@@ -20,14 +20,14 @@ public class BookingModificationService {
     private final BookingModificationRepository modificationRepository;
     private final BookingRepository bookingRepository;
     private final BookingValidator bookingValidator;
-    private final BookingNotificationService notificationService;
+    private final NotificationService notificationService;
     private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
 
     public BookingModificationService(
         BookingModificationRepository modificationRepository,
         BookingRepository bookingRepository,
         BookingValidator bookingValidator,
-        BookingNotificationService notificationService,
+        NotificationService notificationService,
         BookingResourceAvailabilityService bookingResourceAvailabilityService
     ) {
         this.modificationRepository = modificationRepository;
@@ -79,6 +79,7 @@ public class BookingModificationService {
         modification.setStatus(ModificationStatus.PENDING);
 
         BookingModificationEntity saved = modificationRepository.save(modification);
+        notificationService.notifyModificationRequested(saved);
         return toModificationResponse(saved);
     }
 
@@ -120,9 +121,7 @@ public class BookingModificationService {
         modification.setDecisionReason(request != null ? request.decisionReason() : null);
 
         BookingModificationEntity saved = modificationRepository.save(modification);
-        
-        notificationService.notifyModificationApproved(booking);
-        
+        notificationService.notifyModificationApproved(saved);
         return toModificationResponse(saved);
     }
 
@@ -148,9 +147,7 @@ public class BookingModificationService {
         modification.setDecisionReason(request != null ? request.decisionReason() : null);
 
         BookingModificationEntity saved = modificationRepository.save(modification);
-        
-        notificationService.notifyModificationRejected(modification.getBooking());
-        
+        notificationService.notifyModificationRejected(saved);
         return toModificationResponse(saved);
     }
 

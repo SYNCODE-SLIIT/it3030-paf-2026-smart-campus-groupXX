@@ -21,6 +21,8 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 
 import { Navbar, type NavItem } from '@/components/layout/Navbar';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { useNotifications } from '@/components/notifications/useNotifications';
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
 import { useAuth } from '@/components/providers/AuthProvider';
 import type { UserResponse } from '@/lib/api-types';
@@ -310,8 +312,9 @@ export function ProtectedShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { session, signOut } = useAuth();
   const resolvedWorkspace = workspace === 'auto' ? getWorkspaceForUser(user) : workspace;
+  const notificationState = useNotifications(session?.access_token ?? null);
 
   const handleSignOut = React.useCallback(() => {
     void signOut()
@@ -324,6 +327,31 @@ export function ProtectedShell({
   const resolvedSections = React.useMemo<NavSection[]>(() => {
     return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace, user), user);
   }, [resolvedWorkspace, sections, user]);
+
+  const notificationBell = (
+    placement: 'above' | 'below',
+    align: 'left' | 'right' = 'right',
+    portal = false,
+  ) => (
+    <NotificationBell
+      unreadCount={notificationState.unreadCount}
+      notifications={notificationState.notifications}
+      loading={notificationState.loading}
+      error={notificationState.error}
+      placement={placement}
+      align={align}
+      portal={portal}
+      onOpen={() => notificationState.refreshNotifications('all')}
+      onMarkAsRead={notificationState.markRead}
+      onMarkAllAsRead={notificationState.markAllRead}
+      onNavigate={async (notification) => {
+        await notificationState.markRead(notification);
+        if (notification.actionUrl) {
+          router.push(notification.actionUrl);
+        }
+      }}
+    />
+  );
 
   if (resolvedWorkspace === 'students') {
     const navItems: NavItem[] = resolvedSections.flatMap((s) =>
@@ -352,6 +380,7 @@ export function ProtectedShell({
           }}
           onLogout={handleSignOut}
           onNavigate={(href) => router.push(href)}
+          rightAccessory={notificationBell('below')}
         />
         <main style={{ padding: '96px 24px 40px' }}>{children}</main>
       </div>
@@ -384,6 +413,8 @@ export function ProtectedShell({
             onClick: handleSignOut,
           },
         ]}
+        notificationCount={notificationState.unreadCount}
+        notificationAccessory={notificationBell('above', 'left', true)}
         onNavigate={(item) => {
           if (item.href) {
             router.push(item.href);

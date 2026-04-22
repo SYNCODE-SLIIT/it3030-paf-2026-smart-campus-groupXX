@@ -29,7 +29,7 @@ import {
   createRecurringBooking,
   getResourceRemainingRanges,
   getErrorMessage,
-  listBookingNotifications,
+  listNotifications,
   listMyBookings,
   listMyRecurringBookings,
   listResources,
@@ -37,9 +37,9 @@ import {
   requestBookingModification,
 } from '@/lib/api-client';
 import type {
-  BookingNotificationResponse,
   BookingResponse,
   BookingStatus,
+  NotificationResponse,
   RecurringBookingResponse,
   ResourceRemainingRangesResponse,
   ResourceResponse,
@@ -48,7 +48,7 @@ import { getResourceCategoryLabel } from '@/lib/resource-display';
 import { RecurringBookingForm } from '@/components/booking/RecurringBookingForm';
 import { BookingModificationModal } from '@/components/booking/BookingModificationModal';
 import { BookingCheckInPanel } from '@/components/booking/BookingCheckInPanel';
-import { NotificationCenter } from '@/components/booking/NotificationCenter';
+import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { BookingCalendar } from '@/components/booking/BookingCalendar';
 import { BookingScreenSkeleton } from '@/components/booking/BookingScreenSkeleton';
 
@@ -154,7 +154,7 @@ export function RequesterBookingsScreenEnhanced({
   const [resources, setResources] = React.useState<ResourceResponse[]>([]);
   const [bookings, setBookings] = React.useState<BookingResponse[]>([]);
   const [recurringBookings, setRecurringBookings] = React.useState<RecurringBookingResponse[]>([]);
-  const [notifications, setNotifications] = React.useState<BookingNotificationResponse[]>([]);
+  const [notifications, setNotifications] = React.useState<NotificationResponse[]>([]);
   const [form, setForm] = React.useState(NEW_BOOKING_INITIAL);
   const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
@@ -189,7 +189,7 @@ export function RequesterBookingsScreenEnhanced({
         listResources(accessToken),
         listMyBookings(accessToken),
         listMyRecurringBookings(accessToken),
-        listBookingNotifications(accessToken),
+        listNotifications(accessToken, { domain: 'BOOKING', limit: 40 }),
       ]);
       setResources(resourceList);
       setBookings(myBookings);
@@ -363,9 +363,13 @@ export function RequesterBookingsScreenEnhanced({
     }
   }
 
-  async function handleMarkNotificationAsRead(notificationId: string) {
+  async function handleMarkNotificationAsRead(notification: NotificationResponse) {
+    if (!accessToken) {
+      return;
+    }
+
     try {
-      await markNotificationAsRead(notificationId);
+      await markNotificationAsRead(accessToken, notification.id);
       await reload();
     } catch (error) {
       console.error('Failed to mark notification as read', error);
@@ -731,7 +735,8 @@ export function RequesterBookingsScreenEnhanced({
             <NotificationCenter
               notifications={notifications}
               onMarkAsRead={handleMarkNotificationAsRead}
-              isLoading={submitting}
+              onRefresh={reload}
+              loading={submitting}
             />
           )}
         </>
