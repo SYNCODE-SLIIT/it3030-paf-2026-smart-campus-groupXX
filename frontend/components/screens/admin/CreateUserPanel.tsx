@@ -3,9 +3,9 @@
 import React from 'react';
 import { UserPlus } from 'lucide-react';
 
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
 import { ProfileFields } from '@/components/screens/admin/ProfileFields';
 import { RoleRadioGroup } from '@/components/screens/admin/RoleRadioGroup';
-import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Input, Select } from '@/components/ui';
 import { createUser, getErrorMessage } from '@/lib/api-client';
 import type { CreateUserRequest, ManagerRole, UserResponse, UserType } from '@/lib/api-types';
@@ -40,7 +40,6 @@ export function CreateUserPanel({
   defaultUserType?: UserType;
   fixedUserType?: UserType;
 }) {
-  const { showToast } = useToast();
   const [email, setEmail] = React.useState('');
   const [userType, setUserType] = React.useState<UserType>(fixedUserType ?? defaultUserType);
   const [managerRole, setManagerRole] = React.useState<ManagerRole | ''>('');
@@ -48,6 +47,8 @@ export function CreateUserPanel({
   const [adminForm, setAdminForm] = React.useState(createEmptyAdminForm);
   const [managerForm, setManagerForm] = React.useState(createEmptyManagerForm);
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = React.useState<string | null>(null);
+  const [pendingPayload, setPendingPayload] = React.useState<CreateUserRequest | null>(null);
   const [isCreating, startCreateTransition] = React.useTransition();
 
   React.useEffect(() => {
@@ -56,43 +57,58 @@ export function CreateUserPanel({
     }
   }, [fixedUserType]);
 
-  async function handleCreate() {
+  function buildCreatePayload() {
     if (!accessToken) {
       setFormError('The admin session is unavailable. Please sign in again.');
-      return;
+      return null;
     }
 
     if (!email.trim()) {
       setFormError('Email is required.');
-      return;
+      return null;
     }
 
     const selectedManagerRole = userType === 'MANAGER' ? managerRole : '';
 
     if (userType === 'MANAGER' && !selectedManagerRole) {
       setFormError('Select one manager role.');
-      return;
+      return null;
     }
 
     setFormError(null);
+    setFormSuccess(null);
+
+    return {
+      email: email.trim(),
+      userType,
+      sendInvite: true,
+      ...(userType === 'FACULTY' ? { facultyProfile: toFacultyProfileInput(facultyForm) } : {}),
+      ...(userType === 'ADMIN' ? { adminProfile: toAdminProfileInput(adminForm) } : {}),
+      ...(userType === 'MANAGER' ? { managerProfile: toManagerProfileInput(managerForm) } : {}),
+      ...(selectedManagerRole ? { managerRole: selectedManagerRole } : {}),
+    } satisfies CreateUserRequest;
+  }
+
+  function handleCreateRequest() {
+    const payload = buildCreatePayload();
+    if (!payload) return;
+    setPendingPayload(payload);
+  }
+
+  async function handleCreate() {
+    if (!accessToken || !pendingPayload) {
+      setFormError('The admin session is unavailable. Please sign in again.');
+      setPendingPayload(null);
+      return;
+    }
 
     startCreateTransition(async () => {
       try {
-        const payload: CreateUserRequest = {
-          email: email.trim(),
-          userType,
-          sendInvite: true,
-          ...(userType === 'FACULTY' ? { facultyProfile: toFacultyProfileInput(facultyForm) } : {}),
-          ...(userType === 'ADMIN' ? { adminProfile: toAdminProfileInput(adminForm) } : {}),
-          ...(userType === 'MANAGER' ? { managerProfile: toManagerProfileInput(managerForm) } : {}),
-          ...(selectedManagerRole ? { managerRole: selectedManagerRole } : {}),
-        };
+        const createdUser = await createUser(accessToken, pendingPayload);
 
-        const createdUser = await createUser(accessToken, payload);
-
-        showToast('success', 'User created', createdUser.lastInviteReference
-            ? 'User added and access link generated.'
-            : 'User added successfully.');
+        setFormSuccess(createdUser.lastInviteReference
+          ? 'User added, sign-in email sent, and a test link was returned.'
+          : 'User added and sign-in email sent.');
 
         setEmail('');
         setUserType(fixedUserType ?? defaultUserType);
@@ -100,12 +116,14 @@ export function CreateUserPanel({
         setFacultyForm(createEmptyFacultyForm());
         setAdminForm(createEmptyAdminForm());
         setManagerForm(createEmptyManagerForm());
+        setPendingPayload(null);
 
         await onCreated(createdUser);
       } catch (error) {
         const message = getErrorMessage(error, 'We could not create the user.');
         setFormError(message);
-        showToast('error', 'User creation failed', message);
+        setFormSuccess(null);
+        setPendingPayload(null);
       }
     });
   }
@@ -140,6 +158,12 @@ export function CreateUserPanel({
       {formError && (
         <Alert variant="error" title="Unable to create user" style={{ marginBottom: 16 }}>
           {formError}
+        </Alert>
+      )}
+
+      {formSuccess && (
+        <Alert variant="success" title="User created" style={{ marginBottom: 16 }}>
+          {formSuccess}
         </Alert>
       )}
 
@@ -214,13 +238,38 @@ export function CreateUserPanel({
             loading={isCreating}
             iconLeft={<UserPlus size={14} />}
             onClick={() => {
-              void handleCreate();
+              handleCreateRequest();
             }}
           >
             Create User
           </Button>
         </div>
       </div>
+
+      <AdminConfirmDialog
+        open={!!pendingPayload}
+        title="Create user?"
+        description="This will create the account and send the first sign-in email immediately."
+        confirmLabel="Create and Send"
+        confirmVariant="primary"
+        confirmIcon={<UserPlus size={14} />}
+        loading={isCreating}
+        disabled={!accessToken}
+        onClose={() => setPendingPayload(null)}
+        onConfirm={() => {
+          void handleCreate();
+        }}
+      >
+        <div style={{ display: 'grid', gap: 8, color: 'var(--text-body)', fontSize: 13 }}>
+          <span>
+            <strong style={{ color: 'var(--text-h)' }}>Email:</strong> {pendingPayload?.email}
+          </span>
+          <span>
+            <strong style={{ color: 'var(--text-h)' }}>Role:</strong>{' '}
+            {userTypeOptions.find((option) => option.value === pendingPayload?.userType)?.label ?? pendingPayload?.userType}
+          </span>
+        </div>
+      </AdminConfirmDialog>
     </>
   );
 

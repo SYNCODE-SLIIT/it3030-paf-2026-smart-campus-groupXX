@@ -14,8 +14,8 @@ interface AuthContextValue {
   loading: boolean;
   authConfigured: boolean;
   signInWithPassword: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: (options?: { flow?: 'invite' }) => Promise<void>;
-  signInWithMicrosoft: (options?: { flow?: 'invite' }) => Promise<void>;
+  signInWithGoogle: (options?: { flow?: 'invite' | 'recovery' }) => Promise<void>;
+  signInWithMicrosoft: (options?: { flow?: 'invite' | 'recovery' }) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshMe: () => Promise<UserResponse | null>;
@@ -193,7 +193,7 @@ export function AuthProvider({
     };
   }, [applyResolvedAuthState, initialAppUser, normalizeEmail, resolveAppUser, supabase]);
 
-  const handleGoogleSignIn = React.useCallback(async (options?: { flow?: 'invite' }) => {
+  const handleGoogleSignIn = React.useCallback(async (options?: { flow?: 'invite' | 'recovery' }) => {
     if (!supabase) {
       throw new Error(
         'Supabase authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
@@ -204,6 +204,9 @@ export function AuthProvider({
 
     if (options?.flow === 'invite') {
       redirectUrl.searchParams.set('flow', 'invite-google');
+    }
+    if (options?.flow === 'recovery') {
+      redirectUrl.searchParams.set('flow', 'recovery-google');
     }
 
     const { error } = await supabase.auth.signInWithOAuth({
@@ -221,7 +224,7 @@ export function AuthProvider({
     }
   }, [supabase]);
 
-  const handleMicrosoftSignIn = React.useCallback(async (options?: { flow?: 'invite' }) => {
+  const handleMicrosoftSignIn = React.useCallback(async (options?: { flow?: 'invite' | 'recovery' }) => {
     if (!supabase) {
       throw new Error(
         'Supabase authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
@@ -232,6 +235,9 @@ export function AuthProvider({
 
     if (options?.flow === 'invite') {
       redirectUrl.searchParams.set('flow', 'invite-microsoft');
+    }
+    if (options?.flow === 'recovery') {
+      redirectUrl.searchParams.set('flow', 'recovery-microsoft');
     }
 
     const { error } = await supabase.auth.signInWithOAuth({
@@ -278,15 +284,42 @@ export function AuthProvider({
         );
       }
 
+      const missingSessionMessage =
+        'Your secure session expired. Reopen the invite link or continue with Google/Microsoft to verify again.';
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
+
+      if (currentSession?.access_token) {
+        applyResolvedAuthState(currentSession, appUserRef.current);
+      } else if (sessionRef.current?.access_token && sessionRef.current.refresh_token) {
+        const restoredSession = sessionRef.current;
+        const restored = await supabase.auth.setSession({
+          access_token: restoredSession.access_token,
+          refresh_token: restoredSession.refresh_token,
+        });
+
+        if (restored.error || !restored.data.session?.access_token) {
+          throw new Error(missingSessionMessage);
+        }
+
+        applyResolvedAuthState(restored.data.session, appUserRef.current);
+      } else {
+        throw new Error(missingSessionMessage);
+      }
+
       const { error } = await supabase.auth.updateUser({
         password,
       });
 
       if (error) {
+        if (error.message.toLowerCase().includes('auth session missing')) {
+          throw new Error(missingSessionMessage);
+        }
         throw new Error(error.message);
       }
     },
-    [supabase],
+    [applyResolvedAuthState, supabase],
   );
 
   const handleSignOut = React.useCallback(async () => {

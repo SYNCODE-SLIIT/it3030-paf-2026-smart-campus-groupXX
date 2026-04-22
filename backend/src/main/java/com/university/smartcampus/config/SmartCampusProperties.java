@@ -29,6 +29,7 @@ public class SmartCampusProperties {
     public static class Auth {
         private final Delivery delivery = new Delivery();
         private final Supabase supabase = new Supabase();
+        private final LoginLinkRateLimit loginLinkRateLimit = new LoginLinkRateLimit();
 
         public Delivery getDelivery() {
             return delivery;
@@ -36,6 +37,67 @@ public class SmartCampusProperties {
 
         public Supabase getSupabase() {
             return supabase;
+        }
+
+        public LoginLinkRateLimit getLoginLinkRateLimit() {
+            return loginLinkRateLimit;
+        }
+    }
+
+    public static class LoginLinkRateLimit {
+        private boolean enabled = true;
+        private int perIpMaxRequests = 20;
+        private int perIpWindowSeconds = 60;
+        private int perEmailMaxRequests = 5;
+        private int perEmailWindowSeconds = 300;
+        private int perEmailMinIntervalSeconds = 60;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getPerIpMaxRequests() {
+            return perIpMaxRequests;
+        }
+
+        public void setPerIpMaxRequests(int perIpMaxRequests) {
+            this.perIpMaxRequests = perIpMaxRequests;
+        }
+
+        public int getPerIpWindowSeconds() {
+            return perIpWindowSeconds;
+        }
+
+        public void setPerIpWindowSeconds(int perIpWindowSeconds) {
+            this.perIpWindowSeconds = perIpWindowSeconds;
+        }
+
+        public int getPerEmailMaxRequests() {
+            return perEmailMaxRequests;
+        }
+
+        public void setPerEmailMaxRequests(int perEmailMaxRequests) {
+            this.perEmailMaxRequests = perEmailMaxRequests;
+        }
+
+        public int getPerEmailWindowSeconds() {
+            return perEmailWindowSeconds;
+        }
+
+        public void setPerEmailWindowSeconds(int perEmailWindowSeconds) {
+            this.perEmailWindowSeconds = perEmailWindowSeconds;
+        }
+
+        public int getPerEmailMinIntervalSeconds() {
+            return perEmailMinIntervalSeconds;
+        }
+
+        public void setPerEmailMinIntervalSeconds(int perEmailMinIntervalSeconds) {
+            this.perEmailMinIntervalSeconds = perEmailMinIntervalSeconds;
         }
     }
 
@@ -56,6 +118,7 @@ public class SmartCampusProperties {
         private String serviceRoleKey;
         private String inviteRedirectTo;
         private String magicLinkRedirectTo;
+        private String passwordRecoveryRedirectTo;
 
         public String getUrl() {
             return url;
@@ -87,6 +150,14 @@ public class SmartCampusProperties {
 
         public void setMagicLinkRedirectTo(String magicLinkRedirectTo) {
             this.magicLinkRedirectTo = magicLinkRedirectTo;
+        }
+
+        public String getPasswordRecoveryRedirectTo() {
+            return passwordRecoveryRedirectTo;
+        }
+
+        public void setPasswordRecoveryRedirectTo(String passwordRecoveryRedirectTo) {
+            this.passwordRecoveryRedirectTo = passwordRecoveryRedirectTo;
         }
     }
 

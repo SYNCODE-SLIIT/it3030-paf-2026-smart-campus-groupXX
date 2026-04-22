@@ -117,6 +117,75 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void adminCanListAuditLogs() throws Exception {
+        CreateUserRequest request = new CreateUserRequest(
+            "audit-log-student@campus.test",
+            UserType.STUDENT,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        mockMvc.perform(post("/api/admin/users")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/admin/audit-logs")
+                .with(jwtFor("admin@campus.test"))
+                .param("action", "USER_CREATED")
+                .param("size", "5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].action").value("USER_CREATED"))
+            .andExpect(jsonPath("$.items[0].performedByEmail").value("admin@campus.test"))
+            .andExpect(jsonPath("$.items[0].targetUserEmail").value("audit-log-student@campus.test"));
+    }
+
+    @Test
+    void adminCanListAuditLogsForSpecificUser() throws Exception {
+        CreateUserRequest request = new CreateUserRequest(
+            "audit-user@campus.test",
+            UserType.STUDENT,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        mockMvc.perform(post("/api/admin/users")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isCreated());
+
+        UserEntity created = userRepository.findByEmailIgnoreCase("audit-user@campus.test").orElseThrow();
+
+        mockMvc.perform(get("/api/admin/audit-logs/user/{id}", created.getId())
+                .with(jwtFor("admin@campus.test"))
+                .param("size", "5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].targetUserId").value(created.getId().toString()));
+    }
+
+    @Test
+    void nonAdminCannotAccessAuditLogs() throws Exception {
+        seedStudent("student.no.audit@campus.test", AccountStatus.ACTIVE, true);
+
+        mockMvc.perform(get("/api/admin/audit-logs")
+                .with(jwtFor("student.no.audit@campus.test")))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/audit-logs"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void unauthenticatedUserCannotAccessAdminUsersEndpoint() throws Exception {
         mockMvc.perform(get("/api/admin/users"))
             .andExpect(status().isUnauthorized());
@@ -178,6 +247,43 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         mockMvc.perform(post("/api/auth/session/sync")
                 .with(jwtFor("unknown@campus.test")))
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void activeUnboundSessionSyncIsRejectedUntilProvisionedIdentityLinked() throws Exception {
+        seedFaculty("active.unbound@campus.test", AccountStatus.ACTIVE);
+
+        mockMvc.perform(post("/api/auth/session/sync")
+                .with(jwtFor("active.unbound@campus.test")))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("This authenticated account must be invited before first sign-in."));
+    }
+
+    @Test
+    void invitedUnboundSessionSyncRejectsExplicitUnverifiedEmailClaim() throws Exception {
+        seedStudent("invite.unverified@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(post("/api/auth/session/sync")
+                .with(jwt().jwt(jwt -> jwt
+                    .subject(UUID.randomUUID().toString())
+                    .claim("email", "invite.unverified@campus.test")
+                    .claim("email_verified", false))))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("Verified email is required to activate an invited account."));
+    }
+
+    @Test
+    void invitedUnboundSessionSyncAcceptsExplicitVerifiedEmailClaim() throws Exception {
+        seedStudent("invite.verified@campus.test", AccountStatus.INVITED, false);
+
+        mockMvc.perform(post("/api/auth/session/sync")
+                .with(jwt().jwt(jwt -> jwt
+                    .subject(UUID.randomUUID().toString())
+                    .claim("email", "invite.verified@campus.test")
+                    .claim("email_verified", true))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.nextStep").value("ONBOARDING"))
+            .andExpect(jsonPath("$.user.authUserId").isNotEmpty());
     }
 
     @Test
@@ -297,13 +403,47 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         mockMvc.perform(post("/api/admin/users/{id}/invite", student.getId())
                 .with(jwtFor("admin@campus.test")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("Access link generated."));
+            .andExpect(jsonPath("$.message").value("Sign-in email sent."));
 
         mockMvc.perform(post("/api/auth/login-link/request")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"missing@campus.test\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.message").value("If the account exists, an access link has been generated."));
+            .andExpect(jsonPath("$.message").value("If the account exists, a sign-in email has been sent."));
+    }
+
+    @Test
+    void publicPasswordResetRequestUsesGenericResponseAndRateLimit() throws Exception {
+        seedStudent("reset-existing@campus.test", AccountStatus.ACTIVE, true);
+        seedStudent("reset-suspended@campus.test", AccountStatus.SUSPENDED, true);
+
+        mockMvc.perform(post("/api/auth/password-reset/request")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"reset-existing@campus.test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("If the account exists, a password reset email has been sent."));
+
+        int deliveriesAfterFirstRequest = recordingAuthProviderClient.deliveries().size();
+
+        mockMvc.perform(post("/api/auth/password-reset/request")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"missing-reset@campus.test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("If the account exists, a password reset email has been sent."));
+
+        mockMvc.perform(post("/api/auth/password-reset/request")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"reset-suspended@campus.test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("If the account exists, a password reset email has been sent."));
+
+        mockMvc.perform(post("/api/auth/password-reset/request")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"reset-existing@campus.test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("If the account exists, a password reset email has been sent."));
+
+        assertThat(recordingAuthProviderClient.deliveries()).hasSize(deliveriesAfterFirstRequest);
     }
 
     @Test

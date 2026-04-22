@@ -20,11 +20,11 @@ class FlywayMigrationTest extends AbstractPostgresIntegrationTest {
                         select count(*)
                         from information_schema.tables
                         where table_schema = 'public'
-                          and table_name in ('users', 'students', 'faculty', 'admins', 'managers', 'resources')
+              and table_name in ('users', 'students', 'faculty', 'admins', 'managers', 'resources', 'admin_audit_logs')
                         """,
                 Integer.class);
 
-        assertThat(tableCount).isEqualTo(6);
+        assertThat(tableCount).isEqualTo(7);
     }
 
     @Test
@@ -61,6 +61,15 @@ class FlywayMigrationTest extends AbstractPostgresIntegrationTest {
 
         assertThat(removedColumnCount).isZero();
         assertThat(columnType("admins", "full_name")).isEqualTo("varchar");
+    }
+
+    @Test
+    void createsAdminAuditLogEnumAndColumns() {
+        assertThat(columnType("admin_audit_logs", "action")).isEqualTo("admin_action_enum");
+        assertThat(columnType("admin_audit_logs", "performed_by_id")).isEqualTo("uuid");
+        assertThat(columnType("admin_audit_logs", "target_user_id")).isEqualTo("uuid");
+        assertThat(columnType("admin_audit_logs", "details")).isEqualTo("text");
+        assertThat(columnType("admin_audit_logs", "created_at")).isEqualTo("timestamptz");
     }
 
     private String columnType(String tableName, String columnName) {

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { LoginFormCard } from '@/components/screens/login/LoginFormCard';
 import { LoginSideCards } from '@/components/screens/login/LoginSideCards';
-import { getErrorMessage } from '@/lib/api-client';
+import { getErrorMessage, requestPasswordReset } from '@/lib/api-client';
 import {
   getLoginReasonAlert,
   getUserHomePath,
@@ -30,6 +30,7 @@ export function LoginScreen({ reason }: { reason: string | null }) {
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const [isMicrosoftLoading, setIsMicrosoftLoading] = React.useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = React.useState(false);
+  const [isPasswordResetLoading, setIsPasswordResetLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (!appUser) return;
@@ -130,6 +131,46 @@ export function LoginScreen({ reason }: { reason: string | null }) {
     }
   }
 
+  async function handlePasswordReset(email: string) {
+    if (!authConfigured) {
+      setAlert({
+        variant: 'warning',
+        title: 'Authentication is not configured',
+        message: 'Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY before requesting a reset link.',
+      });
+      return;
+    }
+
+    if (!emailPattern.test(email)) {
+      setAlert({
+        variant: 'error',
+        title: 'Enter a valid email',
+        message: 'Use the email address for your Smart Campus account.',
+      });
+      return;
+    }
+
+    setAlert(null);
+    setIsPasswordResetLoading(true);
+
+    try {
+      const response = await requestPasswordReset(email.trim());
+      setAlert({
+        variant: 'success',
+        title: 'Check your email',
+        message: response.message,
+      });
+    } catch (error) {
+      setAlert({
+        variant: 'error',
+        title: 'Reset request failed',
+        message: getErrorMessage(error, 'We could not request a password reset email.'),
+      });
+    } finally {
+      setIsPasswordResetLoading(false);
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       <main
@@ -150,12 +191,17 @@ export function LoginScreen({ reason }: { reason: string | null }) {
             <LoginFormCard
               alert={alert}
               isPasswordLoading={isPasswordLoading}
+              isPasswordResetLoading={isPasswordResetLoading}
               isGoogleLoading={isGoogleLoading}
               isMicrosoftLoading={isMicrosoftLoading}
               authConfigured={authConfigured}
               onPasswordSubmit={(email, password) => {
                 void handlePasswordSubmit(email, password);
               }}
+              onPasswordReset={(email) => {
+                void handlePasswordReset(email);
+              }}
+              onModeChange={() => setAlert(null)}
               onGoogleSignIn={() => {
                 void handleGoogleSignIn();
               }}

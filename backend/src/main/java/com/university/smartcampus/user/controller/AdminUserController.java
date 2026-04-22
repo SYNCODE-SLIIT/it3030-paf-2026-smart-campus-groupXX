@@ -46,8 +46,8 @@ public class AdminUserController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse createUser(@Valid @RequestBody CreateUserRequest request, Authentication authentication) {
-        currentUserService.requireAdmin(authentication);
-        return userManagementService.createUser(request);
+        UserEntity admin = currentUserService.requireAdmin(authentication);
+        return userManagementService.createUser(request, admin);
     }
 
     @GetMapping
@@ -74,8 +74,8 @@ public class AdminUserController {
         @Valid @RequestBody UpdateUserRequest request,
         Authentication authentication
     ) {
-        currentUserService.requireAdmin(authentication);
-        return userManagementService.updateUser(id, request);
+        UserEntity admin = currentUserService.requireAdmin(authentication);
+        return userManagementService.updateUser(id, request, admin);
     }
 
     @PutMapping("/{id}/manager-role")
@@ -84,19 +84,19 @@ public class AdminUserController {
         @Valid @RequestBody ManagerRoleUpdateRequest request,
         Authentication authentication
     ) {
-        currentUserService.requireAdmin(authentication);
-        return userManagementService.replaceManagerRole(id, request.managerRole());
+        UserEntity admin = currentUserService.requireAdmin(authentication);
+        return userManagementService.replaceManagerRole(id, request.managerRole(), admin);
     }
 
     @PostMapping("/{id}/invite")
     public MessageResponse resendInvite(@PathVariable UUID id, Authentication authentication) {
-        currentUserService.requireAdmin(authentication);
-        return userManagementService.resendInvite(id);
+        UserEntity admin = currentUserService.requireAdmin(authentication);
+        return userManagementService.resendInvite(id, admin);
     }
 
     @DeleteMapping("/{id}")
     public MessageResponse deleteUser(@PathVariable UUID id, Authentication authentication) {
         UserEntity admin = currentUserService.requireAdmin(authentication);
-        return userManagementService.deleteUser(id, admin.getId());
+        return userManagementService.deleteUser(id, admin);
     }
 }

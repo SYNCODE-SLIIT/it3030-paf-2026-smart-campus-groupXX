@@ -35,4 +35,13 @@ public class StubAuthProviderClient implements AuthProviderClient {
             properties.getAuth().getSupabase().getMagicLinkRedirectTo()
         );
     }
+
+    @Override
+    public DeliveryResult sendRecoveryLink(String email) {
+        return new DeliveryResult(
+            AuthDeliveryMethod.PASSWORD_RECOVERY_EMAIL,
+            "stub-recovery-" + UUID.randomUUID(),
+            properties.getAuth().getSupabase().getPasswordRecoveryRedirectTo()
+        );
+    }
 }

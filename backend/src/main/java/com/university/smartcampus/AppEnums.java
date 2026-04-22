@@ -13,7 +13,8 @@ public final class AppEnums {
 
     public enum AuthDeliveryMethod {
         INVITE_EMAIL,
-        LOGIN_LINK_EMAIL
+        LOGIN_LINK_EMAIL,
+        PASSWORD_RECOVERY_EMAIL
     }
 
     public enum ManagerRole {

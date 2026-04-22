@@ -13,7 +13,8 @@ public final class AppEnums {
 
     public enum AuthDeliveryMethod {
         INVITE_EMAIL,
-        LOGIN_LINK_EMAIL
+        LOGIN_LINK_EMAIL,
+        PASSWORD_RECOVERY_EMAIL
     }
 
     public enum ManagerRole {
@@ -133,5 +134,15 @@ public final class AppEnums {
         RESOLVED,
         CLOSED,
         REJECTED
+    }
+
+    public enum AdminAction {
+        USER_CREATED,
+        USER_UPDATED,
+        USER_SUSPENDED,
+        USER_ACTIVATED,
+        USER_DELETED,
+        INVITE_RESENT,
+        MANAGER_ROLE_CHANGED
     }
 }

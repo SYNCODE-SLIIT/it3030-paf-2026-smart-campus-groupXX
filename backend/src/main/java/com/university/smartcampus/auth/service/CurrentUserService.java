@@ -20,6 +20,9 @@ import com.university.smartcampus.user.repository.UserRepository;
 @Service
 public class CurrentUserService {
 
+    public record ResolvedUserResult(UserEntity user, boolean emailFallbackUsed) {
+    }
+
     private final UserRepository userRepository;
 
     public CurrentUserService(UserRepository userRepository) {
@@ -36,22 +39,24 @@ public class CurrentUserService {
 
     public UserEntity requireCurrentUser(Authentication authentication) {
         Jwt jwt = requireJwt(authentication);
-        UUID subject = subjectFromJwt(jwt);
-
-        UserEntity user = userRepository.findByAuthUserId(subject)
-            .orElseGet(() -> userRepository.findByEmailIgnoreCase(normalizedEmailFromJwt(jwt))
-                        .orElseThrow(
-                                () -> new ForbiddenException("This authenticated account has not been provisioned.")));
-
-        if (user.getAuthUserId() != null && !user.getAuthUserId().equals(subject)) {
-            throw new ForbiddenException("This identity does not match the provisioned account.");
-        }
+        UserEntity user = resolveProvisionedUser(jwt).user();
 
         if (user.getAccountStatus() == AccountStatus.SUSPENDED) {
             throw new ForbiddenException("This account is suspended.");
         }
 
         return user;
+    }
+
+    public ResolvedUserResult resolveProvisionedUser(Jwt jwt) {
+        UUID subject = subjectFromJwt(jwt);
+
+        UserEntity directMatch = userRepository.findByAuthUserId(subject).orElse(null);
+        if (directMatch != null) {
+            return new ResolvedUserResult(directMatch, false);
+        }
+
+        return resolveProvisionedUserByEmailFallback(jwt, subject);
     }
 
     public UserEntity requireCurrentUserWithCompletedOnboarding(Authentication authentication) {
@@ -156,5 +161,80 @@ public class CurrentUserService {
 
     public String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private ResolvedUserResult resolveProvisionedUserByEmailFallback(Jwt jwt, UUID subject) {
+        UserEntity user = userRepository.findByEmailIgnoreCase(normalizedEmailFromJwt(jwt))
+                .orElseThrow(() -> new ForbiddenException("This authenticated account has not been provisioned."));
+
+        if (user.getAuthUserId() != null && !user.getAuthUserId().equals(subject)) {
+            throw new ForbiddenException("This identity does not match the provisioned account.");
+        }
+
+        if (user.getAuthUserId() != null) {
+            return new ResolvedUserResult(user, false);
+        }
+
+        if (user.getAccountStatus() != AccountStatus.INVITED) {
+            throw new ForbiddenException("This authenticated account must be invited before first sign-in.");
+        }
+
+        ensureVerifiedEmailForInviteFallback(jwt);
+
+        return new ResolvedUserResult(user, true);
+    }
+
+    private void ensureVerifiedEmailForInviteFallback(Jwt jwt) {
+        if (isExplicitlyUnverifiedEmailClaim(jwt)) {
+            throw new ForbiddenException("Verified email is required to activate an invited account.");
+        }
+    }
+
+    private boolean isExplicitlyUnverifiedEmailClaim(Jwt jwt) {
+        Object emailVerifiedClaim = jwt.getClaims().get("email_verified");
+        if (emailVerifiedClaim != null) {
+            Boolean parsedEmailVerified = parseBooleanClaim(emailVerifiedClaim);
+            return Boolean.FALSE.equals(parsedEmailVerified);
+        }
+
+        if (jwt.getClaims().containsKey("email_confirmed_at")) {
+            Object emailConfirmedAtClaim = jwt.getClaims().get("email_confirmed_at");
+            return !hasTruthyConfirmedAtClaim(emailConfirmedAtClaim);
+        }
+
+        return false;
+    }
+
+    private Boolean parseBooleanClaim(Object claimValue) {
+        if (claimValue instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+
+        if (claimValue instanceof String stringValue && StringUtils.hasText(stringValue)) {
+            if ("true".equalsIgnoreCase(stringValue)) {
+                return Boolean.TRUE;
+            }
+            if ("false".equalsIgnoreCase(stringValue)) {
+                return Boolean.FALSE;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean hasTruthyConfirmedAtClaim(Object claimValue) {
+        if (claimValue == null) {
+            return false;
+        }
+
+        if (claimValue instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+
+        if (claimValue instanceof String stringValue) {
+            return StringUtils.hasText(stringValue);
+        }
+
+        return true;
     }
 }

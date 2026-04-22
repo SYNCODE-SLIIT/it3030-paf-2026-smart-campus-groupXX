@@ -19,7 +19,10 @@ snapshot_hash() {
 start_app() {
   echo "[autoreload] Starting backend process..."
   if [ "${FIRST_RUN}" = "true" ]; then
-    mvn -Dspring-boot.run.excludeDevtools=true clean spring-boot:run &
+    sh -c 'mvn -Dspring-boot.run.excludeDevtools=true clean spring-boot:run || {
+      echo "[autoreload] Maven clean failed (likely file lock on mounted target). Retrying without clean..."
+      mvn -Dspring-boot.run.excludeDevtools=true spring-boot:run
+    }' &
     FIRST_RUN="false"
   else
     mvn -Dspring-boot.run.excludeDevtools=true spring-boot:run &
