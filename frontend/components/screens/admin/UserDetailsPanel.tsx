@@ -4,7 +4,6 @@ import React from 'react';
 import { Copy, Mail, ShieldCheck } from 'lucide-react';
 
 import { RoleRadioGroup } from '@/components/screens/admin/RoleRadioGroup';
-import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Chip, Input, Select } from '@/components/ui';
 import { getErrorMessage, replaceManagerRole, resendInvite, updateUser } from '@/lib/api-client';
 import type { AccountStatus, ManagerRole, UpdateUserRequest, UserResponse } from '@/lib/api-types';
@@ -25,10 +24,14 @@ export function UserDetailsPanel({
   accessToken: string | null;
   onReload: (preferredUserId?: string) => Promise<void>;
 }) {
-  const { showToast } = useToast();
   const [accountStatus, setAccountStatus] = React.useState<AccountStatus>('INVITED');
   const [managerRole, setManagerRole] = React.useState<ManagerRole | ''>('');
   const [panelError, setPanelError] = React.useState<string | null>(null);
+  const [panelNotice, setPanelNotice] = React.useState<{
+    variant: 'success' | 'info' | 'warning' | 'neutral';
+    title: string;
+    message: string;
+  } | null>(null);
   const [isSaving, startSaveTransition] = React.useTransition();
   const [isResending, startResendTransition] = React.useTransition();
   const [isCopying, startCopyTransition] = React.useTransition();
@@ -41,6 +44,7 @@ export function UserDetailsPanel({
     setAccountStatus(user.accountStatus);
     setManagerRole(user.managerRole ?? '');
     setPanelError(null);
+    setPanelNotice(null);
   }, [user]);
 
   if (!user) {
@@ -75,6 +79,7 @@ export function UserDetailsPanel({
     }
 
     setPanelError(null);
+    setPanelNotice(null);
 
     startSaveTransition(async () => {
       try {
@@ -91,11 +96,11 @@ export function UserDetailsPanel({
         }
 
         await onReload(currentUser.id);
-        showToast('success', 'Saved', 'User access updated.');
+        setPanelNotice({ variant: 'success', title: 'Saved', message: 'User access updated.' });
       } catch (error) {
         const message = getErrorMessage(error, 'We could not update this user.');
         setPanelError(message);
-        showToast('error', 'Update failed', message);
+        setPanelNotice(null);
       }
     });
   }
@@ -107,16 +112,17 @@ export function UserDetailsPanel({
     }
 
     setPanelError(null);
+    setPanelNotice(null);
 
     startResendTransition(async () => {
       try {
         const response = await resendInvite(accessToken, currentUser.id);
         await onReload(currentUser.id);
-        showToast('success', 'Access link generated', response.message);
+        setPanelNotice({ variant: 'success', title: 'Email sent', message: response.message });
       } catch (error) {
-        const message = getErrorMessage(error, 'We could not generate a new access link.');
+        const message = getErrorMessage(error, 'We could not send a new sign-in email.');
         setPanelError(message);
-        showToast('error', 'Link generation failed', message);
+        setPanelNotice(null);
       }
     });
   }
@@ -131,9 +137,10 @@ export function UserDetailsPanel({
     startCopyTransition(async () => {
       try {
         await navigator.clipboard.writeText(latestInviteLink);
-        showToast('success', 'Copied', 'Access link copied to clipboard.');
+        setPanelNotice({ variant: 'success', title: 'Copied', message: 'Access link copied to clipboard.' });
       } catch {
-        showToast('error', 'Copy failed', 'Could not copy the access link.');
+        setPanelError('Could not copy the access link.');
+        setPanelNotice(null);
       }
     });
   }
@@ -171,6 +178,12 @@ export function UserDetailsPanel({
         {panelError && (
           <Alert variant="error" title="Unable to save">
             {panelError}
+          </Alert>
+        )}
+
+        {panelNotice && (
+          <Alert variant={panelNotice.variant} title={panelNotice.title}>
+            {panelNotice.message}
           </Alert>
         )}
 

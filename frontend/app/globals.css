@@ -264,3 +264,45 @@ input.ui-input-control[type='password']::-webkit-strong-password-auto-fill-butto
   from { opacity: 0; transform: translateY(12px) scale(.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* Global route transition indicator */
+.route-progress {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.route-progress.is-visible {
+  opacity: 1;
+}
+
+.route-progress__bar {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 0.18s linear;
+  background: linear-gradient(
+    90deg,
+    var(--yellow-600) 0%,
+    var(--yellow-500) 45%,
+    var(--yellow-300) 100%
+  );
+  box-shadow: 0 0 10px rgba(212, 174, 40, 0.75);
+}
+
+.route-progress__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.38) 55%, transparent 100%);
+  animation: progress-shimmer 1.1s linear infinite;
+}

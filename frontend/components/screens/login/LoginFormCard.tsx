@@ -13,10 +13,13 @@ type AlertState = {
 interface LoginFormCardProps {
   alert: AlertState;
   isPasswordLoading: boolean;
+  isPasswordResetLoading: boolean;
   isGoogleLoading: boolean;
   isMicrosoftLoading: boolean;
   authConfigured: boolean;
   onPasswordSubmit: (email: string, password: string) => void;
+  onPasswordReset: (email: string) => void;
+  onModeChange?: () => void;
   onGoogleSignIn: () => void;
   onMicrosoftSignIn: () => void;
 }
@@ -90,19 +93,27 @@ function MicrosoftLogo() {
 export function LoginFormCard({
   alert,
   isPasswordLoading,
+  isPasswordResetLoading,
   isGoogleLoading,
   isMicrosoftLoading,
   authConfigured,
   onPasswordSubmit,
+  onPasswordReset,
+  onModeChange,
   onGoogleSignIn,
   onMicrosoftSignIn,
 }: LoginFormCardProps) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
+  const [isResetMode, setIsResetMode] = React.useState(false);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isResetMode) {
+      onPasswordReset(email);
+      return;
+    }
     onPasswordSubmit(email, password);
   }
 
@@ -120,10 +131,12 @@ export function LoginFormCard({
             lineHeight: 1.15,
           }}
         >
-          Welcome Back
+          {isResetMode ? 'Reset Password' : 'Welcome Back'}
         </h1>
         <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 14, fontWeight: 500 }}>
-          Sign in to your Smart Campus dashboard
+          {isResetMode
+            ? 'Enter your account email and we will send a secure reset link'
+            : 'Sign in to your Smart Campus dashboard'}
         </p>
       </div>
 
@@ -146,41 +159,43 @@ export function LoginFormCard({
           disabled={!authConfigured}
         />
 
-        <div style={{ position: 'relative' }}>
-          <Input
-            id="login-password"
-            label="Password"
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            autoComplete="current-password"
-            required
-            disabled={!authConfigured}
-            style={{ paddingRight: 44 }}
-          />
-          <button
-            type="button"
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-            onClick={() => setShowPassword(!showPassword)}
-            style={{
-              position: 'absolute',
-              right: 13,
-              bottom: 0,
-              height: 46,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
-              padding: 0,
-            }}
-          >
-            {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-          </button>
-        </div>
+        {!isResetMode && (
+          <div style={{ position: 'relative' }}>
+            <Input
+              id="login-password"
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              required
+              disabled={!authConfigured}
+              style={{ paddingRight: 44 }}
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: 13,
+                bottom: 0,
+                height: 46,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+                padding: 0,
+              }}
+            >
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 16 }}>
           <Button
@@ -189,12 +204,16 @@ export function LoginFormCard({
             size="lg"
             fullWidth
             disabled={!authConfigured}
-            loading={isPasswordLoading}
+            loading={isResetMode ? isPasswordResetLoading : isPasswordLoading}
           >
-            Sign In
+            {isResetMode ? 'Send Reset Link' : 'Sign In'}
           </Button>
-          <a
-            href="#"
+          <button
+            type="button"
+            onClick={() => {
+              setIsResetMode((current) => !current);
+              onModeChange?.();
+            }}
             style={{
               textAlign: 'center',
               color: 'var(--text-muted)',
@@ -204,10 +223,13 @@ export function LoginFormCard({
               letterSpacing: '.1em',
               textTransform: 'uppercase',
               transition: 'color .15s',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
-            Forgot Password?
-          </a>
+            {isResetMode ? 'Back to Sign In' : 'Forgot Password?'}
+          </button>
         </div>
       </form>
 

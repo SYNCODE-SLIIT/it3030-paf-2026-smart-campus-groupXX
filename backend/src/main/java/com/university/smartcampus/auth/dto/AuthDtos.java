@@ -13,6 +13,9 @@ public final class AuthDtos {
     public record LoginLinkRequest(@NotBlank @Email String email) {
     }
 
+    public record PasswordResetRequest(@NotBlank @Email String email) {
+    }
+
     public record SessionSyncResponse(ApiDtos.UserResponse user, String nextStep) {
     }
 }

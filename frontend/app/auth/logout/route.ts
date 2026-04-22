@@ -16,6 +16,23 @@ function clearSupabaseCookies(response: NextResponse, request: NextRequest) {
   }
 }
 
+function sanitizeInternalNextPath(nextPath: string | null) {
+  if (!nextPath || !nextPath.startsWith('/') || nextPath.startsWith('//')) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(nextPath, 'http://localhost');
+    if (parsed.origin !== 'http://localhost') {
+      return null;
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
 
@@ -27,10 +44,11 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const redirectUrl = new URL('/login', request.url);
+  const nextPath = sanitizeInternalNextPath(request.nextUrl.searchParams.get('next'));
+  const redirectUrl = nextPath ? new URL(nextPath, request.url) : new URL('/login', request.url);
   const reason = request.nextUrl.searchParams.get('reason');
 
-  if (reason) {
+  if (!nextPath && reason) {
     redirectUrl.searchParams.set('reason', reason);
   }
 

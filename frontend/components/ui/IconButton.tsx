@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Tooltip } from './Tooltip';
 
 type IconButtonVariant = 'neutral' | 'danger' | 'warning' | 'primary';
 type IconButtonSize = 'sm' | 'md';
@@ -45,10 +46,9 @@ export function IconButton({
   const dim = sizeMap[size];
   const isDisabled = disabled || loading;
 
-  return (
+  const btn = (
     <button
       type={type}
-      title={title}
       aria-label={ariaLabel ?? title}
       disabled={isDisabled}
       onClick={onClick}
@@ -78,4 +78,10 @@ export function IconButton({
       ) : icon}
     </button>
   );
+
+  if (title) {
+    return <Tooltip content={title}>{btn}</Tooltip>;
+  }
+
+  return btn;
 }

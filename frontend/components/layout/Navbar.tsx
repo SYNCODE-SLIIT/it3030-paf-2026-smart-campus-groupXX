@@ -27,10 +27,11 @@ interface NavbarProps {
   onLogout?: () => void;
   onNavigate?: (href: string) => void;
   hideAuthActions?: boolean;
+  rightAccessory?: React.ReactNode;
 }
 
 
-export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate, hideAuthActions }: NavbarProps) {
+export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate, hideAuthActions, rightAccessory }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -120,6 +121,7 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
           >
             {user ? (
               <>
+                {rightAccessory}
                 <Avatar
                   initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
                   src={user.src}

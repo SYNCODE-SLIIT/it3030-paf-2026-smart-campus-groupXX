@@ -4,6 +4,7 @@ set -eu
 POLL_INTERVAL_SECONDS="${RELOAD_POLL_INTERVAL_SECONDS:-2}"
 APP_PID=""
 FIRST_RUN="true"
+MVN_RUN_OPTS="-Dmaven.test.skip=true -Dspring-boot.run.excludeDevtools=true"
 
 hash_inputs() {
   find src/main/java src/main/resources -type f 2>/dev/null | sort | xargs -r sha1sum
@@ -19,10 +20,10 @@ snapshot_hash() {
 start_app() {
   echo "[autoreload] Starting backend process..."
   if [ "${FIRST_RUN}" = "true" ]; then
-    mvn -Dspring-boot.run.excludeDevtools=true clean spring-boot:run &
+    mvn ${MVN_RUN_OPTS} spring-boot:run &
     FIRST_RUN="false"
   else
-    mvn -Dspring-boot.run.excludeDevtools=true spring-boot:run &
+    mvn ${MVN_RUN_OPTS} spring-boot:run &
   fi
   APP_PID=$!
 }

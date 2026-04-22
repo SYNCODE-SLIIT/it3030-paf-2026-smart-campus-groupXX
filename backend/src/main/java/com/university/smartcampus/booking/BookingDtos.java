@@ -1,13 +1,14 @@
 package com.university.smartcampus.booking;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.AppEnums.CheckInStatus;
 import com.university.smartcampus.AppEnums.ModificationStatus;
-import com.university.smartcampus.AppEnums.NotificationType;
 import com.university.smartcampus.AppEnums.RecurrencePattern;
 import com.university.smartcampus.resource.ResourceDtos;
 
@@ -38,6 +39,7 @@ public final class BookingDtos {
         UUID id,
         ResourceDtos.ResourceSummary resource,
         UUID requesterId,
+        String requesterRegistrationNumber,
         BookingStatus status,
         Instant startTime,
         Instant endTime,
@@ -48,6 +50,21 @@ public final class BookingDtos {
         Instant cancelledAt,
         CheckInStatus checkInStatus,
         Instant checkedInAt
+    ) {
+    }
+
+    public record TimeRange(
+        Instant startTime,
+        Instant endTime
+    ) {
+    }
+
+    public record ResourceRemainingRangesResponse(
+        UUID resourceId,
+        LocalDate date,
+        Instant windowStart,
+        Instant windowEnd,
+        List<TimeRange> remainingRanges
     ) {
     }
 
@@ -118,16 +135,4 @@ public final class BookingDtos {
     ) {
     }
 
-    // Notification DTOs
-    public record BookingNotificationResponse(
-        UUID id,
-        UUID bookingId,
-        NotificationType notificationType,
-        Instant sentAt,
-        Instant readAt,
-        boolean emailSent,
-        boolean smsSent
-    ) {
-    }
 }
-

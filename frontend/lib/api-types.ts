@@ -2,9 +2,18 @@ export type UserType = 'STUDENT' | 'FACULTY' | 'ADMIN' | 'MANAGER';
 
 export type AccountStatus = 'INVITED' | 'ACTIVE' | 'SUSPENDED';
 
-export type AuthDeliveryMethod = 'INVITE_EMAIL' | 'LOGIN_LINK_EMAIL';
+export type AuthDeliveryMethod = 'INVITE_EMAIL' | 'LOGIN_LINK_EMAIL' | 'PASSWORD_RECOVERY_EMAIL';
 
 export type ManagerRole = 'CATALOG_MANAGER' | 'BOOKING_MANAGER' | 'TICKET_MANAGER';
+
+export type AdminAction =
+  | 'USER_CREATED'
+  | 'USER_UPDATED'
+  | 'USER_SUSPENDED'
+  | 'USER_ACTIVATED'
+  | 'USER_DELETED'
+  | 'INVITE_RESENT'
+  | 'MANAGER_ROLE_CHANGED';
 
 export type BookingStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'CHECKED_IN' | 'COMPLETED' | 'NO_SHOW';
 
@@ -14,14 +23,11 @@ export type CheckInStatus = 'PENDING' | 'CHECKED_IN' | 'NO_SHOW';
 
 export type ModificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
-export type NotificationType =
-  | 'BOOKING_APPROVED'
-  | 'BOOKING_REJECTED'
-  | 'BOOKING_CANCELLED'
-  | 'BOOKING_REMINDER_24H'
-  | 'BOOKING_REMINDER_1H'
-  | 'MODIFICATION_APPROVED'
-  | 'MODIFICATION_REJECTED';
+export type NotificationDomain = 'TICKET' | 'BOOKING' | 'CATALOG' | 'SYSTEM';
+
+export type NotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'ACTION_REQUIRED' | 'CRITICAL';
+
+export type NotificationDeliveryStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
 
 export type ResourceCategory =
   | 'SPACES'
@@ -372,6 +378,7 @@ export interface BookingResponse {
   id: string;
   resource: ResourceSummary;
   requesterId: string;
+  requesterRegistrationNumber: string | null;
   status: BookingStatus;
   startTime: string;
   endTime: string;
@@ -382,6 +389,19 @@ export interface BookingResponse {
   cancelledAt: string | null;
   checkInStatus: CheckInStatus | null;
   checkedInAt: string | null;
+}
+
+export interface TimeRangeResponse {
+  startTime: string;
+  endTime: string;
+}
+
+export interface ResourceRemainingRangesResponse {
+  resourceId: string;
+  date: string;
+  windowStart: string;
+  windowEnd: string;
+  remainingRanges: TimeRangeResponse[];
 }
 
 export interface CreateRecurringBookingRequest {
@@ -441,14 +461,67 @@ export interface CheckInResponse {
   checkedInAt: string | null;
 }
 
-export interface BookingNotificationResponse {
+export interface NotificationLinkResponse {
+  ticketId: string | null;
+  ticketCommentId: string | null;
+  bookingId: string | null;
+  bookingModificationId: string | null;
+  resourceId: string | null;
+  locationId: string | null;
+  buildingId: string | null;
+  resourceTypeId: string | null;
+  userId: string | null;
+}
+
+export interface NotificationResponse {
   id: string;
-  bookingId: string;
-  notificationType: NotificationType;
-  sentAt: string;
+  eventId: string;
+  domain: NotificationDomain;
+  type: string;
+  severity: NotificationSeverity;
+  title: string;
+  body: string | null;
+  actorUserId: string | null;
+  actorEmail: string | null;
+  actionUrl: string | null;
+  createdAt: string;
   readAt: string | null;
-  emailSent: boolean;
-  smsSent: boolean;
+  archivedAt: string | null;
+  emailDeliveryStatus: NotificationDeliveryStatus | null;
+  links: NotificationLinkResponse[];
+}
+
+export interface NotificationUnreadCountResponse {
+  unreadCount: number;
+}
+
+export interface NotificationPreferencesResponse {
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+}
+
+export interface UpdateNotificationPreferencesRequest {
+  inAppEnabled?: boolean;
+  emailEnabled?: boolean;
+}
+
+export interface NotificationDeliveryResponse {
+  id: string;
+  recipientId: string;
+  eventId: string;
+  recipientUserId: string;
+  recipientEmail: string;
+  domain: NotificationDomain;
+  type: string;
+  severity: NotificationSeverity;
+  title: string;
+  status: NotificationDeliveryStatus;
+  attemptCount: number;
+  nextAttemptAt: string | null;
+  sentAt: string | null;
+  failedAt: string | null;
+  failureReason: string | null;
+  createdAt: string;
 }
 
 export interface ErrorResponse {
@@ -519,6 +592,35 @@ export interface UserResponse {
   facultyProfile: FacultyProfileResponse | null;
   adminProfile: AdminProfileResponse | null;
   managerProfile: ManagerProfileResponse | null;
+}
+
+export interface AuditLogResponse {
+  id: string;
+  action: AdminAction;
+  performedById: string | null;
+  performedByEmail: string;
+  targetUserId: string | null;
+  targetUserEmail: string;
+  details: string | null;
+  createdAt: string;
+}
+
+export interface AuditLogPageResponse {
+  items: AuditLogResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
+}
+
+export interface AuditLogFilters {
+  action?: AdminAction | '';
+  performedById?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  size?: number;
 }
 
 export interface SessionSyncResponse {
@@ -599,8 +701,6 @@ export interface StudentOnboardingRequest {
   academicYear: AcademicYear;
   semester: Semester;
   profileImageUrl?: string;
-  emailNotificationsEnabled?: boolean;
-  smsNotificationsEnabled?: boolean;
 }
 
 // Ticket management
@@ -767,6 +867,8 @@ export interface TicketSummaryResponse {
 export interface TicketResponse extends TicketSummaryResponse {
   assignedToEmail: string | null;
   assignedToName: string | null;
+  resourceId: string | null;
+  locationId: string | null;
   resolutionNotes: string | null;
   rejectionReason: string | null;
   contactNote: string | null;
@@ -792,6 +894,7 @@ export interface CreateTicketRequest {
   category: TicketCategory;
   priority: TicketPriority;
   contactNote?: string;
+  resourceId?: string;
 }
 
 export interface UpdateTicketRequest {

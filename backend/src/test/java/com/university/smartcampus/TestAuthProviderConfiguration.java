@@ -68,6 +68,16 @@ public class TestAuthProviderConfiguration {
             return result;
         }
 
+        @Override
+        public DeliveryResult sendRecoveryLink(String email) {
+            DeliveryResult result = new DeliveryResult(
+                    AuthDeliveryMethod.PASSWORD_RECOVERY_EMAIL,
+                    "recovery-" + UUID.randomUUID(),
+                    "http://localhost/recovery");
+            deliveries.add(result);
+            return result;
+        }
+
         List<DeliveryResult> deliveries() {
             return Collections.unmodifiableList(deliveries);
         }

@@ -1,23 +1,25 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, ArrowLeft, Copy, Edit3, Mail, Save, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Copy, Edit3, Mail, Save, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { useToast } from '@/components/providers/ToastProvider';
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
+import { AuditLogTimeline } from '@/components/screens/admin/AuditLogTimeline';
 import { ProfileFields } from '@/components/screens/admin/ProfileFields';
 import { RoleRadioGroup } from '@/components/screens/admin/RoleRadioGroup';
 import { Alert, Avatar, Button, Card, Chip, Divider, Input, Select, Skeleton } from '@/components/ui';
 import {
   deleteUser,
+  getUserAuditLogs,
   getErrorMessage,
   getUser,
   replaceManagerRole,
   resendInvite,
   updateUser,
 } from '@/lib/api-client';
-import type { AccountStatus, ManagerRole, UpdateUserRequest, UserResponse } from '@/lib/api-types';
+import type { AccountStatus, AuditLogResponse, ManagerRole, UpdateUserRequest, UserResponse } from '@/lib/api-types';
 import {
   createEmptyAdminForm,
   createEmptyFacultyForm,
@@ -51,6 +53,12 @@ import {
 
 type ConfirmAction = 'reinvite' | 'delete' | null;
 
+type ActionNotice = {
+  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
+  title: string;
+  message: string;
+} | null;
+
 type DetailSection = {
   title: string;
   items: Array<{ label: string; value: React.ReactNode }>;
@@ -61,6 +69,8 @@ const accountStatusOptions: Array<{ value: AccountStatus; label: string }> = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'SUSPENDED', label: 'Suspended' },
 ];
+
+const ACTIVITY_PAGE_SIZE = 10;
 
 function formatDateTime(dateStr: string | null) {
   if (!dateStr) return 'Never';
@@ -235,60 +245,9 @@ function MetaItem({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function ConfirmMessage({
-  action,
-  disabled,
-  loading,
-  onCancel,
-  onConfirm,
-}: {
-  action: Exclude<ConfirmAction, null>;
-  disabled?: boolean;
-  loading?: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const isDelete = action === 'delete';
-
-  return (
-    <div className="admin-confirm-message" role="status">
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <span style={{ color: isDelete ? 'var(--red-500)' : 'var(--yellow-700)', display: 'flex', marginTop: 1 }}>
-          <AlertTriangle size={15} />
-        </span>
-        <div>
-          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 800, color: 'var(--text-h)' }}>
-            {isDelete ? 'Delete this user?' : 'Generate a new access link?'}
-          </p>
-          <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-            {isDelete
-              ? 'This permanently removes the user record and linked auth identity when one exists.'
-              : 'This creates a fresh invitation link and updates the latest access metadata.'}
-          </p>
-        </div>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-        <Button variant="ghost" size="xs" iconLeft={<X size={12} />} onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          variant={isDelete ? 'danger' : 'primary'}
-          size="xs"
-          loading={loading}
-          disabled={disabled}
-          onClick={onConfirm}
-        >
-          Confirm
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export function AdminUserDetailScreen({ userId }: { userId: string }) {
   const router = useRouter();
   const { session, appUser } = useAuth();
-  const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
   const [user, setUser] = React.useState<UserResponse | null>(null);
@@ -306,6 +265,13 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
   const [isResending, startResendTransition] = React.useTransition();
   const [isCopying, startCopyTransition] = React.useTransition();
   const [isDeleting, startDeleteTransition] = React.useTransition();
+  const [activity, setActivity] = React.useState<AuditLogResponse[]>([]);
+  const [activityLoading, setActivityLoading] = React.useState(false);
+  const [activityError, setActivityError] = React.useState<string | null>(null);
+  const [activityPage, setActivityPage] = React.useState(0);
+  const [activityHasNext, setActivityHasNext] = React.useState(false);
+  const [expandedActivityIds, setExpandedActivityIds] = React.useState<Set<string>>(new Set());
+  const [actionNotice, setActionNotice] = React.useState<ActionNotice>(null);
 
   const loadUser = React.useCallback(async () => {
     if (!accessToken) {
@@ -330,6 +296,50 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
   React.useEffect(() => {
     void loadUser();
   }, [loadUser]);
+
+  const loadActivity = React.useCallback(async (nextPage = 0, append = false) => {
+    if (!accessToken) {
+      setActivityLoading(false);
+      setActivityError('The admin session is unavailable. Please sign in again.');
+      return;
+    }
+
+    if (!append) {
+      setActivityLoading(true);
+    }
+
+    setActivityError(null);
+
+    try {
+      const response = await getUserAuditLogs(accessToken, userId, {
+        page: nextPage,
+        size: ACTIVITY_PAGE_SIZE,
+      });
+
+      setActivity((current) => (append ? [...current, ...response.items] : response.items));
+      setActivityPage(response.page);
+      setActivityHasNext(response.hasNext);
+
+      if (!append) {
+        setExpandedActivityIds(new Set());
+      }
+    } catch (activityLoadError) {
+      setActivityError(getErrorMessage(activityLoadError, 'We could not load this user\'s activity history.'));
+      if (!append) {
+        setActivity([]);
+        setActivityPage(0);
+        setActivityHasNext(false);
+      }
+    } finally {
+      if (!append) {
+        setActivityLoading(false);
+      }
+    }
+  }, [accessToken, userId]);
+
+  React.useEffect(() => {
+    void loadActivity(0, false);
+  }, [loadActivity]);
 
   function syncFormState(nextUser: UserResponse) {
     setAccountStatus(nextUser.accountStatus);
@@ -358,21 +368,21 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
     startCopyTransition(async () => {
       try {
         await navigator.clipboard.writeText(user.lastInviteReference ?? '');
-        showToast('success', 'Copied', 'Access link copied to clipboard.');
+        setActionNotice({ variant: 'success', title: 'Copied', message: 'Access link copied to clipboard.' });
       } catch {
-        showToast('error', 'Copy failed', 'Could not copy the access link.');
+        setActionNotice({ variant: 'error', title: 'Copy failed', message: 'Could not copy the access link.' });
       }
     });
   }
 
   async function handleResendInvite() {
     if (!accessToken || !user) {
-      showToast('error', 'Session unavailable', 'Please sign in again.');
+      setActionNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
       return;
     }
 
     if (user.accountStatus === 'SUSPENDED') {
-      showToast('warning', 'Action blocked', 'Suspended users cannot receive new links.');
+      setActionNotice({ variant: 'warning', title: 'Action blocked', message: 'Suspended users cannot receive new links.' });
       return;
     }
 
@@ -381,9 +391,10 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         await resendInvite(accessToken, user.id);
         const refreshed = await getUser(accessToken, user.id);
         setUser(refreshed);
-        showToast('success', 'Access link generated', 'A fresh access link is ready.');
+        void loadActivity(0, false);
+        setActionNotice({ variant: 'success', title: 'Email sent', message: 'A fresh sign-in email was sent.' });
       } catch (error) {
-        showToast('error', 'Link generation failed', getErrorMessage(error, 'We could not generate a new access link.'));
+        setActionNotice({ variant: 'error', title: 'Email send failed', message: getErrorMessage(error, 'We could not send a new sign-in email.') });
       } finally {
         setConfirmAction(null);
       }
@@ -392,7 +403,7 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
 
   async function handleSave() {
     if (!accessToken || !user) {
-      showToast('error', 'Session unavailable', 'Please sign in again.');
+      setActionNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
       return;
     }
 
@@ -424,35 +435,47 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         }
 
         setUser(updated);
+        void loadActivity(0, false);
         setIsEditing(false);
-        showToast('success', 'Saved', 'User profile and access details were updated.');
+        setActionNotice({ variant: 'success', title: 'Saved', message: 'User profile and access details were updated.' });
       } catch (error) {
-        showToast('error', 'Save failed', getErrorMessage(error, 'We could not save this user.'));
+        setActionNotice({ variant: 'error', title: 'Save failed', message: getErrorMessage(error, 'We could not save this user.') });
       }
     });
   }
 
   async function handleDelete() {
     if (!accessToken || !user) {
-      showToast('error', 'Session unavailable', 'Please sign in again.');
+      setActionNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
       return;
     }
 
     if (appUser?.id === user.id) {
-      showToast('warning', 'Action blocked', 'You cannot delete your own account.');
+      setActionNotice({ variant: 'warning', title: 'Action blocked', message: 'You cannot delete your own account.' });
       return;
     }
 
     startDeleteTransition(async () => {
       try {
         await deleteUser(accessToken, user.id);
-        showToast('success', 'User deleted', `${user.email} was removed.`);
         router.push(detailListPath(user));
       } catch (error) {
-        showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete this user.'));
+        setActionNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete this user.') });
       } finally {
         setConfirmAction(null);
       }
+    });
+  }
+
+  function toggleActivityDetails(id: string) {
+    setExpandedActivityIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
     });
   }
 
@@ -620,13 +643,6 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
           display: grid;
           gap: 18px;
         }
-        .admin-confirm-message {
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: var(--surface-2);
-          padding: 13px;
-          box-shadow: var(--chip-shadow);
-        }
         @media (max-width: 960px) {
           .admin-action-cluster {
             justify-content: flex-start;
@@ -671,6 +687,11 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
         </div>
       </div>
 
+      {actionNotice && (
+        <Alert variant={actionNotice.variant} title={actionNotice.title}>
+          {actionNotice.message}
+        </Alert>
+      )}
 
       <Card>
         <div className="admin-summary-card">
@@ -732,21 +753,6 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
                   Delete
                 </Button>
               </div>
-              {confirmAction && (
-                <ConfirmMessage
-                  action={confirmAction}
-                  loading={confirmAction === 'delete' ? isDeleting : isResending}
-                  disabled={confirmAction === 'delete' ? isSelf : suspended}
-                  onCancel={() => setConfirmAction(null)}
-                  onConfirm={() => {
-                    if (confirmAction === 'delete') {
-                      void handleDelete();
-                      return;
-                    }
-                    void handleResendInvite();
-                  }}
-                />
-              )}
             </div>
           </div>
 
@@ -840,6 +846,92 @@ export function AdminUserDetailScreen({ userId }: { userId: string }) {
           </div>
         )}
       </Card>
+
+      <Card>
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 850, color: 'var(--text-h)' }}>
+                Activity History
+              </p>
+              <p style={{ margin: '5px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                Timeline of admin actions recorded for this account.
+              </p>
+            </div>
+            <Button variant="ghost" size="xs" onClick={() => router.push('/admin/audit-log')}>
+              View Full Audit Log
+            </Button>
+          </div>
+
+          {activityError && (
+            <Alert variant="warning" title="Activity unavailable">
+              {activityError}
+            </Alert>
+          )}
+
+          {activityLoading ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              <Skeleton variant="rect" height={84} />
+              <Skeleton variant="rect" height={84} />
+            </div>
+          ) : (
+            <AuditLogTimeline
+              logs={activity}
+              expandedIds={expandedActivityIds}
+              onToggleDetails={toggleActivityDetails}
+              emptyMessage="No recorded activity for this user yet."
+            />
+          )}
+
+          {!activityLoading && !activityError && activityHasNext && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Page {activityPage + 1}</span>
+              <Button
+                variant="subtle"
+                size="xs"
+                onClick={() => { void loadActivity(activityPage + 1, true); }}
+              >
+                Load More
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {confirmAction && (
+        <AdminConfirmDialog
+          open
+          title={confirmAction === 'delete' ? 'Delete user?' : 'Reinvite user?'}
+          description={
+            confirmAction === 'delete'
+              ? 'This permanently removes the user record and linked auth identity when one exists.'
+              : 'This sends a fresh sign-in email and updates the latest delivery metadata.'
+          }
+          confirmLabel={confirmAction === 'delete' ? 'Delete User' : 'Send Email'}
+          confirmVariant={confirmAction === 'delete' ? 'danger' : 'primary'}
+          confirmIcon={confirmAction === 'delete' ? <Trash2 size={14} /> : <Mail size={14} />}
+          loading={confirmAction === 'delete' ? isDeleting : isResending}
+          disabled={confirmAction === 'delete' ? isSelf : suspended}
+          alertVariant={confirmAction === 'delete' ? 'warning' : 'info'}
+          onClose={() => setConfirmAction(null)}
+          onConfirm={() => {
+            if (confirmAction === 'delete') {
+              void handleDelete();
+              return;
+            }
+            void handleResendInvite();
+          }}
+        >
+          <div style={{ display: 'grid', gap: 8, color: 'var(--text-body)', fontSize: 13 }}>
+            <span>
+              <strong style={{ color: 'var(--text-h)' }}>Email:</strong> {user.email}
+            </span>
+            <span>
+              <strong style={{ color: 'var(--text-h)' }}>Status:</strong> {user.accountStatus}
+            </span>
+          </div>
+        </AdminConfirmDialog>
+      )}
     </div>
   );
 }

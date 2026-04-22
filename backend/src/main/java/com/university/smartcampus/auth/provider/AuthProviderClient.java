@@ -8,6 +8,8 @@ public interface AuthProviderClient {
 
     DeliveryResult sendMagicLink(String email);
 
+    DeliveryResult sendRecoveryLink(String email);
+
     record DeliveryResult(AuthDeliveryMethod deliveryMethod, String authReference, String redirectUri) {
     }
 }

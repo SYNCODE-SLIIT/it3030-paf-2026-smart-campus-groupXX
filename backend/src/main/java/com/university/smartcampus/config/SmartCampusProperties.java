@@ -9,6 +9,7 @@ public class SmartCampusProperties {
     private final Security security = new Security();
     private final Bootstrap bootstrap = new Bootstrap();
     private final Storage storage = new Storage();
+    private final Notifications notifications = new Notifications();
 
     public Auth getAuth() {
         return auth;
@@ -26,9 +27,14 @@ public class SmartCampusProperties {
         return storage;
     }
 
+    public Notifications getNotifications() {
+        return notifications;
+    }
+
     public static class Auth {
         private final Delivery delivery = new Delivery();
         private final Supabase supabase = new Supabase();
+        private final LoginLinkRateLimit loginLinkRateLimit = new LoginLinkRateLimit();
 
         public Delivery getDelivery() {
             return delivery;
@@ -36,6 +42,67 @@ public class SmartCampusProperties {
 
         public Supabase getSupabase() {
             return supabase;
+        }
+
+        public LoginLinkRateLimit getLoginLinkRateLimit() {
+            return loginLinkRateLimit;
+        }
+    }
+
+    public static class LoginLinkRateLimit {
+        private boolean enabled = true;
+        private int perIpMaxRequests = 20;
+        private int perIpWindowSeconds = 60;
+        private int perEmailMaxRequests = 5;
+        private int perEmailWindowSeconds = 300;
+        private int perEmailMinIntervalSeconds = 60;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getPerIpMaxRequests() {
+            return perIpMaxRequests;
+        }
+
+        public void setPerIpMaxRequests(int perIpMaxRequests) {
+            this.perIpMaxRequests = perIpMaxRequests;
+        }
+
+        public int getPerIpWindowSeconds() {
+            return perIpWindowSeconds;
+        }
+
+        public void setPerIpWindowSeconds(int perIpWindowSeconds) {
+            this.perIpWindowSeconds = perIpWindowSeconds;
+        }
+
+        public int getPerEmailMaxRequests() {
+            return perEmailMaxRequests;
+        }
+
+        public void setPerEmailMaxRequests(int perEmailMaxRequests) {
+            this.perEmailMaxRequests = perEmailMaxRequests;
+        }
+
+        public int getPerEmailWindowSeconds() {
+            return perEmailWindowSeconds;
+        }
+
+        public void setPerEmailWindowSeconds(int perEmailWindowSeconds) {
+            this.perEmailWindowSeconds = perEmailWindowSeconds;
+        }
+
+        public int getPerEmailMinIntervalSeconds() {
+            return perEmailMinIntervalSeconds;
+        }
+
+        public void setPerEmailMinIntervalSeconds(int perEmailMinIntervalSeconds) {
+            this.perEmailMinIntervalSeconds = perEmailMinIntervalSeconds;
         }
     }
 
@@ -56,6 +123,7 @@ public class SmartCampusProperties {
         private String serviceRoleKey;
         private String inviteRedirectTo;
         private String magicLinkRedirectTo;
+        private String passwordRecoveryRedirectTo;
 
         public String getUrl() {
             return url;
@@ -87,6 +155,14 @@ public class SmartCampusProperties {
 
         public void setMagicLinkRedirectTo(String magicLinkRedirectTo) {
             this.magicLinkRedirectTo = magicLinkRedirectTo;
+        }
+
+        public String getPasswordRecoveryRedirectTo() {
+            return passwordRecoveryRedirectTo;
+        }
+
+        public void setPasswordRecoveryRedirectTo(String passwordRecoveryRedirectTo) {
+            this.passwordRecoveryRedirectTo = passwordRecoveryRedirectTo;
         }
     }
 
@@ -252,6 +328,71 @@ public class SmartCampusProperties {
 
         public void setMaxSizeBytes(long maxSizeBytes) {
             this.maxSizeBytes = maxSizeBytes;
+        }
+    }
+
+    public static class Notifications {
+        private final Email email = new Email();
+
+        public Email getEmail() {
+            return email;
+        }
+    }
+
+    public static class Email {
+        private boolean enabled;
+        private String from = "no-reply@smartcampus.local";
+        private String actionBaseUrl = "http://localhost:3000";
+        private int retryMaxAttempts = 3;
+        private int retryDelaySeconds = 300;
+        private int batchSize = 25;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getFrom() {
+            return from;
+        }
+
+        public void setFrom(String from) {
+            this.from = from;
+        }
+
+        public String getActionBaseUrl() {
+            return actionBaseUrl;
+        }
+
+        public void setActionBaseUrl(String actionBaseUrl) {
+            this.actionBaseUrl = actionBaseUrl;
+        }
+
+        public int getRetryMaxAttempts() {
+            return retryMaxAttempts;
+        }
+
+        public void setRetryMaxAttempts(int retryMaxAttempts) {
+            this.retryMaxAttempts = retryMaxAttempts;
+        }
+
+        public int getRetryDelaySeconds() {
+            return retryDelaySeconds;
+        }
+
+        public void setRetryDelaySeconds(int retryDelaySeconds) {
+            this.retryDelaySeconds = retryDelaySeconds;
+        }
+
+        public int getBatchSize() {
+            return batchSize;
+        }
+
+        public void setBatchSize(int batchSize) {
+            this.batchSize = batchSize;
         }
     }
 }

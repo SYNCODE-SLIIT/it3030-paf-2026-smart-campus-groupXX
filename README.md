@@ -134,6 +134,59 @@ Do not put your pooled Postgres `DATABASE_URL` in `frontend/.env.local` for this
 
 Note: the current backend still does not include PostgreSQL/JDBC/JPA dependencies, so these environment values set the correct secret locations first. You still need to add the actual persistence layer in the backend before it can query Supabase.
 
+## Supabase Auth Email and Core Staff Bootstrap
+
+The backend sends invite, reinvite, and login emails through Supabase Auth APIs. To ensure those emails are delivered from your organization mailbox, configure custom SMTP directly in Supabase Auth.
+
+### 1) Configure Supabase Custom SMTP
+
+In **Supabase Dashboard -> Authentication -> Email -> SMTP settings**:
+
+- Sender email: `support@teamsyncode.com`
+- Sender name: `Team Syncode`
+- Host: `smtp.resend.com`
+- Port: `465`
+- Username: `resend`
+- Password: your Resend SMTP password/API key
+- Minimum interval per user: `60` seconds
+
+Before enabling in production, verify SPF/DKIM/DMARC for your sender domain in Resend.
+
+### 2) Seed Core Staff Accounts (Application DB)
+
+Flyway migration `V202604211430__seed_core_staff_accounts.sql` seeds these ACTIVE accounts:
+
+- `admin@teamsyncode.com` (ADMIN)
+- `catalog@teamsyncode.com` (MANAGER, CATALOG_MANAGER)
+- `technician@teamsyncode.com` (MANAGER, TICKET_MANAGER)
+- `booking@teamsyncode.com` (MANAGER, BOOKING_MANAGER)
+
+Flyway runs automatically when the backend starts.
+
+### 3) Provision Supabase Password Identities
+
+SQL user records alone are not enough for sign-in. After migrations are applied, provision/update Supabase Auth identities for the same emails:
+
+```powershell
+pwsh ./backend/scripts/provision-core-staff-auth.ps1 \
+  -SupabaseUrl "https://<project-ref>.supabase.co" \
+  -SupabaseServiceRoleKey "<service-role-key>" \
+  -InitialPassword (ConvertTo-SecureString "User@123" -AsPlainText -Force)
+```
+
+### 4) Post-Provision Security Step
+
+Rotate the bootstrap password immediately after first successful access in each environment.
+
+The public endpoint `/api/auth/login-link/request` now applies backend rate-limiting controls. Keep limits enabled in production and tune them with these environment variables if needed:
+
+- `APP_AUTH_LOGIN_LINK_RATE_LIMIT_ENABLED`
+- `APP_AUTH_LOGIN_LINK_RATE_LIMIT_PER_IP_MAX_REQUESTS`
+- `APP_AUTH_LOGIN_LINK_RATE_LIMIT_PER_IP_WINDOW_SECONDS`
+- `APP_AUTH_LOGIN_LINK_RATE_LIMIT_PER_EMAIL_MAX_REQUESTS`
+- `APP_AUTH_LOGIN_LINK_RATE_LIMIT_PER_EMAIL_WINDOW_SECONDS`
+- `APP_AUTH_LOGIN_LINK_RATE_LIMIT_PER_EMAIL_MIN_INTERVAL_SECONDS`
+
 ## 📋 Assignment Compliance Checklist
 
 - ✅ **Demonstrable Locally**: Yes (via Docker Compose).

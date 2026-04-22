@@ -13,7 +13,8 @@ public final class AppEnums {
 
     public enum AuthDeliveryMethod {
         INVITE_EMAIL,
-        LOGIN_LINK_EMAIL
+        LOGIN_LINK_EMAIL,
+        PASSWORD_RECOVERY_EMAIL
     }
 
     public enum ManagerRole {
@@ -85,15 +86,4 @@ public final class AppEnums {
         REJECTED
     }
 
-    public enum NotificationType {
-        BOOKING_APPROVED,
-        BOOKING_REJECTED,
-        BOOKING_CANCELLED,
-        BOOKING_REMINDER_24H,
-        BOOKING_REMINDER_1H,
-        MODIFICATION_APPROVED,
-        MODIFICATION_REJECTED
-    }
-
-   
 }

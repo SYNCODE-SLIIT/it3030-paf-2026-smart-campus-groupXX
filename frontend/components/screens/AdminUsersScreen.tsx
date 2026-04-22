@@ -1,14 +1,14 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Copy, Mail, Search, Trash2, UserPlus, X } from 'lucide-react';
+import { Copy, Mail, Search, Trash2, UserPlus, X } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { useToast } from '@/components/providers/ToastProvider';
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
 import { CreateUserPanel } from '@/components/screens/admin/CreateUserPanel';
 import { UserStatsGrid } from '@/components/screens/admin/UserStatsGrid';
 import { UserTableCard, roleTabs, type RoleTab } from '@/components/screens/admin/UserTableCard';
-import { Alert, Button, Card, Input, Skeleton, Tabs, Textarea, Toast, ToastStack } from '@/components/ui';
+import { Alert, Button, Card, Input, Skeleton, Tabs, Textarea } from '@/components/ui';
 import { deleteUser, getErrorMessage, getUser, listUsers, resendInvite } from '@/lib/api-client';
 import type { AccountStatus, UserResponse } from '@/lib/api-types';
 
@@ -22,11 +22,16 @@ type PendingUserAction = {
   user: UserResponse;
 } | null;
 
+type ActionNotice = {
+  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
+  title: string;
+  message: string;
+} | null;
+
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }) {
   const { session, appUser } = useAuth();
-  const { showToast } = useToast();
   const resolvedUser = currentUser ?? appUser ?? null;
   const accessToken = session?.access_token ?? null;
 
@@ -43,6 +48,7 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
   const [pendingUserAction, setPendingUserAction] = React.useState<PendingUserAction>(null);
   const [reinvitingUserId, setReinvitingUserId] = React.useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = React.useState<string | null>(null);
+  const [actionNotice, setActionNotice] = React.useState<ActionNotice>(null);
   const [isCopyingLink, startCopyLinkTransition] = React.useTransition();
 
   const reloadUsers = React.useCallback(async () => {
@@ -75,17 +81,16 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
   }, [reloadUsers]);
 
   React.useEffect(() => {
-    if (!isCreateDialogOpen && !createdInvite) return;
+    if (!createdInvite) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
-      if (createdInvite) { setCreatedInvite(null); return; }
-      setIsCreateDialogOpen(false);
+      setCreatedInvite(null);
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createdInvite, isCreateDialogOpen]);
+  }, [createdInvite]);
 
 
   function handleCopyGeneratedLink() {
@@ -93,21 +98,21 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
     startCopyLinkTransition(async () => {
       try {
         await navigator.clipboard.writeText(createdInvite.link);
-        showToast('success', 'Copied', 'Access link copied to clipboard.');
+        setActionNotice({ variant: 'success', title: 'Copied', message: 'Access link copied to clipboard.' });
       } catch {
-        showToast('error', 'Copy failed', 'Could not copy the access link.');
+        setActionNotice({ variant: 'error', title: 'Copy failed', message: 'Could not copy the access link.' });
       }
     });
   }
 
   async function handleReinviteUser(targetUser: UserResponse) {
     if (!accessToken) {
-      showToast('error', 'Session unavailable', 'Please sign in again.');
+      setActionNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
       return;
     }
 
     if (targetUser.accountStatus === 'SUSPENDED') {
-      showToast('warning', 'Action blocked', 'Suspended users cannot receive new links.');
+      setActionNotice({ variant: 'warning', title: 'Action blocked', message: 'Suspended users cannot receive new links.' });
       return;
     }
 
@@ -116,9 +121,9 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
       await resendInvite(accessToken, targetUser.id);
       const refreshed = await getUser(accessToken, targetUser.id);
       setUsers((current) => current.map((user) => (user.id === refreshed.id ? refreshed : user)));
-      showToast('success', 'Access link generated', `A fresh access link is ready for ${targetUser.email}.`);
+      setActionNotice({ variant: 'success', title: 'Email sent', message: `A fresh sign-in email was sent to ${targetUser.email}.` });
     } catch (error) {
-      showToast('error', 'Link generation failed', getErrorMessage(error, 'We could not generate a new access link.'));
+      setActionNotice({ variant: 'error', title: 'Email send failed', message: getErrorMessage(error, 'We could not send a new sign-in email.') });
     } finally {
       setReinvitingUserId(null);
     }
@@ -126,12 +131,12 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
 
   async function handleDeleteUser(targetUser: UserResponse) {
     if (!accessToken) {
-      showToast('error', 'Session unavailable', 'Please sign in again.');
+      setActionNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
       return;
     }
 
     if (resolvedUser?.id === targetUser.id) {
-      showToast('warning', 'Action blocked', 'You cannot delete your own account.');
+      setActionNotice({ variant: 'warning', title: 'Action blocked', message: 'You cannot delete your own account.' });
       return;
     }
 
@@ -139,9 +144,9 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
     try {
       await deleteUser(accessToken, targetUser.id);
       setUsers((current) => current.filter((user) => user.id !== targetUser.id));
-      showToast('success', 'User deleted', `${targetUser.email} was removed.`);
+      setActionNotice({ variant: 'success', title: 'User deleted', message: `${targetUser.email} was removed.` });
     } catch (error) {
-      showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete this user.'));
+      setActionNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete this user.') });
     } finally {
       setDeletingUserId(null);
     }
@@ -250,6 +255,12 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
           </p>
         </div>
 
+        {actionNotice && (
+          <Alert variant={actionNotice.variant} title={actionNotice.title}>
+            {actionNotice.message}
+          </Alert>
+        )}
+
         {/* Stats */}
         <UserStatsGrid
           totalUsers={totalUsers}
@@ -321,41 +332,39 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
         />
       </div>
 
-      <ToastStack>
-        {pendingUserAction && (
-          <Toast
-            variant={pendingUserAction.type === 'delete' ? 'warning' : 'info'}
-            title={pendingUserAction.type === 'delete' ? 'Confirm delete user' : 'Confirm reinvite user'}
-            icon={pendingUserAction.type === 'delete' ? <AlertTriangle size={18} /> : <Mail size={18} />}
-            dismissible
-            onDismiss={() => setPendingUserAction(null)}
-            actions={
-              <>
-                <Button variant="ghost" size="xs" onClick={() => setPendingUserAction(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant={pendingUserAction.type === 'delete' ? 'danger' : 'primary'}
-                  size="xs"
-                  iconLeft={pendingUserAction.type === 'delete' ? <Trash2 size={12} /> : <Mail size={12} />}
-                  loading={
-                    pendingUserAction.type === 'delete'
-                      ? deletingUserId === pendingUserAction.user.id
-                      : reinvitingUserId === pendingUserAction.user.id
-                  }
-                  onClick={() => { void handleConfirmPendingUserAction(); }}
-                >
-                  Confirm
-                </Button>
-              </>
-            }
-          >
-            {pendingUserAction.type === 'delete'
-              ? `Delete ${pendingUserAction.user.email}? This permanently removes the account.`
-              : `Generate a fresh access link for ${pendingUserAction.user.email}?`}
-          </Toast>
-        )}
-      </ToastStack>
+      {pendingUserAction && (
+        <AdminConfirmDialog
+          open
+          title={pendingUserAction.type === 'delete' ? 'Delete user?' : 'Reinvite user?'}
+          description={
+            pendingUserAction.type === 'delete'
+              ? 'This permanently removes the account and linked identity when one exists.'
+              : 'This sends a fresh sign-in email and updates the user invite metadata.'
+          }
+          confirmLabel={pendingUserAction.type === 'delete' ? 'Delete User' : 'Send Email'}
+          confirmVariant={pendingUserAction.type === 'delete' ? 'danger' : 'primary'}
+          confirmIcon={pendingUserAction.type === 'delete' ? <Trash2 size={14} /> : <Mail size={14} />}
+          loading={
+            pendingUserAction.type === 'delete'
+              ? deletingUserId === pendingUserAction.user.id
+              : reinvitingUserId === pendingUserAction.user.id
+          }
+          alertVariant={pendingUserAction.type === 'delete' ? 'warning' : 'info'}
+          onClose={() => setPendingUserAction(null)}
+          onConfirm={() => {
+            void handleConfirmPendingUserAction();
+          }}
+        >
+          <div style={{ display: 'grid', gap: 8, color: 'var(--text-body)', fontSize: 13 }}>
+            <span>
+              <strong style={{ color: 'var(--text-h)' }}>Email:</strong> {pendingUserAction.user.email}
+            </span>
+            <span>
+              <strong style={{ color: 'var(--text-h)' }}>Status:</strong> {pendingUserAction.user.accountStatus}
+            </span>
+          </div>
+        </AdminConfirmDialog>
+      )}
 
       {/* Create user dialog */}
       {isCreateDialogOpen && (
@@ -390,7 +399,7 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
                     Add User
                   </p>
                   <p style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-body)' }}>
-                    Create the account and copy the generated link to test sign-in right away.
+                    Create the account and send the first sign-in email right away.
                   </p>
                 </div>
                 <button
@@ -414,7 +423,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
                     setCreatedInvite({ email: createdUser.email, link: createdUser.lastInviteReference });
                     return;
                   }
-                  showToast('warning', 'User created', 'No access link was returned.');
                 }}
                 onCancel={() => setIsCreateDialogOpen(false)}
               />

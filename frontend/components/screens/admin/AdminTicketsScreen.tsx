@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
+import { TicketPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Dialog, Skeleton, Tabs } from '@/components/ui';
-import { TicketCard } from '@/components/tickets';
+import { SubmitTicketModal, TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
 import { assignTicket, deleteTicket, getErrorMessage, listMyTickets, listUsers } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse, UserResponse } from '@/lib/api-types';
 
@@ -148,6 +149,7 @@ export function AdminTicketsScreen() {
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [deleteConfirmCode, setDeleteConfirmCode] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [submitModalOpen, setSubmitModalOpen] = React.useState(false);
 
   const reload = React.useCallback(async () => {
     if (!accessToken) {
@@ -334,20 +336,9 @@ export function AdminTicketsScreen() {
   const renderContent = () => {
     if (loading) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ background: 'var(--surface-1)', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Skeleton variant="line" width={180} height={14} />
-                <Skeleton variant="line" width={60} height={14} />
-              </div>
-              <Skeleton variant="line" width="85%" height={12} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Skeleton variant="line" width={70} height={10} />
-                <Skeleton variant="line" width={90} height={10} />
-              </div>
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+          <TicketsSectionSkeleton count={3} />
+          <TicketsSectionSkeleton count={3} />
         </div>
       );
     }
@@ -426,35 +417,40 @@ export function AdminTicketsScreen() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Page header */}
-      <div>
-        <p
-          style={{
-            margin: '0 0 8px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            fontWeight: 900,
-            letterSpacing: '.32em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-          }}
-        >
-          Admin Console
-        </p>
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: 'var(--font-display)',
-            fontSize: 36,
-            fontWeight: 900,
-            lineHeight: 1.1,
-            color: 'var(--text-h)',
-          }}
-        >
-          Ticket Management
-        </h1>
-        <p style={{ margin: '8px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
-          View all campus support tickets and assign them to ticket managers.
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <p
+            style={{
+              margin: '0 0 8px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              fontWeight: 900,
+              letterSpacing: '.32em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+            }}
+          >
+            Admin Console
+          </p>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: 'var(--font-display)',
+              fontSize: 36,
+              fontWeight: 900,
+              lineHeight: 1.1,
+              color: 'var(--text-h)',
+            }}
+          >
+            Ticket Management
+          </h1>
+          <p style={{ margin: '8px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
+            View all campus support tickets and assign them to ticket managers.
+          </p>
+        </div>
+        <Button iconLeft={<TicketPlus size={14} />} onClick={() => setSubmitModalOpen(true)} style={{ flexShrink: 0, marginTop: 8 }}>
+          New Ticket
+        </Button>
       </div>
 
       {/* Summary cards */}
@@ -552,6 +548,15 @@ export function AdminTicketsScreen() {
 
         {renderContent()}
       </div>
+
+      <SubmitTicketModal
+        open={submitModalOpen}
+        onClose={() => setSubmitModalOpen(false)}
+        onSuccess={() => {
+          void reload();
+          showToast('success', 'Ticket submitted', 'Your support ticket has been created.');
+        }}
+      />
 
       <Dialog
         open={deleteConfirmCode !== null}

@@ -25,9 +25,7 @@ public final class StudentDtos {
         @NotNull StudentProgram programName,
         @NotNull AcademicYear academicYear,
         @NotNull Semester semester,
-        String profileImageUrl,
-        Boolean emailNotificationsEnabled,
-        Boolean smsNotificationsEnabled
+        String profileImageUrl
     ) {
     }
 

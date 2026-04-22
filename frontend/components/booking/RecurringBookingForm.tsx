@@ -4,6 +4,7 @@ import React from 'react';
 import { Calendar, Clock, RotateCw } from 'lucide-react';
 import { Button, Card, Input, Select, Textarea } from '@/components/ui';
 import type { CreateRecurringBookingRequest, RecurrencePattern, ResourceResponse } from '@/lib/api-types';
+import { getResourceCategoryLabel } from '@/lib/resource-display';
 
 interface RecurringBookingFormProps {
   resources: ResourceResponse[];
@@ -12,8 +13,26 @@ interface RecurringBookingFormProps {
   isLoading?: boolean;
 }
 
+const DURATION_HINTS: Record<string, string> = {
+  LECTURE_HALL: 'Max 3 hours',
+  LABORATORY: 'Max 3 hours',
+  LIBRARY_SPACE: 'Max 3 hours',
+  MEETING_ROOM: 'No limit',
+  EVENT_SPACE: 'No limit',
+};
+
+function normalizeSubcategory(value: string | null) {
+  if (!value) {
+    return '';
+  }
+
+  return value.trim().replace(/[\s-]+/g, '_').toUpperCase();
+}
+
 export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading }: RecurringBookingFormProps) {
   const [formData, setFormData] = React.useState({
+    category: '',
+    subcategory: '',
     resourceId: '',
     recurrencePattern: 'WEEKLY' as RecurrencePattern,
     startDate: '',
@@ -32,10 +51,36 @@ export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading 
     { value: 'BIWEEKLY', label: 'Biweekly' },
     { value: 'MONTHLY', label: 'Monthly' },
   ];
+  const bookableResources = resources.filter((resource) => resource.status === 'ACTIVE' && resource.bookable);
+  const categoryOptions = Array.from(new Set(bookableResources.map((resource) => resource.category)))
+    .sort()
+    .map((category) => ({ value: category, label: getResourceCategoryLabel(category) }));
+  const categoryFilteredResources = formData.category
+    ? bookableResources.filter((resource) => resource.category === formData.category)
+    : [];
+  const subcategoryOptions = (formData.category
+    ? Array.from(
+        new Set(
+          categoryFilteredResources
+            .map((resource) => resource.subcategory)
+            .filter((subcategory): subcategory is string => Boolean(subcategory && subcategory.trim())),
+        ),
+      )
+    : [])
+    .sort((left, right) => left.localeCompare(right))
+    .map((subcategory) => ({ value: subcategory, label: subcategory }));
+  const filteredResources = formData.subcategory
+    ? categoryFilteredResources.filter(
+      (resource) => normalizeSubcategory(resource.subcategory) === normalizeSubcategory(formData.subcategory),
+    )
+    : categoryFilteredResources;
+  const selectedSubcategoryHint = DURATION_HINTS[normalizeSubcategory(formData.subcategory)] ?? null;
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
+    if (!formData.category) newErrors.category = 'Category is required';
+    if (!formData.subcategory) newErrors.subcategory = 'Subcategory is required';
     if (!formData.resourceId) newErrors.resourceId = 'Resource is required';
     if (!formData.startDate) newErrors.startDate = 'Start date is required';
     if (!formData.startTime) newErrors.startTime = 'Start time is required';
@@ -88,15 +133,63 @@ export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading 
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>
         <div>
           <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+            Category *
+          </label>
+          <Select
+            value={formData.category}
+            onChange={(e) =>
+              setFormData((current) => ({
+                ...current,
+                category: e.target.value,
+                subcategory: '',
+                resourceId: '',
+              }))
+            }
+            style={{ width: '100%' }}
+            options={[
+              { value: '', label: 'Select a category' },
+              ...categoryOptions,
+            ]}
+          />
+          {errors.category && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.category}</p>}
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+            Subcategory *
+          </label>
+          <Select
+            value={formData.subcategory}
+            onChange={(e) =>
+              setFormData((current) => ({
+                ...current,
+                subcategory: e.target.value,
+                resourceId: '',
+              }))
+            }
+            style={{ width: '100%' }}
+            options={[
+              { value: '', label: 'Select a subcategory' },
+              ...subcategoryOptions,
+            ]}
+          />
+          {selectedSubcategoryHint && (
+            <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>{selectedSubcategoryHint}</p>
+          )}
+          {errors.subcategory && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.subcategory}</p>}
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
             Resource *
           </label>
           <Select
             value={formData.resourceId}
-            onChange={(e) => setFormData({ ...formData, resourceId: e.target.value })}
+            onChange={(e) => setFormData((current) => ({ ...current, resourceId: e.target.value }))}
             style={{ width: '100%' }}
             options={[
               { value: '', label: 'Select a resource' },
-              ...resources.map((r) => ({ value: r.id, label: `${r.code} - ${r.name}` })),
+              ...filteredResources.map((resource) => ({ value: resource.id, label: resource.name })),
             ]}
           />
           {errors.resourceId && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.resourceId}</p>}

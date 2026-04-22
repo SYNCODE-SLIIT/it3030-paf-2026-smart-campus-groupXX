@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   FileText,
   GraduationCap,
+  History,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -20,11 +21,14 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 
 import { Navbar, type NavItem } from '@/components/layout/Navbar';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { useNotifications } from '@/components/notifications/useNotifications';
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
 import { useAuth } from '@/components/providers/AuthProvider';
 import type { UserResponse } from '@/lib/api-types';
 import { getManagerDashboardPath } from '@/lib/auth-routing';
 import { filterSectionsByRole } from '@/lib/nav-rbac';
+import { triggerRouteProgress } from '@/lib/route-progress';
 import { getUserDisplayName, getUserInitials, getUserTypeLabel } from '@/lib/user-display';
 import type { WorkspaceKind } from '@/lib/workspace';
 
@@ -120,6 +124,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: Us
               allowedUserTypes: ['ADMIN'],
             },
             {
+              label: 'Bookings',
+              icon: Calendar,
+              href: '/admin/bookings',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
               label: 'Tickets',
               icon: Ticket,
               href: '/admin/tickets',
@@ -146,6 +156,12 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: Us
               label: 'Reports',
               icon: FileText,
               href: '/admin/reports',
+              allowedUserTypes: ['ADMIN'],
+            },
+            {
+              label: 'Audit Log',
+              icon: History,
+              href: '/admin/audit-log',
               allowedUserTypes: ['ADMIN'],
             },
             {
@@ -297,20 +313,101 @@ export function ProtectedShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { session, signOut } = useAuth();
   const resolvedWorkspace = workspace === 'auto' ? getWorkspaceForUser(user) : workspace;
+  const notificationState = useNotifications(session?.access_token ?? null);
+  const refreshNotifications = notificationState.refreshNotifications;
+
+  const navigateTo = React.useCallback((href: string) => {
+    triggerRouteProgress();
+    router.push(href);
+  }, [router]);
 
   const handleSignOut = React.useCallback(() => {
     void signOut()
       .catch(() => undefined)
       .finally(() => {
-        router.push('/auth/logout?reason=signed_out');
+        navigateTo('/auth/logout?reason=signed_out');
       });
-  }, [router, signOut]);
+  }, [navigateTo, signOut]);
 
   const resolvedSections = React.useMemo<NavSection[]>(() => {
     return filterSectionsByRole(sections ?? getDefaultSections(resolvedWorkspace, user), user);
   }, [resolvedWorkspace, sections, user]);
+
+  const isDashboardRoute = React.useMemo(() => {
+    const normalizedPath = pathname.endsWith('/') && pathname !== '/'
+      ? pathname.slice(0, -1)
+      : pathname;
+
+    switch (resolvedWorkspace) {
+      case 'admin':
+        return normalizedPath === '/admin';
+      case 'students':
+        return normalizedPath === '/students';
+      case 'faculty':
+        return normalizedPath === '/faculty';
+      case 'managers': {
+        const managerDashboardPath = getManagerDashboardPath(user.managerRole);
+        return normalizedPath === managerDashboardPath;
+      }
+      default:
+        return false;
+    }
+  }, [pathname, resolvedWorkspace, user.managerRole]);
+
+  React.useEffect(() => {
+    if (!isDashboardRoute || !session?.access_token) {
+      return undefined;
+    }
+
+    const refreshNotificationsInBackground = () => {
+      void refreshNotifications('all');
+    };
+
+    refreshNotificationsInBackground();
+
+    const interval = window.setInterval(refreshNotificationsInBackground, 45_000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshNotificationsInBackground();
+      }
+    };
+
+    window.addEventListener('focus', refreshNotificationsInBackground);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshNotificationsInBackground);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isDashboardRoute, refreshNotifications, session?.access_token]);
+
+  const notificationBell = (
+    placement: 'above' | 'below',
+    align: 'left' | 'right' = 'right',
+    portal = false,
+  ) => (
+    <NotificationBell
+      unreadCount={notificationState.unreadCount}
+      notifications={notificationState.notifications}
+      loading={notificationState.loading}
+      error={notificationState.error}
+      placement={placement}
+      align={align}
+      portal={portal}
+      onOpen={() => notificationState.refreshNotifications('all')}
+      onMarkAsRead={notificationState.markRead}
+      onMarkAllAsRead={notificationState.markAllRead}
+      onNavigate={async (notification) => {
+        await notificationState.markRead(notification);
+        if (notification.actionUrl) {
+          navigateTo(notification.actionUrl);
+        }
+      }}
+    />
+  );
 
   if (resolvedWorkspace === 'students') {
     const navItems: NavItem[] = resolvedSections.flatMap((s) =>
@@ -338,7 +435,8 @@ export function ProtectedShell({
             src: userDisplay?.src,
           }}
           onLogout={handleSignOut}
-          onNavigate={(href) => router.push(href)}
+          onNavigate={navigateTo}
+          rightAccessory={notificationBell('below')}
         />
         <main style={{ padding: '96px 24px 40px' }}>{children}</main>
       </div>
@@ -371,9 +469,11 @@ export function ProtectedShell({
             onClick: handleSignOut,
           },
         ]}
+        notificationCount={notificationState.unreadCount}
+        notificationAccessory={notificationBell('above', 'left', true)}
         onNavigate={(item) => {
           if (item.href) {
-            router.push(item.href);
+            navigateTo(item.href);
           }
         }}
         onLogout={handleSignOut}
