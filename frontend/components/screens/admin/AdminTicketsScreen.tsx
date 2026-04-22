@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Dialog, Skeleton, Tabs } from '@/components/ui';
-import { SubmitTicketModal, TicketCard } from '@/components/tickets';
+import { SubmitTicketModal, TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
 import { assignTicket, deleteTicket, getErrorMessage, listMyTickets, listUsers } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse, UserResponse } from '@/lib/api-types';
 
@@ -336,20 +336,9 @@ export function AdminTicketsScreen() {
   const renderContent = () => {
     if (loading) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ background: 'var(--surface-1)', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Skeleton variant="line" width={180} height={14} />
-                <Skeleton variant="line" width={60} height={14} />
-              </div>
-              <Skeleton variant="line" width="85%" height={12} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Skeleton variant="line" width={70} height={10} />
-                <Skeleton variant="line" width={90} height={10} />
-              </div>
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+          <TicketsSectionSkeleton count={3} />
+          <TicketsSectionSkeleton count={3} />
         </div>
       );
     }

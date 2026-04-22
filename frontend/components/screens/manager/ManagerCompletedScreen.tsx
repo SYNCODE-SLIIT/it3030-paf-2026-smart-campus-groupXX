@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Chip, Skeleton, Tabs } from '@/components/ui';
-import { TicketCard } from '@/components/tickets';
+import { TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
 
@@ -161,9 +161,9 @@ export function ManagerCompletedScreen() {
       {error && <Alert variant="error" title="Load failed">{error}</Alert>}
 
       {loading ? (
-        <div style={{ display: 'grid', gap: 14 }}>
-          <Skeleton variant="rect" height={48} />
-          <Skeleton variant="rect" height={320} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+          <TicketsSectionSkeleton count={3} />
+          <TicketsSectionSkeleton count={3} />
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

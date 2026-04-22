@@ -4,6 +4,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { Clock, Trash2, User } from 'lucide-react';
 import { Button, Chip } from '@/components/ui';
+import { Skeleton } from '@/components/ui/Skeleton';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
 import { computeSlaBadge } from '@/lib/sla';
 
@@ -98,6 +99,93 @@ function formatDate(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return new Intl.DateTimeFormat('en-LK', { year: 'numeric', month: 'short', day: '2-digit' }).format(d);
+}
+
+export function TicketCardSkeleton() {
+  return (
+    <div
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
+        boxShadow: 'var(--card-shadow)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        minWidth: 320,
+        maxWidth: 340,
+      }}
+    >
+      {/* Priority stripe */}
+      <Skeleton variant="rect" height={3} style={{ borderRadius: 0 }} />
+
+      {/* Header */}
+      <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+            <Skeleton width={52} height={9} />
+            <Skeleton width={64} height={18} style={{ borderRadius: 'var(--radius-sm)' }} />
+          </div>
+          <Skeleton width="80%" height={13} />
+          <Skeleton width="100%" height={10} />
+          <Skeleton width="65%" height={10} />
+        </div>
+        <Skeleton width={52} height={18} style={{ borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
+      </div>
+
+      {/* Status track */}
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, display: 'flex', gap: 3 }}>
+          <Skeleton variant="rect" height={3} style={{ flex: 1, borderRadius: 2 }} />
+          <Skeleton variant="rect" height={3} style={{ flex: 1, borderRadius: 2 }} />
+          <Skeleton variant="rect" height={3} style={{ flex: 1, borderRadius: 2 }} />
+        </div>
+        <Skeleton width={48} height={8} />
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: '10px 16px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Skeleton width={90} height={9} />
+          <Skeleton width={56} height={9} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Skeleton variant="circle" width={20} height={20} />
+          <Skeleton width={44} height={24} style={{ borderRadius: 'var(--radius-sm)' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function TicketsSectionSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Section label */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+        <Skeleton variant="rect" width={3} height={16} style={{ borderRadius: 2, flexShrink: 0 }} />
+        <Skeleton width={80} height={10} />
+        <Skeleton width={16} height={10} />
+      </div>
+      {/* Cards row */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 16,
+          overflowX: 'auto',
+          padding: '18px 24px 36px',
+          margin: '-18px -24px -24px',
+          scrollbarWidth: 'thin',
+        }}
+      >
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} style={{ flexShrink: 0 }}>
+            <TicketCardSkeleton />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function TicketCard({ ticket, onView, showReporter = false, showSlaBadge = false, assignOptions, onAssign, onDelete }: TicketCardProps) {

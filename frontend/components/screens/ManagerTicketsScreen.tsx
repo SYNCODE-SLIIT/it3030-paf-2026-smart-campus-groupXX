@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Input, Select, Skeleton, Tabs } from '@/components/ui';
-import { TicketCard } from '@/components/tickets';
+import { TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketCategory, TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
 
@@ -218,8 +218,11 @@ function ManagerTicketsScreenInner() {
         {loadError && <Alert variant="error" title="Load failed">{loadError}</Alert>}
 
         {loading ? (
-          <Skeleton variant="rect" height={320} />
-        ) : priorityGroups.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+            <TicketsSectionSkeleton count={3} />
+            <TicketsSectionSkeleton count={3} />
+          </div>
+        ) :priorityGroups.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 48 }}>
             {tickets.length === 0 ? 'No tickets assigned to you yet.' : 'No tickets match your filters.'}
           </p>

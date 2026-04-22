@@ -5,7 +5,7 @@ import { AlertTriangle, BarChart2, CheckCircle2, Clock, Inbox } from 'lucide-rea
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { TicketCard } from '@/components/tickets';
+import { TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
 import { Alert, Card, Chip, Skeleton } from '@/components/ui';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketCategory, TicketPriority, TicketSummaryResponse } from '@/lib/api-types';
@@ -194,11 +194,14 @@ export function ManagerDashboardScreen() {
       )}
 
       {loading ? (
-        <div style={{ display: 'grid', gap: 14 }}>
-          <Skeleton variant="rect" height={96} />
-          <Skeleton variant="rect" height={220} />
-          <Skeleton variant="rect" height={220} />
-          <Skeleton variant="rect" height={200} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} variant="rect" height={96} />
+            ))}
+          </div>
+          <TicketsSectionSkeleton count={3} />
+          <TicketsSectionSkeleton count={3} />
         </div>
       ) : (
         <>
