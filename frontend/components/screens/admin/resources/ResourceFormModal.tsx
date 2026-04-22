@@ -32,11 +32,15 @@ type ResourceFormValues = {
   status: ResourceStatus;
   bookable: boolean;
   movable: boolean;
+  availableFrom: string;
+  availableTo: string;
   managedByRole: string;
   featureCodes: string[];
 };
 
-type ResourceFormErrors = Partial<Record<'code' | 'name' | 'resourceTypeId' | 'locationId' | 'capacity' | 'quantity', string>>;
+type ResourceFormErrors = Partial<
+  Record<'code' | 'name' | 'resourceTypeId' | 'locationId' | 'capacity' | 'quantity' | 'availableFrom' | 'availableTo', string>
+>;
 
 const defaultValues: ResourceFormValues = {
   code: '',
@@ -49,6 +53,8 @@ const defaultValues: ResourceFormValues = {
   status: 'ACTIVE',
   bookable: true,
   movable: false,
+  availableFrom: '',
+  availableTo: '',
   managedByRole: '',
   featureCodes: [],
 };
@@ -60,6 +66,19 @@ function parseOptionalNumber(value: string) {
   if (!trimmed) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseOptionalTime(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isLocationRelevant(resourceType: ResourceTypeOption | null) {
+  if (!resourceType) {
+    return true;
+  }
+
+  return resourceType.locationRequired || resourceType.category === 'SPACES' || !resourceType.isMovableDefault;
 }
 
 function valuesFromResource(resource: ResourceResponse | null): ResourceFormValues {
@@ -78,6 +97,8 @@ function valuesFromResource(resource: ResourceResponse | null): ResourceFormValu
     status: resource.status,
     bookable: resource.bookable,
     movable: resource.movable,
+    availableFrom: resource.availableFrom ?? '',
+    availableTo: resource.availableTo ?? '',
     managedByRole: '',
     featureCodes: resource.features?.map((feature) => feature.code) ?? [],
   };
@@ -115,6 +136,16 @@ export function ResourceFormModal({
   const [errors, setErrors] = React.useState<ResourceFormErrors>({});
   const [managedByRoleTouched, setManagedByRoleTouched] = React.useState(false);
 
+  const selectedResourceType = React.useMemo(
+    () => resourceTypeOptions.find((option) => option.id === values.resourceTypeId) ?? null,
+    [resourceTypeOptions, values.resourceTypeId],
+  );
+  const showLocation = isLocationRelevant(selectedResourceType);
+  const showCapacity = Boolean(selectedResourceType?.capacityEnabled);
+  const showQuantity = Boolean(selectedResourceType?.quantityEnabled);
+  const showFeatures = Boolean(selectedResourceType?.featuresEnabled);
+  const showAvailability = Boolean(selectedResourceType?.availabilityEnabled);
+
   React.useEffect(() => {
     if (!open) return;
     setValues(valuesFromResource(resource));
@@ -123,17 +154,66 @@ export function ResourceFormModal({
     setStep(1);
   }, [open, resource]);
 
+  function applyTypeDrivenValues(current: ResourceFormValues, resourceTypeId: string): ResourceFormValues {
+    const nextResourceType = resourceTypeOptions.find((option) => option.id === resourceTypeId) ?? null;
+    const nextShowLocation = isLocationRelevant(nextResourceType);
+
+    return {
+      ...current,
+      resourceTypeId,
+      bookable: nextResourceType?.isBookableDefault ?? current.bookable,
+      movable: nextResourceType?.isMovableDefault ?? current.movable,
+      locationId: nextShowLocation ? current.locationId : '',
+      capacity: nextResourceType?.capacityEnabled ? current.capacity : '',
+      quantity: nextResourceType?.quantityEnabled ? current.quantity : '',
+      availableFrom: nextResourceType?.availabilityEnabled ? current.availableFrom : '',
+      availableTo: nextResourceType?.availabilityEnabled ? current.availableTo : '',
+      featureCodes: nextResourceType?.featuresEnabled ? current.featureCodes : [],
+    };
+  }
+
   function validateStep(next: ResourceFormValues, targetStep: number) {
     const nextErrors: ResourceFormErrors = {};
+    const nextResourceType = resourceTypeOptions.find((option) => option.id === next.resourceTypeId) ?? null;
+    const nextShowLocation = isLocationRelevant(nextResourceType);
+    const nextShowCapacity = Boolean(nextResourceType?.capacityEnabled);
+    const nextShowQuantity = Boolean(nextResourceType?.quantityEnabled);
+    const nextShowAvailability = Boolean(nextResourceType?.availabilityEnabled);
+
     if (targetStep === 1) {
       if (!resource && !next.code.trim()) nextErrors.code = 'Code is required.';
       if (!next.name.trim()) nextErrors.name = 'Name is required.';
       if (!next.resourceTypeId) nextErrors.resourceTypeId = 'Resource type is required.';
     }
     if (targetStep === 2) {
-      if (!next.locationId) nextErrors.locationId = 'Location is required.';
-      if (next.capacity.trim() && parseOptionalNumber(next.capacity) === null) nextErrors.capacity = 'Capacity must be a valid number.';
-      if (next.quantity.trim() && parseOptionalNumber(next.quantity) === null) nextErrors.quantity = 'Quantity must be a valid number.';
+      if (nextResourceType?.locationRequired && nextShowLocation && !next.locationId) {
+        nextErrors.locationId = 'Location is required for this resource type.';
+      }
+      if (nextShowCapacity) {
+        if (nextResourceType?.capacityRequired && !next.capacity.trim()) {
+          nextErrors.capacity = 'Capacity is required for this resource type.';
+        } else if (next.capacity.trim() && parseOptionalNumber(next.capacity) === null) {
+          nextErrors.capacity = 'Capacity must be a valid number.';
+        }
+      }
+      if (nextShowQuantity && next.quantity.trim() && parseOptionalNumber(next.quantity) === null) {
+        nextErrors.quantity = 'Quantity must be a valid number.';
+      }
+      if (nextShowAvailability) {
+        const normalizedAvailableFrom = parseOptionalTime(next.availableFrom);
+        const normalizedAvailableTo = parseOptionalTime(next.availableTo);
+
+        if ((normalizedAvailableFrom && !normalizedAvailableTo) || (!normalizedAvailableFrom && normalizedAvailableTo)) {
+          nextErrors.availableFrom = 'Set both availability times or leave both blank.';
+          nextErrors.availableTo = 'Set both availability times or leave both blank.';
+        } else if (
+          normalizedAvailableFrom
+          && normalizedAvailableTo
+          && normalizedAvailableFrom >= normalizedAvailableTo
+        ) {
+          nextErrors.availableTo = 'End time must be after the start time.';
+        }
+      }
     }
     return nextErrors;
   }
@@ -147,7 +227,7 @@ export function ResourceFormModal({
 
   function firstErrorStep(nextErrors: ResourceFormErrors) {
     if (nextErrors.code || nextErrors.name || nextErrors.resourceTypeId) return 1;
-    if (nextErrors.locationId || nextErrors.capacity || nextErrors.quantity) return 2;
+    if (nextErrors.locationId || nextErrors.capacity || nextErrors.quantity || nextErrors.availableFrom || nextErrors.availableTo) return 2;
     return 3;
   }
 
@@ -172,20 +252,29 @@ export function ResourceFormModal({
       return;
     }
 
+    const normalizedLocationId = showLocation ? (values.locationId || null) : null;
+    const normalizedCapacity = showCapacity ? parseOptionalNumber(values.capacity) : null;
+    const normalizedQuantity = showQuantity ? parseOptionalNumber(values.quantity) : null;
+    const normalizedAvailableFrom = showAvailability ? parseOptionalTime(values.availableFrom) : null;
+    const normalizedAvailableTo = showAvailability ? parseOptionalTime(values.availableTo) : null;
+    const normalizedFeatureCodes = showFeatures ? values.featureCodes : [];
+
     if (!resource) {
       const payload: CreateResourceRequest = {
         code: values.code.trim(),
         name: values.name.trim(),
         description: values.description.trim() || null,
         resourceTypeId: values.resourceTypeId,
-        locationId: values.locationId,
-        capacity: parseOptionalNumber(values.capacity),
-        quantity: parseOptionalNumber(values.quantity),
+        locationId: normalizedLocationId,
+        capacity: normalizedCapacity,
+        quantity: normalizedQuantity,
         status: values.status,
         bookable: values.bookable,
         movable: values.movable,
+        availableFrom: normalizedAvailableFrom,
+        availableTo: normalizedAvailableTo,
         managedByRole: (values.managedByRole || null) as ResourceManagedByRole | null,
-        featureCodes: values.featureCodes,
+        featureCodes: normalizedFeatureCodes,
       };
 
       await onSubmit(payload);
@@ -196,13 +285,15 @@ export function ResourceFormModal({
       name: values.name.trim(),
       description: values.description.trim() || null,
       resourceTypeId: values.resourceTypeId,
-      locationId: values.locationId,
-      capacity: parseOptionalNumber(values.capacity),
-      quantity: parseOptionalNumber(values.quantity),
+      locationId: normalizedLocationId,
+      capacity: normalizedCapacity,
+      quantity: normalizedQuantity,
       status: values.status,
       bookable: values.bookable,
       movable: values.movable,
-      featureCodes: values.featureCodes,
+      availableFrom: normalizedAvailableFrom,
+      availableTo: normalizedAvailableTo,
+      featureCodes: normalizedFeatureCodes,
     };
 
     if (managedByRoleTouched) {
@@ -322,7 +413,7 @@ export function ResourceFormModal({
               <Select
                 label="Resource Type"
                 value={values.resourceTypeId}
-                onChange={(event) => setValues((current) => ({ ...current, resourceTypeId: event.target.value }))}
+                onChange={(event) => setValues((current) => applyTypeDrivenValues(current, event.target.value))}
                 options={resourceTypeSelectOptions}
                 error={errors.resourceTypeId}
                 disabled={lookupsLoading}
@@ -340,30 +431,38 @@ export function ResourceFormModal({
         {step === 2 && (
           <div style={{ display: 'grid', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-              <Select
-                label="Location"
-                value={values.locationId}
-                onChange={(event) => setValues((current) => ({ ...current, locationId: event.target.value }))}
-                options={locationSelectOptions}
-                error={errors.locationId}
-                disabled={lookupsLoading}
-              />
-              <Input
-                label="Capacity"
-                type="number"
-                min={0}
-                value={values.capacity}
-                onChange={(event) => setValues((current) => ({ ...current, capacity: event.target.value }))}
-                error={errors.capacity}
-              />
-              <Input
-                label="Quantity"
-                type="number"
-                min={0}
-                value={values.quantity}
-                onChange={(event) => setValues((current) => ({ ...current, quantity: event.target.value }))}
-                error={errors.quantity}
-              />
+              {showLocation && (
+                <Select
+                  label={selectedResourceType?.locationRequired ? 'Location' : 'Location (Optional)'}
+                  value={values.locationId}
+                  onChange={(event) => setValues((current) => ({ ...current, locationId: event.target.value }))}
+                  options={locationSelectOptions}
+                  error={errors.locationId}
+                  disabled={lookupsLoading}
+                  hint={selectedResourceType?.locationRequired ? 'Required by the selected resource type.' : undefined}
+                />
+              )}
+              {showCapacity && (
+                <Input
+                  label={selectedResourceType?.capacityRequired ? 'Capacity' : 'Capacity (Optional)'}
+                  type="number"
+                  min={0}
+                  value={values.capacity}
+                  onChange={(event) => setValues((current) => ({ ...current, capacity: event.target.value }))}
+                  error={errors.capacity}
+                  hint={selectedResourceType?.capacityRequired ? 'Required by the selected resource type.' : undefined}
+                />
+              )}
+              {showQuantity && (
+                <Input
+                  label="Quantity"
+                  type="number"
+                  min={0}
+                  value={values.quantity}
+                  onChange={(event) => setValues((current) => ({ ...current, quantity: event.target.value }))}
+                  error={errors.quantity}
+                />
+              )}
               <Select
                 label="Status"
                 value={values.status}
@@ -393,6 +492,30 @@ export function ResourceFormModal({
                 />
               </div>
             </div>
+            {showAvailability && (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
+                  Availability
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+                  <Input
+                    label="Available From"
+                    type="time"
+                    value={values.availableFrom}
+                    onChange={(event) => setValues((current) => ({ ...current, availableFrom: event.target.value }))}
+                    error={errors.availableFrom}
+                  />
+                  <Input
+                    label="Available To"
+                    type="time"
+                    value={values.availableTo}
+                    onChange={(event) => setValues((current) => ({ ...current, availableTo: event.target.value }))}
+                    error={errors.availableTo}
+                    hint="Leave both availability fields blank to allow any time."
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -409,45 +532,52 @@ export function ResourceFormModal({
               disabled={lookupsLoading || Boolean(lookupError)}
               hint={!resource ? undefined : 'Choose a value only if you want to change the current managed role.'}
             />
-            <div>
-              <p style={{ margin: '0 0 8px', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
-                Features
-              </p>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: 12,
-                  padding: 14,
-                  border: '1.5px solid var(--input-border)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--input-bg)',
-                }}
-              >
-                {featureOptions.length === 0 ? (
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                    {lookupsLoading ? 'Loading feature options...' : 'No feature options are available yet.'}
-                  </span>
-                ) : (
-                  featureOptions.map((feature) => (
-                    <Checkbox
-                      key={feature.code}
-                      label={feature.name}
-                      checked={values.featureCodes.includes(feature.code)}
-                      onChange={(event) => {
-                        const checked = event.target.checked;
-                        setValues((current) => ({
-                          ...current,
-                          featureCodes: checked
-                            ? [...current.featureCodes, feature.code]
-                            : current.featureCodes.filter((code) => code !== feature.code),
-                        }));
-                      }}
-                    />
-                  ))
-                )}
+            {showFeatures && (
+              <div>
+                <p style={{ margin: '0 0 8px', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
+                  Features
+                </p>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: 12,
+                    padding: 14,
+                    border: '1.5px solid var(--input-border)',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--input-bg)',
+                  }}
+                >
+                  {featureOptions.length === 0 ? (
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                      {lookupsLoading ? 'Loading feature options...' : 'No feature options are available yet.'}
+                    </span>
+                  ) : (
+                    featureOptions.map((feature) => (
+                      <Checkbox
+                        key={feature.code}
+                        label={feature.name}
+                        checked={values.featureCodes.includes(feature.code)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setValues((current) => ({
+                            ...current,
+                            featureCodes: checked
+                              ? [...current.featureCodes, feature.code]
+                              : current.featureCodes.filter((code) => code !== feature.code),
+                          }));
+                        }}
+                      />
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+            {!showFeatures && selectedResourceType && (
+              <Alert variant="info" title="Features are not used for this type">
+                The selected resource type does not support feature tags, so this section is hidden.
+              </Alert>
+            )}
           </div>
         )}
 

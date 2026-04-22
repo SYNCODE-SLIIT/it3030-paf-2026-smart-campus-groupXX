@@ -166,12 +166,14 @@ export interface CreateResourceRequest {
   name: string;
   description?: string | null;
   resourceTypeId: string;
-  locationId: string;
+  locationId: string | null;
   capacity?: number | null;
   quantity?: number | null;
   status: ResourceStatus;
   bookable: boolean;
   movable: boolean;
+  availableFrom?: string | null;
+  availableTo?: string | null;
   managedByRole?: ResourceManagedByRole | null;
   featureCodes?: string[] | null;
 }
@@ -180,12 +182,14 @@ export interface UpdateResourceRequest {
   name?: string;
   description?: string | null;
   resourceTypeId?: string;
-  locationId?: string;
+  locationId?: string | null;
   capacity?: number | null;
   quantity?: number | null;
   status?: ResourceStatus;
   bookable?: boolean;
   movable?: boolean;
+  availableFrom?: string | null;
+  availableTo?: string | null;
   managedByRole?: ResourceManagedByRole | null;
   featureCodes?: string[] | null;
 }
@@ -227,6 +231,12 @@ export interface ResourceTypeOption {
   category: ResourceCategory;
   isBookableDefault: boolean;
   isMovableDefault: boolean;
+  locationRequired: boolean;
+  capacityEnabled: boolean;
+  capacityRequired: boolean;
+  quantityEnabled: boolean;
+  availabilityEnabled: boolean;
+  featuresEnabled: boolean;
 }
 
 export interface CatalogueResourceTypeResponse {

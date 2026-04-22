@@ -27,6 +27,8 @@ public class ResourceMapper {
         resource.setStatus(request.status());
         resource.setBookable(request.bookable());
         resource.setMovable(request.movable());
+        resource.setAvailableFrom(request.availableFrom());
+        resource.setAvailableTo(request.availableTo());
         resource.setManagedByRole(trimToNull(request.managedByRole()));
         return resource;
     }
@@ -52,6 +54,10 @@ public class ResourceMapper {
         }
         if (request.movable() != null) {
             resource.setMovable(request.movable());
+        }
+        if (request.availableFrom() != null || request.availableTo() != null) {
+            resource.setAvailableFrom(request.availableFrom());
+            resource.setAvailableTo(request.availableTo());
         }
         if (request.managedByRole() != null) {
             resource.setManagedByRole(trimToNull(request.managedByRole()));

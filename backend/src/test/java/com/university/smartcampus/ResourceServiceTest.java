@@ -64,6 +64,8 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
             ResourceStatus.ACTIVE,
             true,
             false,
+            null,
+            null,
             "technical_manager",
             List.of("wifi", "projector")
         ));
@@ -135,6 +137,8 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
             ResourceStatus.MAINTENANCE,
             false,
             true,
+            null,
+            null,
             "facilities_manager",
             List.of("air_conditioning", "microphone")
         ));

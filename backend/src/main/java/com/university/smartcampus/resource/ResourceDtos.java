@@ -29,12 +29,14 @@ public final class ResourceDtos {
         @NotBlank String name,
         String description,
         @NotNull UUID resourceTypeId,
-        @NotNull UUID locationId,
+        UUID locationId,
         @PositiveOrZero Integer capacity,
         @PositiveOrZero Integer quantity,
         @NotNull ResourceStatus status,
         boolean bookable,
         boolean movable,
+        LocalTime availableFrom,
+        LocalTime availableTo,
         String managedByRole,
         List<String> featureCodes
     ) {
@@ -50,6 +52,8 @@ public final class ResourceDtos {
         ResourceStatus status,
         Boolean bookable,
         Boolean movable,
+        LocalTime availableFrom,
+        LocalTime availableTo,
         String managedByRole,
         List<String> featureCodes
     ) {
@@ -119,7 +123,13 @@ public final class ResourceDtos {
         String name,
         String category,
         boolean isBookableDefault,
-        boolean isMovableDefault
+        boolean isMovableDefault,
+        boolean locationRequired,
+        boolean capacityEnabled,
+        boolean capacityRequired,
+        boolean quantityEnabled,
+        boolean availabilityEnabled,
+        boolean featuresEnabled
     ) {
     }
 

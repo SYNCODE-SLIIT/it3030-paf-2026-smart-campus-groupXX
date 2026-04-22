@@ -1,5 +1,6 @@
 package com.university.smartcampus.resource;
 
+import java.time.LocalTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -79,7 +80,14 @@ public class ResourceService {
 
         ResourceEntity resource = resourceMapper.toEntity(request);
         ResourceType resourceType = requireResourceType(request.resourceTypeId());
-        Location location = requireLocation(request.locationId());
+        Location location = request.locationId() == null ? null : requireLocation(request.locationId());
+        validateResourceTypeDrivenFields(
+            resourceType,
+            request.locationId(),
+            request.capacity(),
+            request.availableFrom(),
+            request.availableTo()
+        );
 
         resource.setId(UUID.randomUUID());
         resource.setCode(normalizedCode);
@@ -87,7 +95,17 @@ public class ResourceService {
         resource.setResourceType(resourceType);
         resource.setLocationEntity(location);
         resource.setManagedByRole(normalizeManagedByRole(request.managedByRole()));
-        resource.setFeatures(resolveFeatures(request.featureCodes()));
+        if (!resourceType.isCapacityEnabled()) {
+            resource.setCapacity(null);
+        }
+        if (!resourceType.isQuantityEnabled()) {
+            resource.setQuantity(null);
+        }
+        if (!resourceType.isAvailabilityEnabled()) {
+            resource.setAvailableFrom(null);
+            resource.setAvailableTo(null);
+        }
+        resource.setFeatures(resourceType.isFeaturesEnabled() ? resolveFeatures(request.featureCodes()) : new HashSet<>());
         syncLegacyCompatibilityFields(resource, resourceType, location);
         ResourceEntity saved = resourceRepository.save(resource);
         notificationService.notifyResourceCreated(saved, actor);
@@ -140,7 +158,13 @@ public class ResourceService {
                 resourceType.getName(),
                 resourceType.getCategory() == null ? null : resourceType.getCategory().name(),
                 resourceType.isBookableDefault(),
-                resourceType.isMovableDefault()
+                resourceType.isMovableDefault(),
+                resourceType.isLocationRequired(),
+                resourceType.isCapacityEnabled(),
+                resourceType.isCapacityRequired(),
+                resourceType.isQuantityEnabled(),
+                resourceType.isAvailabilityEnabled(),
+                resourceType.isFeaturesEnabled()
             ))
             .toList();
     }
@@ -206,6 +230,9 @@ public class ResourceService {
         if (request.locationId() != null) {
             nextLocation = requireLocation(request.locationId());
             resource.setLocationEntity(nextLocation);
+        } else if (request.resourceTypeId() != null && !nextResourceType.isLocationRequired()) {
+            nextLocation = null;
+            resource.setLocationEntity(null);
         }
 
         resourceMapper.applyUpdate(resource, request);
@@ -218,6 +245,29 @@ public class ResourceService {
         if (request.featureCodes() != null) {
             resource.setFeatures(resolveFeatures(request.featureCodes()));
         }
+        if (!nextResourceType.isCapacityEnabled()) {
+            resource.setCapacity(null);
+        }
+        if (!nextResourceType.isQuantityEnabled()) {
+            resource.setQuantity(null);
+        }
+        if (!nextResourceType.isAvailabilityEnabled()) {
+            resource.setAvailableFrom(null);
+            resource.setAvailableTo(null);
+        } else if (request.availableFrom() != null || request.availableTo() != null) {
+            resource.setAvailableFrom(request.availableFrom());
+            resource.setAvailableTo(request.availableTo());
+        }
+        if (!nextResourceType.isFeaturesEnabled()) {
+            resource.setFeatures(new HashSet<>());
+        }
+        validateResourceTypeDrivenFields(
+            nextResourceType,
+            nextLocation == null ? null : nextLocation.getId(),
+            resource.getCapacity(),
+            resource.getAvailableFrom(),
+            resource.getAvailableTo()
+        );
         syncLegacyCompatibilityFields(resource, nextResourceType, nextLocation);
 
         notificationService.notifyResourceUpdated(resource, actor);
@@ -346,8 +396,38 @@ public class ResourceService {
             resource.setSubcategory(resourceType.getName());
         }
 
-        if (location != null) {
-            resource.setLocation(location.getLocationName());
+        resource.setLocation(location == null ? null : location.getLocationName());
+    }
+
+    private void validateResourceTypeDrivenFields(
+        ResourceType resourceType,
+        UUID locationId,
+        Integer capacity,
+        LocalTime availableFrom,
+        LocalTime availableTo
+    ) {
+        if (resourceType.isLocationRequired() && locationId == null) {
+            throw new BadRequestException("Location is required for the selected resource type.");
+        }
+
+        if (resourceType.isCapacityRequired() && capacity == null) {
+            throw new BadRequestException("Capacity is required for the selected resource type.");
+        }
+
+        if (availableFrom == null && availableTo == null) {
+            return;
+        }
+
+        if (!resourceType.isAvailabilityEnabled()) {
+            throw new BadRequestException("Availability is not supported for the selected resource type.");
+        }
+
+        if (availableFrom == null || availableTo == null) {
+            throw new BadRequestException("Availability start and end times must both be provided.");
+        }
+
+        if (!availableFrom.isBefore(availableTo)) {
+            throw new BadRequestException("Availability start time must be before the end time.");
         }
     }
 
