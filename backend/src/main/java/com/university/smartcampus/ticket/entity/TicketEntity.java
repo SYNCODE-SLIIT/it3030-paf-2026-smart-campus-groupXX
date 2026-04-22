@@ -7,6 +7,8 @@ import com.university.smartcampus.common.entity.TimestampedEntity;
 import com.university.smartcampus.common.enums.AppEnums.TicketCategory;
 import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
 import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
+import com.university.smartcampus.resource.Location;
+import com.university.smartcampus.resource.ResourceEntity;
 import com.university.smartcampus.user.entity.UserEntity;
 
 import org.hibernate.annotations.JdbcType;
@@ -61,11 +63,13 @@ public class TicketEntity extends TimestampedEntity {
     @JoinColumn(name = "assigned_to")
     private UserEntity assignedTo;
 
-    @Column(name = "resource_id")
-    private UUID resourceId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resource_id")
+    private ResourceEntity resource;
 
-    @Column(name = "location_id")
-    private UUID locationId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id")
+    private Location location;
 
     @Column(name = "resolution_notes", columnDefinition = "text")
     private String resolutionNotes;
@@ -109,11 +113,15 @@ public class TicketEntity extends TimestampedEntity {
     public UserEntity getAssignedTo() { return assignedTo; }
     public void setAssignedTo(UserEntity assignedTo) { this.assignedTo = assignedTo; }
 
-    public UUID getResourceId() { return resourceId; }
-    public void setResourceId(UUID resourceId) { this.resourceId = resourceId; }
+    public ResourceEntity getResource() { return resource; }
+    public void setResource(ResourceEntity resource) { this.resource = resource; }
 
-    public UUID getLocationId() { return locationId; }
-    public void setLocationId(UUID locationId) { this.locationId = locationId; }
+    public UUID getResourceId() { return resource == null ? null : resource.getId(); }
+
+    public Location getLocation() { return location; }
+    public void setLocation(Location location) { this.location = location; }
+
+    public UUID getLocationId() { return location == null ? null : location.getId(); }
 
     public String getResolutionNotes() { return resolutionNotes; }
     public void setResolutionNotes(String resolutionNotes) { this.resolutionNotes = resolutionNotes; }

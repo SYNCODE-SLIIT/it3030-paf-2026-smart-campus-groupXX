@@ -805,6 +805,8 @@ export interface TicketSummaryResponse {
 export interface TicketResponse extends TicketSummaryResponse {
   assignedToEmail: string | null;
   assignedToName: string | null;
+  resourceId: string | null;
+  locationId: string | null;
   resolutionNotes: string | null;
   rejectionReason: string | null;
   contactNote: string | null;
@@ -830,6 +832,7 @@ export interface CreateTicketRequest {
   category: TicketCategory;
   priority: TicketPriority;
   contactNote?: string;
+  resourceId?: string;
 }
 
 export interface UpdateTicketRequest {

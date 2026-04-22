@@ -32,6 +32,10 @@ import com.university.smartcampus.common.enums.AppEnums.TicketCategory;
 import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
 import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.resource.Location;
+import com.university.smartcampus.resource.LocationRepository;
+import com.university.smartcampus.resource.ResourceEntity;
+import com.university.smartcampus.resource.ResourceRepository;
 import com.university.smartcampus.ticket.dto.TicketDtos.AddCommentRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.AddTicketAttachmentRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.AssignTicketRequest;
@@ -68,6 +72,12 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ResourceRepository resourceRepository;
+
+    @Autowired
+    private LocationRepository locationRepository;
 
     @Autowired
     private TicketRepository ticketRepository;
@@ -120,7 +130,69 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                 .andExpect(jsonPath("$.status").value("OPEN"))
                 .andExpect(jsonPath("$.title").value("Broken light in Lab 3"))
                 .andExpect(jsonPath("$.reportedByEmail").value("student@campus.test"))
+                .andExpect(jsonPath("$.resourceId").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.locationId").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$._links.self.href").exists());
+
+        TicketEntity persisted = ticketRepository.findAll().get(0);
+        assertThat(persisted.getResourceId()).isNull();
+        assertThat(persisted.getLocationId()).isNull();
+    }
+
+    @Test
+    void reporterCanCreateTicketForResourceAndBackendDerivesLocation() throws Exception {
+        Location location = seedLocation("Issue Location");
+        ResourceEntity resource = seedResource("Projector", location);
+        CreateTicketRequest request = new CreateTicketRequest(
+                "Projector issue", "The display keeps cutting out.",
+                TicketCategory.EQUIPMENT, TicketPriority.HIGH, null, resource.getId());
+
+        mockMvc.perform(post("/api/tickets")
+                        .with(jwtFor("student@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resourceId").value(resource.getId().toString()))
+                .andExpect(jsonPath("$.locationId").value(location.getId().toString()));
+
+        TicketEntity persisted = ticketRepository.findAll().get(0);
+        assertThat(persisted.getResourceId()).isEqualTo(resource.getId());
+        assertThat(persisted.getLocationId()).isEqualTo(location.getId());
+    }
+
+    @Test
+    void reporterCanCreateTicketForResourceWithoutLocation() throws Exception {
+        ResourceEntity resource = seedResource("Portable Speaker", null);
+        CreateTicketRequest request = new CreateTicketRequest(
+                "Speaker issue", "The speaker battery no longer charges.",
+                TicketCategory.EQUIPMENT, TicketPriority.MEDIUM, null, resource.getId());
+
+        mockMvc.perform(post("/api/tickets")
+                        .with(jwtFor("student@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resourceId").value(resource.getId().toString()))
+                .andExpect(jsonPath("$.locationId").value(org.hamcrest.Matchers.nullValue()));
+
+        TicketEntity persisted = ticketRepository.findAll().get(0);
+        assertThat(persisted.getResourceId()).isEqualTo(resource.getId());
+        assertThat(persisted.getLocationId()).isNull();
+    }
+
+    @Test
+    void reporterCannotCreateTicketForUnknownResource() throws Exception {
+        CreateTicketRequest request = new CreateTicketRequest(
+                "Unknown resource issue", "The selected resource no longer exists.",
+                TicketCategory.EQUIPMENT, TicketPriority.MEDIUM, null, UUID.randomUUID());
+
+        mockMvc.perform(post("/api/tickets")
+                        .with(jwtFor("student@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+
+        assertThat(ticketRepository.findAll()).isEmpty();
     }
 
     @Test
@@ -1694,6 +1766,28 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
         ticketStatusHistoryRepository.save(history);
 
         return savedTicket;
+    }
+
+    private ResourceEntity seedResource(String name, Location location) {
+        ResourceEntity resource = new ResourceEntity();
+        resource.setId(UUID.randomUUID());
+        resource.setCode("TICKET-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        resource.setName(name);
+        resource.setCategory(com.university.smartcampus.AppEnums.ResourceCategory.GENERAL_UTILITY);
+        resource.setDescription(name + " description");
+        resource.setLocationEntity(location);
+        resource.setLocation(location == null ? null : location.getLocationName());
+        resource.setStatus(com.university.smartcampus.AppEnums.ResourceStatus.ACTIVE);
+        resource.setBookable(false);
+        resource.setMovable(true);
+        return resourceRepository.save(resource);
+    }
+
+    private Location seedLocation(String locationName) {
+        Location location = new Location();
+        location.setLocationName(locationName + " " + UUID.randomUUID().toString().substring(0, 8));
+        location.setLocationType("OTHER");
+        return locationRepository.save(location);
     }
 
     private TicketEntity setTicketCreatedAt(TicketEntity ticket, Instant createdAt) {
