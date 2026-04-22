@@ -37,7 +37,7 @@ services:
 
   frontend:
     build: ./frontend
-    command: sh -c "mkdir -p .next/dev/logs .next/dev/types .next/types && npm run dev -- --webpack"
+    command: sh -c "mkdir -p .next/dev/logs .next/dev/types .next/types && npm run dev"
     ports:
       - "3000:3000"
     environment:
