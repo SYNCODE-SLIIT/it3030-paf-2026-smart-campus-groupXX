@@ -207,6 +207,16 @@ interface OnboardingFormState {
   profileImageUrl: string;
 }
 
+interface OnboardingFieldErrors {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  facultyName?: string;
+  programName?: string;
+  academicYear?: string;
+  semester?: string;
+}
+
 function toFormState(profile: UserResponse['studentProfile']): OnboardingFormState {
   const parsedPhone = parsePhoneForForm(profile?.phoneNumber ?? '');
 
@@ -237,6 +247,8 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     message: string;
   } | null>(null);
   const [isSubmitting, startSubmitTransition] = React.useTransition();
+  const [fieldErrors, setFieldErrors] = React.useState<OnboardingFieldErrors>({});
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [selectedImageFile, setSelectedImageFile] = React.useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(null);
   const [hasAppliedCrop, setHasAppliedCrop] = React.useState(false);
@@ -361,6 +373,14 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       ...current,
       [field]: value,
     }));
+
+    if (field in fieldErrors) {
+      setFieldErrors((current) => {
+        const next = { ...current };
+        delete next[field as keyof OnboardingFieldErrors];
+        return next;
+      });
+    }
   }
 
   function handleFacultyChange(facultyName: StudentFaculty | '') {
@@ -372,6 +392,13 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           ? current.programName
           : '',
     }));
+
+    setFieldErrors((current) => {
+      const next = { ...current };
+      delete next.facultyName;
+      delete next.programName;
+      return next;
+    });
   }
 
   function closeCropEditor() {
@@ -599,14 +626,15 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }
   }
 
-  function validatePersonalInfo() {
-    if (!formState.firstName.trim() || !formState.lastName.trim()) {
-      setAlert({
-        variant: 'error',
-        title: 'Personal details required',
-        message: 'Enter your first and last name before completing onboarding.',
-      });
-      return false;
+  function validateForm() {
+    const nextErrors: OnboardingFieldErrors = {};
+
+    if (!formState.firstName.trim()) {
+      nextErrors.firstName = 'First name is required';
+    }
+
+    if (!formState.lastName.trim()) {
+      nextErrors.lastName = 'Last name is required';
     }
 
     const selectedCountry = PHONE_COUNTRY_BY_CODE[formState.phoneCountryCode] ?? PHONE_COUNTRY_BY_CODE[DEFAULT_PHONE_COUNTRY];
@@ -616,29 +644,33 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       phoneDigits.length < selectedCountry.minNationalDigits ||
       phoneDigits.length > selectedCountry.maxNationalDigits
     ) {
-      setAlert({
-        variant: 'error',
-        title: 'Valid phone number required',
-        message: `Use ${selectedCountry.minNationalDigits}-${selectedCountry.maxNationalDigits} digits for ${selectedCountry.name}.`,
-      });
-      return false;
+      nextErrors.phoneNumber = `Use ${selectedCountry.minNationalDigits}-${selectedCountry.maxNationalDigits} digits`;
     }
 
-    return true;
-  }
-
-  function validateAcademicInfo() {
     const facultyName = formState.facultyName;
     const programName = formState.programName;
     const academicYear = formState.academicYear;
     const semester = formState.semester;
 
-    if (!facultyName || !programName || !academicYear || !semester) {
-      setAlert({
-        variant: 'error',
-        title: 'Academic details required',
-        message: 'Choose your faculty, program, academic year, and semester before completing onboarding.',
-      });
+    if (!facultyName) {
+      nextErrors.facultyName = 'Faculty is required';
+    }
+
+    if (!programName) {
+      nextErrors.programName = 'Program is required';
+    }
+
+    if (!academicYear) {
+      nextErrors.academicYear = 'Academic year is required';
+    }
+
+    if (!semester) {
+      nextErrors.semester = 'Semester is required';
+    }
+
+    setFieldErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
       return null;
     }
 
@@ -647,21 +679,14 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setSubmitError(null);
 
     if (!session?.access_token) {
-      setAlert({
-        variant: 'error',
-        title: 'Session expired',
-        message: 'Please sign in again before completing onboarding.',
-      });
+      setSubmitError('Please sign in again before completing onboarding.');
       return;
     }
 
-    if (!validatePersonalInfo()) {
-      return;
-    }
-
-    const academicInfo = validateAcademicInfo();
+    const academicInfo = validateForm();
 
     if (!academicInfo) {
       return;
@@ -726,16 +751,14 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           window.location.assign(getUserHomePath(redirectUser));
         }
       } catch (error) {
-        setAlert({
-          variant: 'error',
-          title: submitStep === 'image' ? 'Image upload failed' : 'Onboarding failed',
-          message: getErrorMessage(
+        setSubmitError(
+          getErrorMessage(
             error,
             submitStep === 'image'
               ? 'We could not upload your profile image right now.'
               : 'We could not complete onboarding.',
           ),
-        });
+        );
       } finally {
         setSubmitStage(null);
       }
@@ -1153,7 +1176,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
             </p>
           </div>
 
-          {alert && (
+          {alert && alert.variant !== 'error' && (
             <div style={{ marginBottom: 20 }}>
               <Alert variant={alert.variant} title={alert.title}>
                 {alert.message}
@@ -1182,7 +1205,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
               </Card>
             </div>
           ) : (
-            <form className="onboarding-form-layout" onSubmit={handleSubmit}>
+            <form className="onboarding-form-layout" onSubmit={handleSubmit} noValidate>
               <div className="onboarding-form-grid">
                 <div className="onboarding-column">
                   <Card hoverable className="onboarding-form-card">
@@ -1198,6 +1221,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           placeholder="e.g. Julian"
                           value={formState.firstName}
                           onChange={(event) => setField('firstName', event.target.value)}
+                          error={fieldErrors.firstName}
                           disabled={isSubmitting}
                           required
                         />
@@ -1206,6 +1230,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           placeholder="e.g. Ashford"
                           value={formState.lastName}
                           onChange={(event) => setField('lastName', event.target.value)}
+                          error={fieldErrors.lastName}
                           disabled={isSubmitting}
                           required
                         />
@@ -1216,6 +1241,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                               value={formState.phoneCountryCode}
                               onChange={(event) => setField('phoneCountryCode', event.target.value as PhoneCountryCode)}
                               options={phoneCountryOptions}
+                              error={fieldErrors.phoneNumber}
                               disabled={isSubmitting}
                               required
                             />
@@ -1226,6 +1252,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                               autoComplete="tel-national"
                               value={formState.phoneNumber}
                               onChange={(event) => setField('phoneNumber', normalizePhoneDigits(event.target.value))}
+                              error={fieldErrors.phoneNumber}
                               disabled={isSubmitting}
                               required
                             />
@@ -1248,6 +1275,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           onChange={(event) => handleFacultyChange(event.target.value as StudentFaculty | '')}
                           options={facultyOptions}
                           placeholder="Choose faculty"
+                          error={fieldErrors.facultyName}
                           disabled={isSubmitting}
                           required
                         />
@@ -1257,6 +1285,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           onChange={(event) => setField('programName', event.target.value as StudentProgram | '')}
                           options={programOptions}
                           placeholder="Choose program"
+                          error={fieldErrors.programName}
                           disabled={!formState.facultyName || isSubmitting}
                           required
                         />
@@ -1266,6 +1295,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           onChange={(event) => setField('academicYear', event.target.value as AcademicYear | '')}
                           options={academicYearOptions}
                           placeholder="Choose year"
+                          error={fieldErrors.academicYear}
                           disabled={isSubmitting}
                           required
                         />
@@ -1275,12 +1305,14 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           onChange={(event) => setField('semester', event.target.value as Semester | '')}
                           options={semesterOptions}
                           placeholder="Choose semester"
+                          error={fieldErrors.semester}
                           disabled={isSubmitting}
                           required
                         />
                       </div>
 
                       <div className="onboarding-submit-section">
+                        {submitError && <p className="onboarding-status" style={{ color: 'var(--red-500)' }}>{submitError}</p>}
                         {submitStage && <p className="onboarding-status">{submitStage}</p>}
                         <Button
                           type="submit"
