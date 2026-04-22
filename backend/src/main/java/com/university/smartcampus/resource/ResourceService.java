@@ -1,7 +1,10 @@
 package com.university.smartcampus.resource;
 
+import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -20,6 +23,7 @@ import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ConflictException;
 import com.university.smartcampus.common.exception.NotFoundException;
 import com.university.smartcampus.notification.NotificationService;
+import com.university.smartcampus.resource.ResourceDtos.AvailabilityWindowRequest;
 import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
 import com.university.smartcampus.resource.ResourceDtos.LocationOption;
 import com.university.smartcampus.resource.ResourceDtos.ManagedByRoleOption;
@@ -32,6 +36,16 @@ import com.university.smartcampus.user.entity.UserEntity;
 
 @Service
 public class ResourceService {
+
+    private static final List<DayOfWeek> ALL_DAYS_OF_WEEK = List.of(
+        DayOfWeek.MONDAY,
+        DayOfWeek.TUESDAY,
+        DayOfWeek.WEDNESDAY,
+        DayOfWeek.THURSDAY,
+        DayOfWeek.FRIDAY,
+        DayOfWeek.SATURDAY,
+        DayOfWeek.SUNDAY
+    );
 
     private static final Set<String> ALLOWED_MANAGED_BY_ROLES = Set.of(
         "CATALOG_MANAGER",
@@ -83,14 +97,16 @@ public class ResourceService {
         Location location = request.locationId() == null ? null : requireLocation(request.locationId());
         Integer normalizedCapacity = resourceType.isCapacityEnabled() ? request.capacity() : null;
         Integer normalizedQuantity = resourceType.isQuantityEnabled() ? request.quantity() : null;
-        LocalTime normalizedAvailableFrom = resourceType.isAvailabilityEnabled() ? request.availableFrom() : null;
-        LocalTime normalizedAvailableTo = resourceType.isAvailabilityEnabled() ? request.availableTo() : null;
+        List<ResourceAvailabilityWindow> normalizedAvailabilityWindows = resourceType.isAvailabilityEnabled()
+            ? resolveAvailabilityWindows(request.availabilityWindows(), request.availableFrom(), request.availableTo())
+            : List.of();
+        AvailabilitySummary normalizedAvailability = summarizeAvailabilityWindows(normalizedAvailabilityWindows);
         validateResourceTypeDrivenFields(
             resourceType,
             request.locationId(),
             normalizedCapacity,
-            normalizedAvailableFrom,
-            normalizedAvailableTo
+            normalizedAvailability.availableFrom(),
+            normalizedAvailability.availableTo()
         );
 
         resource.setId(UUID.randomUUID());
@@ -101,8 +117,9 @@ public class ResourceService {
         resource.setManagedByRole(normalizeManagedByRole(request.managedByRole()));
         resource.setCapacity(normalizedCapacity);
         resource.setQuantity(normalizedQuantity);
-        resource.setAvailableFrom(normalizedAvailableFrom);
-        resource.setAvailableTo(normalizedAvailableTo);
+        resource.setAvailabilityWindows(normalizedAvailabilityWindows);
+        resource.setAvailableFrom(normalizedAvailability.availableFrom());
+        resource.setAvailableTo(normalizedAvailability.availableTo());
         resource.setBookable(resourceType.isBookableDefault());
         resource.setMovable(resourceType.isMovableDefault());
         resource.setFeatures(resourceType.isFeaturesEnabled() ? resolveFeatures(request.featureCodes()) : new HashSet<>());
@@ -256,11 +273,19 @@ public class ResourceService {
             resource.setQuantity(null);
         }
         if (!nextResourceType.isAvailabilityEnabled()) {
+            resource.setAvailabilityWindows(List.of());
             resource.setAvailableFrom(null);
             resource.setAvailableTo(null);
-        } else if (request.availableFrom() != null || request.availableTo() != null) {
-            resource.setAvailableFrom(request.availableFrom());
-            resource.setAvailableTo(request.availableTo());
+        } else if (request.availabilityWindows() != null || request.availableFrom() != null || request.availableTo() != null) {
+            List<ResourceAvailabilityWindow> nextAvailabilityWindows = resolveAvailabilityWindows(
+                request.availabilityWindows(),
+                request.availableFrom(),
+                request.availableTo()
+            );
+            AvailabilitySummary normalizedAvailability = summarizeAvailabilityWindows(nextAvailabilityWindows);
+            resource.setAvailabilityWindows(nextAvailabilityWindows);
+            resource.setAvailableFrom(normalizedAvailability.availableFrom());
+            resource.setAvailableTo(normalizedAvailability.availableTo());
         }
         validateResourceTypeDrivenFields(
             nextResourceType,
@@ -370,6 +395,74 @@ public class ResourceService {
         return features;
     }
 
+    private List<ResourceAvailabilityWindow> resolveAvailabilityWindows(
+        List<AvailabilityWindowRequest> availabilityWindows,
+        LocalTime availableFrom,
+        LocalTime availableTo
+    ) {
+        if (availabilityWindows != null) {
+            if (availabilityWindows.isEmpty()) {
+                return List.of();
+            }
+
+            List<ResourceAvailabilityWindow> resolvedWindows = new ArrayList<>();
+            Set<String> seenKeys = new LinkedHashSet<>();
+
+            for (AvailabilityWindowRequest availabilityWindow : availabilityWindows) {
+                DayOfWeek dayOfWeek = normalizeDayOfWeek(availabilityWindow);
+                LocalTime startTime = availabilityWindow == null ? null : availabilityWindow.startTime();
+                LocalTime endTime = availabilityWindow == null ? null : availabilityWindow.endTime();
+
+                if (startTime == null || endTime == null) {
+                    throw new BadRequestException("Availability window start and end times are required.");
+                }
+
+                if (!startTime.isBefore(endTime)) {
+                    throw new BadRequestException("Each availability window must have a start time before its end time.");
+                }
+
+                String windowKey = dayOfWeek.name() + ":" + startTime + ":" + endTime;
+                if (!seenKeys.add(windowKey)) {
+                    throw new BadRequestException("Duplicate availability windows are not allowed.");
+                }
+
+                ResourceAvailabilityWindow resourceAvailabilityWindow = new ResourceAvailabilityWindow();
+                resourceAvailabilityWindow.setId(UUID.randomUUID());
+                resourceAvailabilityWindow.setDayOfWeek(dayOfWeek);
+                resourceAvailabilityWindow.setStartTime(startTime);
+                resourceAvailabilityWindow.setEndTime(endTime);
+                resourceAvailabilityWindow.setActive(true);
+                resolvedWindows.add(resourceAvailabilityWindow);
+            }
+
+            return resolvedWindows;
+        }
+
+        if (availableFrom == null && availableTo == null) {
+            return List.of();
+        }
+
+        if (availableFrom == null || availableTo == null) {
+            throw new BadRequestException("Availability start and end times must both be provided.");
+        }
+
+        if (!availableFrom.isBefore(availableTo)) {
+            throw new BadRequestException("Availability start time must be before the end time.");
+        }
+
+        return ALL_DAYS_OF_WEEK.stream()
+            .map(dayOfWeek -> {
+                ResourceAvailabilityWindow resourceAvailabilityWindow = new ResourceAvailabilityWindow();
+                resourceAvailabilityWindow.setId(UUID.randomUUID());
+                resourceAvailabilityWindow.setDayOfWeek(dayOfWeek);
+                resourceAvailabilityWindow.setStartTime(availableFrom);
+                resourceAvailabilityWindow.setEndTime(availableTo);
+                resourceAvailabilityWindow.setActive(true);
+                return resourceAvailabilityWindow;
+            })
+            .toList();
+    }
+
     private String normalizeManagedByRole(String managedByRole) {
         if (!StringUtils.hasText(managedByRole)) {
             return null;
@@ -389,6 +482,38 @@ public class ResourceService {
         }
 
         return featureCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private DayOfWeek normalizeDayOfWeek(AvailabilityWindowRequest availabilityWindow) {
+        if (availabilityWindow == null || !StringUtils.hasText(availabilityWindow.dayOfWeek())) {
+            throw new BadRequestException("Availability window day of week is required.");
+        }
+
+        try {
+            return DayOfWeek.valueOf(availabilityWindow.dayOfWeek().trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new BadRequestException("Availability window day of week is invalid.");
+        }
+    }
+
+    private AvailabilitySummary summarizeAvailabilityWindows(List<ResourceAvailabilityWindow> availabilityWindows) {
+        if (availabilityWindows == null || availabilityWindows.isEmpty()) {
+            return new AvailabilitySummary(null, null);
+        }
+
+        LocalTime earliestStartTime = null;
+        LocalTime latestEndTime = null;
+
+        for (ResourceAvailabilityWindow availabilityWindow : availabilityWindows) {
+            if (earliestStartTime == null || availabilityWindow.getStartTime().isBefore(earliestStartTime)) {
+                earliestStartTime = availabilityWindow.getStartTime();
+            }
+            if (latestEndTime == null || availabilityWindow.getEndTime().isAfter(latestEndTime)) {
+                latestEndTime = availabilityWindow.getEndTime();
+            }
+        }
+
+        return new AvailabilitySummary(earliestStartTime, latestEndTime);
     }
 
     private void syncLegacyCompatibilityFields(ResourceEntity resource, ResourceType resourceType, Location location) {
@@ -456,5 +581,11 @@ public class ResourceService {
         }
 
         return label.toString();
+    }
+
+    private record AvailabilitySummary(
+        LocalTime availableFrom,
+        LocalTime availableTo
+    ) {
     }
 }

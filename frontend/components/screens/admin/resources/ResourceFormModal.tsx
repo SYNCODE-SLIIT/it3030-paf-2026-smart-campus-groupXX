@@ -5,11 +5,13 @@ import { Check } from 'lucide-react';
 
 import { Alert, Button, Checkbox, Dialog, Input, Select, Textarea, Toggle } from '@/components/ui';
 import type {
+  AvailabilityWindowInput,
   CreateResourceRequest,
+  DayOfWeek,
   LocationOption,
   ManagedByRoleOption,
-  ResourceManagedByRole,
   ResourceFeatureOption,
+  ResourceManagedByRole,
   ResourceResponse,
   ResourceStatus,
   ResourceTypeOption,
@@ -20,6 +22,14 @@ import {
   formatResourceTypeOptionLabel,
   resourceStatusOptions,
 } from '@/lib/resource-display';
+
+type AvailabilityWindowFormValue = {
+  dayOfWeek: DayOfWeek | '';
+  startTime: string;
+  endTime: string;
+};
+
+type AvailabilityWindowFormErrors = Partial<Record<'dayOfWeek' | 'startTime' | 'endTime', string>>;
 
 type ResourceFormValues = {
   code: string;
@@ -32,15 +42,26 @@ type ResourceFormValues = {
   status: ResourceStatus;
   bookable: boolean;
   movable: boolean;
-  availableFrom: string;
-  availableTo: string;
   managedByRole: string;
   featureCodes: string[];
+  availabilityWindows: AvailabilityWindowFormValue[];
 };
 
 type ResourceFormErrors = Partial<
-  Record<'code' | 'name' | 'resourceTypeId' | 'locationId' | 'capacity' | 'quantity' | 'availableFrom' | 'availableTo', string>
->;
+  Record<'code' | 'name' | 'resourceTypeId' | 'locationId' | 'capacity' | 'quantity' | 'availabilityWindows', string>
+> & {
+  availabilityWindowRows?: AvailabilityWindowFormErrors[];
+};
+
+const DAY_OF_WEEK_OPTIONS: Array<{ value: DayOfWeek; label: string }> = [
+  { value: 'MONDAY', label: 'Monday' },
+  { value: 'TUESDAY', label: 'Tuesday' },
+  { value: 'WEDNESDAY', label: 'Wednesday' },
+  { value: 'THURSDAY', label: 'Thursday' },
+  { value: 'FRIDAY', label: 'Friday' },
+  { value: 'SATURDAY', label: 'Saturday' },
+  { value: 'SUNDAY', label: 'Sunday' },
+];
 
 const defaultValues: ResourceFormValues = {
   code: '',
@@ -53,10 +74,9 @@ const defaultValues: ResourceFormValues = {
   status: 'ACTIVE',
   bookable: true,
   movable: false,
-  availableFrom: '',
-  availableTo: '',
   managedByRole: '',
   featureCodes: [],
+  availabilityWindows: [],
 };
 
 const STEP_LABELS = ['Basics', 'Availability', 'Features'];
@@ -81,6 +101,38 @@ function isLocationRelevant(resourceType: ResourceTypeOption | null) {
   return resourceType.locationRequired || resourceType.category === 'SPACES' || !resourceType.isMovableDefault;
 }
 
+function emptyAvailabilityWindow(): AvailabilityWindowFormValue {
+  return {
+    dayOfWeek: '',
+    startTime: '',
+    endTime: '',
+  };
+}
+
+function deriveAvailabilityWindows(resource: ResourceResponse | null): AvailabilityWindowFormValue[] {
+  if (!resource) {
+    return [];
+  }
+
+  if (resource.availabilityWindows?.length) {
+    return resource.availabilityWindows.map((availabilityWindow) => ({
+      dayOfWeek: availabilityWindow.dayOfWeek,
+      startTime: availabilityWindow.startTime ?? '',
+      endTime: availabilityWindow.endTime ?? '',
+    }));
+  }
+
+  if (resource.availableFrom && resource.availableTo) {
+    return DAY_OF_WEEK_OPTIONS.map((dayOption) => ({
+      dayOfWeek: dayOption.value,
+      startTime: resource.availableFrom ?? '',
+      endTime: resource.availableTo ?? '',
+    }));
+  }
+
+  return [];
+}
+
 function valuesFromResource(resource: ResourceResponse | null): ResourceFormValues {
   if (!resource) {
     return defaultValues;
@@ -97,11 +149,14 @@ function valuesFromResource(resource: ResourceResponse | null): ResourceFormValu
     status: resource.status,
     bookable: resource.bookable,
     movable: resource.movable,
-    availableFrom: resource.availableFrom ?? '',
-    availableTo: resource.availableTo ?? '',
     managedByRole: '',
     featureCodes: resource.features?.map((feature) => feature.code) ?? [],
+    availabilityWindows: deriveAvailabilityWindows(resource),
   };
+}
+
+function hasAvailabilityWindowErrors(rowErrors: AvailabilityWindowFormErrors[] | undefined) {
+  return Boolean(rowErrors?.some((rowError) => Object.keys(rowError).length > 0));
 }
 
 export function ResourceFormModal({
@@ -166,9 +221,8 @@ export function ResourceFormModal({
       locationId: nextShowLocation ? current.locationId : '',
       capacity: nextResourceType?.capacityEnabled ? current.capacity : '',
       quantity: nextResourceType?.quantityEnabled ? current.quantity : '',
-      availableFrom: nextResourceType?.availabilityEnabled ? current.availableFrom : '',
-      availableTo: nextResourceType?.availabilityEnabled ? current.availableTo : '',
       featureCodes: nextResourceType?.featuresEnabled ? current.featureCodes : [],
+      availabilityWindows: nextResourceType?.availabilityEnabled ? current.availabilityWindows : [],
     };
   }
 
@@ -185,10 +239,12 @@ export function ResourceFormModal({
       if (!next.name.trim()) nextErrors.name = 'Name is required.';
       if (!next.resourceTypeId) nextErrors.resourceTypeId = 'Resource type is required.';
     }
+
     if (targetStep === 2) {
       if (nextResourceType?.locationRequired && nextShowLocation && !next.locationId) {
         nextErrors.locationId = 'Location is required for this resource type.';
       }
+
       if (nextShowCapacity) {
         if (nextResourceType?.capacityRequired && !next.capacity.trim()) {
           nextErrors.capacity = 'Capacity is required for this resource type.';
@@ -196,25 +252,51 @@ export function ResourceFormModal({
           nextErrors.capacity = 'Capacity must be a valid number.';
         }
       }
+
       if (nextShowQuantity && next.quantity.trim() && parseOptionalNumber(next.quantity) === null) {
         nextErrors.quantity = 'Quantity must be a valid number.';
       }
-      if (nextShowAvailability) {
-        const normalizedAvailableFrom = parseOptionalTime(next.availableFrom);
-        const normalizedAvailableTo = parseOptionalTime(next.availableTo);
 
-        if ((normalizedAvailableFrom && !normalizedAvailableTo) || (!normalizedAvailableFrom && normalizedAvailableTo)) {
-          nextErrors.availableFrom = 'Set both availability times or leave both blank.';
-          nextErrors.availableTo = 'Set both availability times or leave both blank.';
-        } else if (
-          normalizedAvailableFrom
-          && normalizedAvailableTo
-          && normalizedAvailableFrom >= normalizedAvailableTo
-        ) {
-          nextErrors.availableTo = 'End time must be after the start time.';
+      if (nextShowAvailability) {
+        const rowErrors = next.availabilityWindows.map<AvailabilityWindowFormErrors>(() => ({}));
+        const seenWindows = new Set<string>();
+
+        next.availabilityWindows.forEach((availabilityWindow, index) => {
+          const normalizedDayOfWeek = availabilityWindow.dayOfWeek;
+          const normalizedStartTime = parseOptionalTime(availabilityWindow.startTime);
+          const normalizedEndTime = parseOptionalTime(availabilityWindow.endTime);
+
+          if (!normalizedDayOfWeek) {
+            rowErrors[index].dayOfWeek = 'Select a day.';
+          }
+          if (!normalizedStartTime) {
+            rowErrors[index].startTime = 'Start time is required.';
+          }
+          if (!normalizedEndTime) {
+            rowErrors[index].endTime = 'End time is required.';
+          }
+
+          if (!rowErrors[index].startTime && !rowErrors[index].endTime && normalizedStartTime && normalizedEndTime) {
+            if (normalizedStartTime >= normalizedEndTime) {
+              rowErrors[index].endTime = 'End time must be after the start time.';
+            } else {
+              const availabilityKey = `${normalizedDayOfWeek}:${normalizedStartTime}:${normalizedEndTime}`;
+              if (seenWindows.has(availabilityKey)) {
+                rowErrors[index].dayOfWeek = 'Duplicate availability window.';
+                nextErrors.availabilityWindows = 'Duplicate availability windows are not allowed.';
+              } else {
+                seenWindows.add(availabilityKey);
+              }
+            }
+          }
+        });
+
+        if (hasAvailabilityWindowErrors(rowErrors)) {
+          nextErrors.availabilityWindowRows = rowErrors;
         }
       }
     }
+
     return nextErrors;
   }
 
@@ -227,7 +309,13 @@ export function ResourceFormModal({
 
   function firstErrorStep(nextErrors: ResourceFormErrors) {
     if (nextErrors.code || nextErrors.name || nextErrors.resourceTypeId) return 1;
-    if (nextErrors.locationId || nextErrors.capacity || nextErrors.quantity || nextErrors.availableFrom || nextErrors.availableTo) return 2;
+    if (
+      nextErrors.locationId
+      || nextErrors.capacity
+      || nextErrors.quantity
+      || nextErrors.availabilityWindows
+      || hasAvailabilityWindowErrors(nextErrors.availabilityWindowRows)
+    ) return 2;
     return 3;
   }
 
@@ -255,9 +343,14 @@ export function ResourceFormModal({
     const normalizedLocationId = showLocation ? (values.locationId || null) : null;
     const normalizedCapacity = showCapacity ? parseOptionalNumber(values.capacity) : null;
     const normalizedQuantity = showQuantity ? parseOptionalNumber(values.quantity) : null;
-    const normalizedAvailableFrom = showAvailability ? parseOptionalTime(values.availableFrom) : null;
-    const normalizedAvailableTo = showAvailability ? parseOptionalTime(values.availableTo) : null;
     const normalizedFeatureCodes = showFeatures ? values.featureCodes : [];
+    const normalizedAvailabilityWindows: AvailabilityWindowInput[] = showAvailability
+      ? values.availabilityWindows.map((availabilityWindow) => ({
+          dayOfWeek: availabilityWindow.dayOfWeek as DayOfWeek,
+          startTime: parseOptionalTime(availabilityWindow.startTime) ?? '',
+          endTime: parseOptionalTime(availabilityWindow.endTime) ?? '',
+        }))
+      : [];
 
     if (!resource) {
       const payload: CreateResourceRequest = {
@@ -271,10 +364,11 @@ export function ResourceFormModal({
         status: values.status,
         bookable: values.bookable,
         movable: values.movable,
-        availableFrom: normalizedAvailableFrom,
-        availableTo: normalizedAvailableTo,
+        availableFrom: null,
+        availableTo: null,
         managedByRole: (values.managedByRole || null) as ResourceManagedByRole | null,
         featureCodes: normalizedFeatureCodes,
+        availabilityWindows: normalizedAvailabilityWindows,
       };
 
       await onSubmit(payload);
@@ -291,9 +385,10 @@ export function ResourceFormModal({
       status: values.status,
       bookable: values.bookable,
       movable: values.movable,
-      availableFrom: normalizedAvailableFrom,
-      availableTo: normalizedAvailableTo,
+      availableFrom: null,
+      availableTo: null,
       featureCodes: normalizedFeatureCodes,
+      availabilityWindows: normalizedAvailabilityWindows,
     };
 
     if (managedByRoleTouched) {
@@ -325,6 +420,11 @@ export function ResourceFormModal({
       value: option.value,
       label: option.label,
     })),
+  ];
+
+  const dayOfWeekSelectOptions = [
+    { value: '', label: 'Select day' },
+    ...DAY_OF_WEEK_OPTIONS,
   ];
 
   return (
@@ -494,27 +594,136 @@ export function ResourceFormModal({
             </div>
             {showAvailability && (
               <div style={{ display: 'grid', gap: 10 }}>
-                <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
-                  Availability
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-                  <Input
-                    label="Available From"
-                    type="time"
-                    value={values.availableFrom}
-                    onChange={(event) => setValues((current) => ({ ...current, availableFrom: event.target.value }))}
-                    error={errors.availableFrom}
-                  />
-                  <Input
-                    label="Available To"
-                    type="time"
-                    value={values.availableTo}
-                    onChange={(event) => setValues((current) => ({ ...current, availableTo: event.target.value }))}
-                    error={errors.availableTo}
-                    hint="Leave both availability fields blank to allow any time."
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--text-label)' }}>
+                      Availability Windows
+                    </p>
+                    <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+                      Add one row per active day and time range.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => {
+                      setErrors((current) => ({ ...current, availabilityWindows: undefined, availabilityWindowRows: undefined }));
+                      setValues((current) => ({
+                        ...current,
+                        availabilityWindows: [...current.availabilityWindows, emptyAvailabilityWindow()],
+                      }));
+                    }}
+                  >
+                    Add Window
+                  </Button>
                 </div>
+                {errors.availabilityWindows && (
+                  <Alert variant="error" title="Availability windows need attention">
+                    {errors.availabilityWindows}
+                  </Alert>
+                )}
+                {values.availabilityWindows.length === 0 ? (
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                    No availability windows added. Leave it empty to keep the resource available without a stored schedule.
+                  </span>
+                ) : (
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    {values.availabilityWindows.map((availabilityWindow, index) => {
+                      const rowErrors = errors.availabilityWindowRows?.[index] ?? {};
+                      return (
+                        <div
+                          key={`${availabilityWindow.dayOfWeek || 'blank'}-${index}`}
+                          style={{
+                            display: 'grid',
+                            gap: 12,
+                            padding: 14,
+                            border: '1.5px solid var(--input-border)',
+                            borderRadius: 'var(--radius-md)',
+                            background: 'var(--input-bg)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-h)' }}>
+                              Window {index + 1}
+                            </span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setValues((current) => ({
+                                  ...current,
+                                  availabilityWindows: current.availabilityWindows.filter((_, rowIndex) => rowIndex !== index),
+                                }));
+                                setErrors((current) => ({
+                                  ...current,
+                                  availabilityWindows: undefined,
+                                  availabilityWindowRows: current.availabilityWindowRows?.filter((_, rowIndex) => rowIndex !== index),
+                                }));
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+                            <Select
+                              label="Day"
+                              value={availabilityWindow.dayOfWeek}
+                              onChange={(event) => {
+                                const nextDayOfWeek = event.target.value as DayOfWeek | '';
+                                setValues((current) => ({
+                                  ...current,
+                                  availabilityWindows: current.availabilityWindows.map((currentWindow, rowIndex) => (
+                                    rowIndex === index ? { ...currentWindow, dayOfWeek: nextDayOfWeek } : currentWindow
+                                  )),
+                                }));
+                              }}
+                              options={dayOfWeekSelectOptions}
+                              error={rowErrors.dayOfWeek}
+                            />
+                            <Input
+                              label="Start Time"
+                              type="time"
+                              value={availabilityWindow.startTime}
+                              onChange={(event) => {
+                                const nextStartTime = event.target.value;
+                                setValues((current) => ({
+                                  ...current,
+                                  availabilityWindows: current.availabilityWindows.map((currentWindow, rowIndex) => (
+                                    rowIndex === index ? { ...currentWindow, startTime: nextStartTime } : currentWindow
+                                  )),
+                                }));
+                              }}
+                              error={rowErrors.startTime}
+                            />
+                            <Input
+                              label="End Time"
+                              type="time"
+                              value={availabilityWindow.endTime}
+                              onChange={(event) => {
+                                const nextEndTime = event.target.value;
+                                setValues((current) => ({
+                                  ...current,
+                                  availabilityWindows: current.availabilityWindows.map((currentWindow, rowIndex) => (
+                                    rowIndex === index ? { ...currentWindow, endTime: nextEndTime } : currentWindow
+                                  )),
+                                }));
+                              }}
+                              error={rowErrors.endTime}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+            )}
+            {!showAvailability && selectedResourceType && (
+              <Alert variant="info" title="Availability windows are not used for this type">
+                The selected resource type does not support availability scheduling, so this section is hidden.
+              </Alert>
             )}
           </div>
         )}

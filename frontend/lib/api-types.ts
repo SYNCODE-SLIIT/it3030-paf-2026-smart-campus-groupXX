@@ -40,6 +40,8 @@ export type ResourceCategory =
 
 export type ResourceStatus = 'ACTIVE' | 'OUT_OF_SERVICE' | 'MAINTENANCE' | 'INACTIVE';
 
+export type DayOfWeek = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+
 export type ResourceManagedByRole =
   | 'CATALOG_MANAGER'
   | 'LIBRARY_MANAGER'
@@ -158,6 +160,7 @@ export interface ResourceResponse {
   resourceType: ResourceTypeDetails | null;
   locationDetails: LocationDetails | null;
   features: ResourceFeatureDetails[];
+  availabilityWindows: ResourceAvailabilityWindow[];
   images: ResourceImageDetails[];
 }
 
@@ -176,6 +179,7 @@ export interface CreateResourceRequest {
   availableTo?: string | null;
   managedByRole?: ResourceManagedByRole | null;
   featureCodes?: string[] | null;
+  availabilityWindows?: AvailabilityWindowInput[] | null;
 }
 
 export interface UpdateResourceRequest {
@@ -192,6 +196,7 @@ export interface UpdateResourceRequest {
   availableTo?: string | null;
   managedByRole?: ResourceManagedByRole | null;
   featureCodes?: string[] | null;
+  availabilityWindows?: AvailabilityWindowInput[] | null;
 }
 
 export interface ResourceTypeDetails {
@@ -216,6 +221,19 @@ export interface LocationDetails {
 export interface ResourceFeatureDetails {
   code: string;
   name: string;
+}
+
+export interface AvailabilityWindowInput {
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+}
+
+export interface ResourceAvailabilityWindow {
+  id: string;
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
 }
 
 export interface ResourceImageDetails {

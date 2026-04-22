@@ -1,5 +1,6 @@
 package com.university.smartcampus.resource;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.UUID;
 import com.university.smartcampus.AppEnums.ResourceCategory;
 import com.university.smartcampus.AppEnums.ResourceStatus;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -38,7 +40,8 @@ public final class ResourceDtos {
         LocalTime availableFrom,
         LocalTime availableTo,
         String managedByRole,
-        List<String> featureCodes
+        List<String> featureCodes,
+        @Valid List<AvailabilityWindowRequest> availabilityWindows
     ) {
     }
 
@@ -55,7 +58,8 @@ public final class ResourceDtos {
         LocalTime availableFrom,
         LocalTime availableTo,
         String managedByRole,
-        List<String> featureCodes
+        List<String> featureCodes,
+        @Valid List<AvailabilityWindowRequest> availabilityWindows
     ) {
     }
 
@@ -79,7 +83,15 @@ public final class ResourceDtos {
         ResourceTypeDetails resourceType,
         LocationDetails locationDetails,
         List<ResourceFeatureDetails> features,
+        List<ResourceAvailabilityWindowDetails> availabilityWindows,
         List<ResourceImageDetails> images
+    ) {
+    }
+
+    public record AvailabilityWindowRequest(
+        String dayOfWeek,
+        LocalTime startTime,
+        LocalTime endTime
     ) {
     }
 
@@ -107,6 +119,14 @@ public final class ResourceDtos {
     public record ResourceFeatureDetails(
         String code,
         String name
+    ) {
+    }
+
+    public record ResourceAvailabilityWindowDetails(
+        UUID id,
+        DayOfWeek dayOfWeek,
+        LocalTime startTime,
+        LocalTime endTime
     ) {
     }
 
