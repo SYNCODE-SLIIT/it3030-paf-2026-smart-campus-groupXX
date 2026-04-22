@@ -6,6 +6,7 @@ import { CalendarPlus } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from '@/components/ui';
+import { BookingScreenSkeleton } from '@/components/booking/BookingScreenSkeleton';
 import { cancelMyBooking, createBooking, getErrorMessage, listMyBookings, listResources } from '@/lib/api-client';
 import type { BookingResponse, BookingStatus, ResourceResponse } from '@/lib/api-types';
 
@@ -190,6 +191,10 @@ export function RequesterBookingsScreen({
 
   const pendingCount = bookings.filter((booking) => booking.status === 'PENDING').length;
   const approvedCount = bookings.filter((booking) => booking.status === 'APPROVED').length;
+
+  if (loading) {
+    return <BookingScreenSkeleton variant="requester" />;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

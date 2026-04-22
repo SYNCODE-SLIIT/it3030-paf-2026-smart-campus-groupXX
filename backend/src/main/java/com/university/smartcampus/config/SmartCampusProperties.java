@@ -9,6 +9,7 @@ public class SmartCampusProperties {
     private final Security security = new Security();
     private final Bootstrap bootstrap = new Bootstrap();
     private final Storage storage = new Storage();
+    private final Notifications notifications = new Notifications();
 
     public Auth getAuth() {
         return auth;
@@ -24,6 +25,10 @@ public class SmartCampusProperties {
 
     public Storage getStorage() {
         return storage;
+    }
+
+    public Notifications getNotifications() {
+        return notifications;
     }
 
     public static class Auth {
@@ -323,6 +328,71 @@ public class SmartCampusProperties {
 
         public void setMaxSizeBytes(long maxSizeBytes) {
             this.maxSizeBytes = maxSizeBytes;
+        }
+    }
+
+    public static class Notifications {
+        private final Email email = new Email();
+
+        public Email getEmail() {
+            return email;
+        }
+    }
+
+    public static class Email {
+        private boolean enabled;
+        private String from = "no-reply@smartcampus.local";
+        private String actionBaseUrl = "http://localhost:3000";
+        private int retryMaxAttempts = 3;
+        private int retryDelaySeconds = 300;
+        private int batchSize = 25;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getFrom() {
+            return from;
+        }
+
+        public void setFrom(String from) {
+            this.from = from;
+        }
+
+        public String getActionBaseUrl() {
+            return actionBaseUrl;
+        }
+
+        public void setActionBaseUrl(String actionBaseUrl) {
+            this.actionBaseUrl = actionBaseUrl;
+        }
+
+        public int getRetryMaxAttempts() {
+            return retryMaxAttempts;
+        }
+
+        public void setRetryMaxAttempts(int retryMaxAttempts) {
+            this.retryMaxAttempts = retryMaxAttempts;
+        }
+
+        public int getRetryDelaySeconds() {
+            return retryDelaySeconds;
+        }
+
+        public void setRetryDelaySeconds(int retryDelaySeconds) {
+            this.retryDelaySeconds = retryDelaySeconds;
+        }
+
+        public int getBatchSize() {
+            return batchSize;
+        }
+
+        public void setBatchSize(int batchSize) {
+            this.batchSize = batchSize;
         }
     }
 }

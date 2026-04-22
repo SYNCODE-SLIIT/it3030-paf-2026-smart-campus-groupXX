@@ -1,4 +1,5 @@
 export { AssignmentDropdownButton } from './AssignmentDropdownButton';
+export { TicketResourceCard } from './TicketResourceCard';
 export { ReassignConfirmDialog } from './ReassignConfirmDialog';
 export { TicketActionsCard } from './TicketActionsCard';
 export { TicketAttachmentsCard } from './TicketAttachmentsCard';

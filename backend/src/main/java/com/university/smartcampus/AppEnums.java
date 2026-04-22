@@ -86,15 +86,4 @@ public final class AppEnums {
         REJECTED
     }
 
-    public enum NotificationType {
-        BOOKING_APPROVED,
-        BOOKING_REJECTED,
-        BOOKING_CANCELLED,
-        BOOKING_REMINDER_24H,
-        BOOKING_REMINDER_1H,
-        MODIFICATION_APPROVED,
-        MODIFICATION_REJECTED
-    }
-
-   
 }

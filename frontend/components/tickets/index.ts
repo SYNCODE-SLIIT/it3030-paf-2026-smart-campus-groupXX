@@ -1,2 +1,2 @@
 export { SubmitTicketModal } from './SubmitTicketModal';
-export { TicketCard } from './TicketCard';
+export { TicketCard, TicketCardSkeleton, TicketsSectionSkeleton } from './TicketCard';

@@ -10,12 +10,14 @@ import {
   Gauge,
   GraduationCap,
   ShieldCheck,
+  TicketPlus,
   UserPlus,
   Users,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { UserIdentityCell } from '@/components/screens/admin/UserIdentityCell';
 import {
   Alert,
@@ -31,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui';
+import { SubmitTicketModal } from '@/components/tickets';
 import { getErrorMessage, listAuditLogs, listUsers } from '@/lib/api-client';
 import type { AuditLogResponse, UserResponse } from '@/lib/api-types';
 import {
@@ -268,6 +271,7 @@ function SectionTitle({ title, caption }: { title: string; caption?: string }) {
 export function AdminDashboardScreen() {
   const router = useRouter();
   const { session } = useAuth();
+  const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
   const [users, setUsers] = React.useState<UserResponse[]>([]);
@@ -275,6 +279,7 @@ export function AdminDashboardScreen() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [activityError, setActivityError] = React.useState<string | null>(null);
+  const [submitModalOpen, setSubmitModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!accessToken) {
@@ -869,6 +874,9 @@ export function AdminDashboardScreen() {
                 <Button variant="subtle" size="sm" fullWidth iconLeft={<Users size={14} />} onClick={() => router.push('/admin/users')}>
                   User Management
                 </Button>
+                <Button variant="subtle" size="sm" fullWidth iconLeft={<TicketPlus size={14} />} onClick={() => setSubmitModalOpen(true)}>
+                  New Ticket
+                </Button>
                 <Button variant="subtle" size="sm" fullWidth iconLeft={<Bell size={14} />} onClick={() => router.push('/admin/notifications')}>
                   Notifications
                 </Button>
@@ -1006,6 +1014,14 @@ export function AdminDashboardScreen() {
           </aside>
         </div>
       )}
+
+      <SubmitTicketModal
+        open={submitModalOpen}
+        onClose={() => setSubmitModalOpen(false)}
+        onSuccess={() => {
+          showToast('success', 'Ticket submitted', 'Your support ticket has been created.');
+        }}
+      />
     </div>
   );
 }

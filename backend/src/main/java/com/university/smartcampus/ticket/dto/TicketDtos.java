@@ -23,8 +23,18 @@ public final class TicketDtos {
         @NotBlank String description,
         @NotNull TicketCategory category,
         @NotNull TicketPriority priority,
-        String contactNote
+        String contactNote,
+        UUID resourceId
     ) {
+        public CreateTicketRequest(
+            String title,
+            String description,
+            TicketCategory category,
+            TicketPriority priority,
+            String contactNote
+        ) {
+            this(title, description, category, priority, contactNote, null);
+        }
     }
 
     public record UpdateTicketRequest(
@@ -243,6 +253,8 @@ public final class TicketDtos {
         UUID assignedToId,
         String assignedToEmail,
         String assignedToName,
+        UUID resourceId,
+        UUID locationId,
         String resolutionNotes,
         String rejectionReason,
         String contactNote,

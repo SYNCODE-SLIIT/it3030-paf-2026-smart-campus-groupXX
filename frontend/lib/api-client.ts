@@ -8,7 +8,6 @@ import {
   type BuildingResponse,
   type BookingDecisionRequest,
   type BookingModificationResponse,
-  type BookingNotificationResponse,
   type BookingResponse,
   type CancelBookingRequest,
   type CatalogueResourceTypeResponse,
@@ -28,9 +27,17 @@ import {
   type ManagedByRoleOption,
   type MessageResponse,
   type ModificationDecisionRequest,
+  type NotificationDeliveryResponse,
+  type NotificationDeliveryStatus,
+  type NotificationDomain,
+  type NotificationPreferencesResponse,
+  type NotificationResponse,
+  type NotificationUnreadCountResponse,
+  type UpdateNotificationPreferencesRequest,
   type LocationOption,
   type RecurringBookingResponse,
   type RequestModificationRequest,
+  type ResourceRemainingRangesResponse,
   type ResourceFeatureOption,
   type ResourceResponse,
   type ResourceTypeOption,
@@ -444,6 +451,10 @@ export async function listResources(accessToken: string) {
   });
 }
 
+export async function getResource(accessToken: string, resourceId: string) {
+  return request<ResourceResponse>(`/api/resources/${resourceId}`, { accessToken });
+}
+
 export async function listResourceTypeOptions(accessToken: string) {
   return request<ResourceTypeOption[]>('/api/resources/lookups/types', {
     accessToken,
@@ -616,6 +627,17 @@ export async function cancelMyBooking(accessToken: string, bookingId: string, pa
   });
 }
 
+export async function getResourceRemainingRanges(
+  accessToken: string,
+  resourceId: string,
+  date: string,
+) {
+  const query = new URLSearchParams({ date }).toString();
+  return request<ResourceRemainingRangesResponse>(`/api/bookings/resources/${resourceId}/remaining-ranges?${query}`, {
+    accessToken,
+  });
+}
+
 export async function listAllBookings(accessToken: string) {
   return request<BookingResponse[]>('/api/admin/bookings', {
     accessToken,
@@ -750,22 +772,70 @@ export async function completeBooking(accessToken: string, bookingId: string) {
   });
 }
 
-// Booking Notifications
-export async function listBookingNotifications(accessToken: string) {
-  return request<BookingNotificationResponse[]>('/api/notifications/bookings', {
+// Notifications
+export async function listNotifications(
+  accessToken: string,
+  options: { status?: 'all' | 'unread'; domain?: NotificationDomain; limit?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (options.status) params.set('status', options.status);
+  if (options.domain) params.set('domain', options.domain);
+  if (options.limit !== undefined) params.set('limit', String(options.limit));
+  const query = params.toString();
+
+  return request<NotificationResponse[]>(`/api/notifications${query ? `?${query}` : ''}`, {
     accessToken,
   });
 }
 
-export async function listUnreadNotifications(accessToken: string) {
-  return request<BookingNotificationResponse[]>('/api/notifications/bookings/unread', {
+export async function getNotificationUnreadCount(accessToken: string) {
+  return request<NotificationUnreadCountResponse>('/api/notifications/unread-count', {
     accessToken,
   });
 }
 
-export async function markNotificationAsRead(notificationId: string) {
-  return request<void>(`/api/notifications/bookings/${notificationId}/read`, {
+export async function markNotificationAsRead(accessToken: string, notificationId: string) {
+  return request<NotificationResponse>(`/api/notifications/${notificationId}/read`, {
     method: 'POST',
+    accessToken,
+  });
+}
+
+export async function markAllNotificationsAsRead(accessToken: string) {
+  return request<NotificationUnreadCountResponse>('/api/notifications/read-all', {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function getNotificationPreferences(accessToken: string) {
+  return request<NotificationPreferencesResponse>('/api/notifications/preferences', {
+    accessToken,
+  });
+}
+
+export async function updateNotificationPreferences(
+  accessToken: string,
+  payload: UpdateNotificationPreferencesRequest,
+) {
+  return request<NotificationPreferencesResponse>('/api/notifications/preferences', {
+    method: 'PATCH',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function listNotificationDeliveries(
+  accessToken: string,
+  options: { status?: NotificationDeliveryStatus; limit?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (options.status) params.set('status', options.status);
+  if (options.limit !== undefined) params.set('limit', String(options.limit));
+  const query = params.toString();
+
+  return request<NotificationDeliveryResponse[]>(`/api/admin/notifications/deliveries${query ? `?${query}` : ''}`, {
+    accessToken,
   });
 }
 

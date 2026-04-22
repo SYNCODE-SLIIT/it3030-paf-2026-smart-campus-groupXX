@@ -1,6 +1,9 @@
 package com.university.smartcampus.booking;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -13,27 +16,43 @@ import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.resource.ResourceEntity;
 import com.university.smartcampus.resource.ResourceService;
+import com.university.smartcampus.user.entity.FacultyEntity;
+import com.university.smartcampus.user.entity.StudentEntity;
 import com.university.smartcampus.user.entity.UserEntity;
 
 @Service
 public class BookingService {
 
+    private static final List<BookingStatus> BLOCKING_STATUSES = List.of(
+        BookingStatus.PENDING,
+        BookingStatus.APPROVED,
+        BookingStatus.CHECKED_IN
+    );
+
     private final BookingRepository bookingRepository;
     private final ResourceService resourceService;
     private final BookingValidator bookingValidator;
+    private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
+    private final NotificationService notificationService;
 
     public BookingService(
         BookingRepository bookingRepository,
         ResourceService resourceService,
-        BookingValidator bookingValidator
+        BookingValidator bookingValidator,
+        BookingResourceAvailabilityService bookingResourceAvailabilityService,
+        NotificationService notificationService
     ) {
         this.bookingRepository = bookingRepository;
         this.resourceService = resourceService;
         this.bookingValidator = bookingValidator;
+        this.bookingResourceAvailabilityService = bookingResourceAvailabilityService;
+        this.notificationService = notificationService;
     }
 
+    @Transactional
     public BookingDtos.BookingResponse createBooking(UserEntity requester, BookingDtos.CreateBookingRequest request) {
         Objects.requireNonNull(requester, "Requester is required.");
         Objects.requireNonNull(request, "Request is required.");
@@ -50,6 +69,7 @@ public class BookingService {
         Instant endTime = Objects.requireNonNull(request.endTime(), "End time is required.");
 
         bookingValidator.validateTimeRange(startTime, endTime);
+        bookingValidator.validateDuration(resource, startTime, endTime);
         bookingValidator.requireFutureStart(startTime);
         bookingValidator.ensureNoPendingOrApprovedOverlap(resource.getId(), startTime, endTime);
 
@@ -63,38 +83,114 @@ public class BookingService {
         booking.setStatus(BookingStatus.PENDING);
 
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingCreated(saved);
         return toResponse(saved);
     }
 
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<BookingDtos.BookingResponse> listBookingsForUser(UserEntity requester) {
         Objects.requireNonNull(requester, "Requester is required.");
-        return bookingRepository.findAllByRequesterIdOrderByStartTimeDesc(requester.getId()).stream()
+        List<BookingEntity> bookings = bookingRepository.findAllByRequesterIdOrderByStartTimeDesc(requester.getId());
+        bookingResourceAvailabilityService.reconcileFutureBookings(bookings);
+        return bookings.stream()
             .map(this::toResponse)
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public BookingDtos.BookingResponse getBookingForUser(UserEntity requester, UUID bookingId) {
         Objects.requireNonNull(requester, "Requester is required.");
         BookingEntity booking = requireBooking(bookingId);
         if (!booking.getRequester().getId().equals(requester.getId())) {
             throw new ForbiddenException("You cannot view this booking.");
         }
+        bookingResourceAvailabilityService.reconcileFutureBookings(List.of(booking));
         return toResponse(booking);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<BookingDtos.BookingResponse> listAllBookings() {
-        return bookingRepository.findAllByOrderByStartTimeDesc().stream()
+        List<BookingEntity> bookings = bookingRepository.findAllByOrderByStartTimeDesc();
+        bookingResourceAvailabilityService.reconcileFutureBookings(bookings);
+        return bookings.stream()
             .map(this::toResponse)
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public BookingDtos.BookingResponse getBooking(UUID bookingId) {
-        return toResponse(requireBooking(bookingId));
+        BookingEntity booking = requireBooking(bookingId);
+        bookingResourceAvailabilityService.reconcileFutureBookings(List.of(booking));
+        return toResponse(booking);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingDtos.ResourceRemainingRangesResponse getRemainingRangesForResource(UUID resourceId, LocalDate date) {
+        Objects.requireNonNull(resourceId, "Resource id is required.");
+        Objects.requireNonNull(date, "Date is required.");
+
+        ResourceEntity resource = resourceService.requireActiveResource(resourceId);
+        if (!resource.isBookable()) {
+            throw new BadRequestException("This resource is not available for booking.");
+        }
+
+        ZoneId zoneId = ZoneId.systemDefault();
+        Instant dayStart = date.atStartOfDay(zoneId).toInstant();
+        Instant dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant();
+
+        Instant now = bookingValidator.currentInstant();
+        Instant windowStart = dayStart.isBefore(now) ? now : dayStart;
+
+        if (!windowStart.isBefore(dayEnd)) {
+            return new BookingDtos.ResourceRemainingRangesResponse(
+                resourceId,
+                date,
+                windowStart,
+                dayEnd,
+                List.of()
+            );
+        }
+
+        List<BookingEntity> blockedBookings = bookingRepository
+            .findAllByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThanOrderByStartTimeAsc(
+                resourceId,
+                BLOCKING_STATUSES,
+                dayEnd,
+                windowStart
+            );
+
+        List<BookingDtos.TimeRange> remainingRanges = new ArrayList<>();
+        Instant cursor = windowStart;
+
+        for (BookingEntity booking : blockedBookings) {
+            Instant blockedStart = booking.getStartTime().isAfter(windowStart) ? booking.getStartTime() : windowStart;
+            Instant blockedEnd = booking.getEndTime().isBefore(dayEnd) ? booking.getEndTime() : dayEnd;
+
+            if (!blockedStart.isBefore(blockedEnd)) {
+                continue;
+            }
+
+            if (cursor.isBefore(blockedStart)) {
+                remainingRanges.add(new BookingDtos.TimeRange(cursor, blockedStart));
+            }
+
+            if (cursor.isBefore(blockedEnd)) {
+                cursor = blockedEnd;
+            }
+        }
+
+        if (cursor.isBefore(dayEnd)) {
+            remainingRanges.add(new BookingDtos.TimeRange(cursor, dayEnd));
+        }
+
+        return new BookingDtos.ResourceRemainingRangesResponse(
+            resourceId,
+            date,
+            windowStart,
+            dayEnd,
+            remainingRanges
+        );
     }
 
 
@@ -124,6 +220,7 @@ public class BookingService {
         booking.setCancelledAt(bookingValidator.currentInstant());
 
         BookingEntity saved = bookingRepository.save(booking);
+        notificationService.notifyBookingCancelledByRequester(saved, requester);
         return toResponse(saved);
     }
 
@@ -140,6 +237,7 @@ public class BookingService {
             booking.getId(),
             resourceService.toSummary(booking.getResource()),
             booking.getRequester() != null ? booking.getRequester().getId() : null,
+            resolveRequesterRegistrationNumber(booking.getRequester()),
             booking.getStatus(),
             booking.getStartTime(),
             booking.getEndTime(),
@@ -155,5 +253,23 @@ public class BookingService {
 
     private String normalizeReason(String reason) {
         return StringUtils.hasText(reason) ? reason.trim() : null;
+    }
+
+    private String resolveRequesterRegistrationNumber(UserEntity requester) {
+        if (requester == null) {
+            return null;
+        }
+
+        StudentEntity student = requester.getStudentProfile();
+        if (student != null && StringUtils.hasText(student.getRegistrationNumber())) {
+            return student.getRegistrationNumber().trim();
+        }
+
+        FacultyEntity faculty = requester.getFacultyProfile();
+        if (faculty != null && StringUtils.hasText(faculty.getEmployeeNumber())) {
+            return faculty.getEmployeeNumber().trim();
+        }
+
+        return requester.getId() != null ? requester.getId().toString() : null;
     }
 }

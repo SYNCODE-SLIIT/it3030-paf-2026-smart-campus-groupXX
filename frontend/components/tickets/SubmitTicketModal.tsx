@@ -5,8 +5,8 @@ import { Paperclip, TicketPlus, Trash2, Upload } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Button, Dialog, Input, Select, Textarea } from '@/components/ui';
-import { createTicket, getErrorMessage, uploadTicketAttachment } from '@/lib/api-client';
-import type { TicketCategory, TicketPriority } from '@/lib/api-types';
+import { createTicket, getErrorMessage, listResources, uploadTicketAttachment } from '@/lib/api-client';
+import type { ResourceResponse, TicketCategory, TicketPriority } from '@/lib/api-types';
 
 const CATEGORY_OPTIONS: { value: TicketCategory; label: string }[] = [
   { value: 'ELECTRICAL', label: 'Electrical' },
@@ -35,11 +35,11 @@ interface SubmitTicketModalProps {
 }
 
 type Step1 = { title: string; description: string; category: TicketCategory | '' };
-type Step2 = { priority: TicketPriority | ''; contactNote: string };
+type Step2 = { priority: TicketPriority | ''; resourceId: string; contactNote: string };
 type StagedFile = { id: string; file: File };
 
 const INIT_STEP1: Step1 = { title: '', description: '', category: '' };
-const INIT_STEP2: Step2 = { priority: '', contactNote: '' };
+const INIT_STEP2: Step2 = { priority: '', resourceId: '', contactNote: '' };
 
 const STEP_LABELS = ['Issue Details', 'Priority & Context', 'Attachments'];
 
@@ -57,9 +57,61 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
   const [s1, setS1] = React.useState<Step1>(INIT_STEP1);
   const [s2, setS2] = React.useState<Step2>(INIT_STEP2);
   const [files, setFiles] = React.useState<StagedFile[]>([]);
+  const [resources, setResources] = React.useState<ResourceResponse[]>([]);
+  const [resourcesLoading, setResourcesLoading] = React.useState(false);
+  const [resourceLoadError, setResourceLoadError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (!accessToken) {
+      setResources([]);
+      setResourcesLoading(false);
+      setResourceLoadError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setResourcesLoading(true);
+    setResourceLoadError(null);
+
+    listResources(accessToken)
+      .then((nextResources) => {
+        if (!cancelled) {
+          setResources(nextResources);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setResources([]);
+          setResourceLoadError(getErrorMessage(err, 'Could not load resources.'));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setResourcesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, open]);
+
+  const resourceOptions = React.useMemo(
+    () => [
+      { value: '', label: 'No resource' },
+      ...resources.map((resource) => ({ value: resource.id, label: resource.name })),
+    ],
+    [resources],
+  );
+
+  const selectedResource = React.useMemo(
+    () => resources.find((resource) => resource.id === s2.resourceId) ?? null,
+    [resources, s2.resourceId],
+  );
 
   function reset() {
     setStep(1);
@@ -128,6 +180,7 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
         category: s1.category as TicketCategory,
         priority: s2.priority as TicketPriority,
         contactNote: s2.contactNote.trim() || undefined,
+        resourceId: s2.resourceId || undefined,
       });
       ticketRef = ticket.ticketCode;
     } catch (err) {
@@ -266,28 +319,24 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
                 <Select
                   id="st-resource"
                   label="Resource"
-                  value=""
-                  onChange={() => undefined}
-                  placeholder="Coming soon"
-                  options={[]}
-                  disabled
+                  value={s2.resourceId}
+                  onChange={(e) => setS2((p) => ({ ...p, resourceId: e.target.value }))}
+                  options={resourceOptions}
+                  disabled={resourcesLoading || Boolean(resourceLoadError)}
                 />
                 <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                  Not yet available
+                  {resourceLoadError ?? (resourcesLoading ? 'Loading resources' : 'Optional')}
                 </p>
               </div>
               <div>
                 <Input
                   id="st-location"
                   label="Location"
-                  placeholder="Coming soon"
-                  value=""
+                  placeholder=""
+                  value={selectedResource?.locationDetails?.locationName ?? ''}
                   onChange={() => undefined}
                   disabled
                 />
-                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                  Not yet available
-                </p>
               </div>
             </div>
             <Input

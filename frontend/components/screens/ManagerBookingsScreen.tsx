@@ -6,6 +6,7 @@ import { Check, Search, X } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { BookingScreenSkeleton } from '@/components/booking/BookingScreenSkeleton';
 import { approveBooking, cancelApprovedBookingAsManager, getErrorMessage, listAllBookings, listResources, rejectBooking } from '@/lib/api-client';
 import type { BookingResponse, BookingStatus, ResourceResponse } from '@/lib/api-types';
 
@@ -116,6 +117,10 @@ export function ManagerBookingsScreen() {
   const approvedCount = bookings.filter((booking) => booking.status === 'APPROVED').length;
   const rejectedCount = bookings.filter((booking) => booking.status === 'REJECTED').length;
   const cancelledCount = bookings.filter((booking) => booking.status === 'CANCELLED').length;
+
+  if (loading) {
+    return <BookingScreenSkeleton variant="manager" />;
+  }
 
   async function handleApprove(booking: BookingResponse) {
     if (!accessToken) {

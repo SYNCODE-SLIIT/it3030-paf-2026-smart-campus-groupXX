@@ -16,10 +16,14 @@ import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.TicketCategory;
 import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
 import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
+import com.university.smartcampus.AppEnums.ResourceStatus;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.notification.NotificationService;
+import com.university.smartcampus.resource.ResourceEntity;
+import com.university.smartcampus.resource.ResourceRepository;
 import com.university.smartcampus.ticket.dto.TicketDtos.AddCommentRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.AddTicketAttachmentRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.CreateTicketRequest;
@@ -56,6 +60,8 @@ public class TicketService {
     private final TicketStatusHistoryRepository ticketStatusHistoryRepository;
     private final TicketAttachmentStorageClient ticketAttachmentStorageClient;
     private final UserRepository userRepository;
+    private final ResourceRepository resourceRepository;
+    private final NotificationService notificationService;
 
     public TicketService(
             TicketRepository ticketRepository,
@@ -64,7 +70,9 @@ public class TicketService {
             TicketCommentRepository ticketCommentRepository,
             TicketStatusHistoryRepository ticketStatusHistoryRepository,
             TicketAttachmentStorageClient ticketAttachmentStorageClient,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            ResourceRepository resourceRepository,
+            NotificationService notificationService) {
         this.ticketRepository = ticketRepository;
         this.ticketAttachmentRepository = ticketAttachmentRepository;
         this.ticketAssignmentHistoryRepository = ticketAssignmentHistoryRepository;
@@ -72,6 +80,8 @@ public class TicketService {
         this.ticketStatusHistoryRepository = ticketStatusHistoryRepository;
         this.ticketAttachmentStorageClient = ticketAttachmentStorageClient;
         this.userRepository = userRepository;
+        this.resourceRepository = resourceRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -89,9 +99,29 @@ public class TicketService {
         ticket.setStatus(TicketStatus.OPEN);
         ticket.setReportedBy(reporter);
         ticket.setContactNote(request.contactNote());
+
+        ResourceStatus oldResourceStatus = null;
+        ResourceStatus newResourceStatus = null;
+        if (request.resourceId() != null) {
+            ResourceEntity resource = resolveResource(request.resourceId());
+            ticket.setResource(resource);
+            ticket.setLocation(resource.getLocationEntity());
+
+            oldResourceStatus = resource.getStatus();
+            if (request.priority() == TicketPriority.URGENT && resource.getStatus() == ResourceStatus.ACTIVE) {
+                resource.setStatus(ResourceStatus.INACTIVE);
+                newResourceStatus = resource.getStatus();
+                resourceRepository.save(resource);
+            }
+        }
+
         ticketRepository.save(ticket);
 
         recordHistory(ticket, null, TicketStatus.OPEN, reporter, null);
+        notificationService.notifyTicketCreated(ticket);
+        if (oldResourceStatus != null && newResourceStatus != null) {
+            notificationService.notifyTicketResourceImpacted(ticket, oldResourceStatus, newResourceStatus);
+        }
 
         return toTicketResponse(ticket);
     }
@@ -222,6 +252,7 @@ public class TicketService {
         }
 
         recordHistory(ticket, oldStatus, request.newStatus(), manager, request.note());
+        notificationService.notifyTicketStatusChanged(ticket, oldStatus, request.newStatus(), manager);
 
         return toTicketResponse(ticket);
     }
@@ -239,6 +270,7 @@ public class TicketService {
         UserEntity newAssignee = resolveAssignableAssignee(assignedToUserId);
         ticket.setAssignedTo(newAssignee);
         recordAssignmentHistory(ticket, oldAssignee, newAssignee, actor, null);
+        notificationService.notifyTicketAssigned(ticket, oldAssignee, newAssignee, actor);
         return toTicketResponse(ticket);
     }
 
@@ -263,6 +295,7 @@ public class TicketService {
         comment.setCommentText(request.commentText());
         comment.setEdited(false);
         ticketCommentRepository.save(comment);
+        notificationService.notifyTicketCommentAdded(ticket, comment);
 
         return toCommentResponse(comment);
     }
@@ -508,6 +541,11 @@ public class TicketService {
         return assignee;
     }
 
+    private ResourceEntity resolveResource(UUID resourceId) {
+        return resourceRepository.findById(resourceId)
+                .orElseThrow(() -> new NotFoundException("Resource not found."));
+    }
+
     private boolean isAssignableAssignee(UserEntity user) {
         return user.getAccountStatus() == AccountStatus.ACTIVE
                 && (isAdmin(user) || isTicketManager(user));
@@ -599,6 +637,8 @@ public class TicketService {
                 ticket.getAssignedTo() != null ? ticket.getAssignedTo().getId() : null,
                 ticket.getAssignedTo() != null ? ticket.getAssignedTo().getEmail() : null,
                 resolveAssignedToName(ticket.getAssignedTo()),
+                ticket.getResourceId(),
+                ticket.getLocationId(),
                 ticket.getResolutionNotes(),
                 ticket.getRejectionReason(),
                 ticket.getContactNote(),
