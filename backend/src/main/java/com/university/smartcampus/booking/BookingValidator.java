@@ -1,6 +1,5 @@
 package com.university.smartcampus.booking;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -33,16 +32,13 @@ public class BookingValidator {
     private static final List<BookingStatus> APPROVED_ONLY = List.of(BookingStatus.APPROVED);
 
     private final BookingRepository bookingRepository;
-    private final BookingDurationPolicy bookingDurationPolicy;
     private final ZoneId bookingZoneId;
 
     public BookingValidator(
         BookingRepository bookingRepository,
-        BookingDurationPolicy bookingDurationPolicy,
         @Value("${app.booking.time-zone:Asia/Colombo}") String bookingTimeZone
     ) {
         this.bookingRepository = bookingRepository;
-        this.bookingDurationPolicy = bookingDurationPolicy;
         this.bookingZoneId = ZoneId.of(bookingTimeZone);
     }
 
@@ -79,12 +75,13 @@ public class BookingValidator {
         Objects.requireNonNull(startTime, "Start time is required.");
         Objects.requireNonNull(endTime, "End time is required.");
 
-        Integer maxDurationMinutes = resource.getCategory() == ResourceCategory.SPACES
-            ? 180
-            : bookingDurationPolicy.getMaxDurationMinutes(resource.getSubcategory());
-        long durationMinutes = Duration.between(startTime, endTime).toMinutes();
+        if (resource.getCategory() != ResourceCategory.SPACES) {
+            return;
+        }
 
-        if (maxDurationMinutes != null && durationMinutes > maxDurationMinutes) {
+        long durationMinutes = java.time.Duration.between(startTime, endTime).toMinutes();
+        int maxDurationMinutes = 180;
+        if (durationMinutes > maxDurationMinutes) {
             throw new BadRequestException(
                 "Maximum booking duration for this resource is " + (maxDurationMinutes / 60) + " hours"
             );

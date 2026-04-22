@@ -23,7 +23,6 @@ class BookingValidatorTest {
 
     private final BookingValidator bookingValidator = new BookingValidator(
         mock(BookingRepository.class),
-        mock(BookingDurationPolicy.class),
         "Asia/Colombo"
     );
 
@@ -83,6 +82,17 @@ class BookingValidatorTest {
             resource,
             instant(2026, 4, 23, 9, 0),
             instant(2026, 4, 23, 12, 0)
+        );
+    }
+
+    @Test
+    void validateDurationIgnoresNonSpaceBookingsForLongRanges() {
+        ResourceEntity resource = resource(ResourceCategory.TECHNICAL_EQUIPMENT);
+
+        bookingValidator.validateDuration(
+            resource,
+            instant(2026, 4, 23, 9, 0),
+            instant(2026, 4, 25, 12, 0)
         );
     }
 
