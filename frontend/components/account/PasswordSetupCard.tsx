@@ -147,25 +147,9 @@ export function PasswordSetupCard({
       return;
     }
 
-    const mediaQuery = window.matchMedia('(min-width: 981px)');
-    const updatePortalState = () => {
-      setPolicyPortalElement(document.getElementById(policyPortalTargetId));
-      setShouldUsePolicyPortal(mediaQuery.matches);
-    };
-
-    updatePortalState();
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', updatePortalState);
-      return () => {
-        mediaQuery.removeEventListener('change', updatePortalState);
-      };
-    }
-
-    mediaQuery.addListener(updatePortalState);
-    return () => {
-      mediaQuery.removeListener(updatePortalState);
-    };
+    const portalTarget = document.getElementById(policyPortalTargetId);
+    setPolicyPortalElement(portalTarget);
+    setShouldUsePolicyPortal(Boolean(portalTarget));
   }, [policyPortalTargetId]);
 
   const isOverlayPolicy = policyVisualStyle === 'overlay';

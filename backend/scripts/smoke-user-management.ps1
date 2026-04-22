@@ -158,8 +158,6 @@ $completedStudent = Invoke-SmokeApi -Method Put -Path "/api/students/me/onboardi
     academicYear = "YEAR_2"
     semester = "SEMESTER_1"
     profileImageUrl = $null
-    emailNotificationsEnabled = $true
-    smsNotificationsEnabled = $false
 }
 
 if (-not $completedStudent.studentProfile.onboardingCompleted) {

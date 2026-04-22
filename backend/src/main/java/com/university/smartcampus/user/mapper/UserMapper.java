@@ -56,9 +56,7 @@ public class UserMapper {
             student.getProgramName(),
             student.getAcademicYear(),
             student.getSemester(),
-            student.getProfileImageUrl(),
-            student.getEmailNotificationsEnabled(),
-            student.getSmsNotificationsEnabled()
+            student.getProfileImageUrl()
         );
     }
 

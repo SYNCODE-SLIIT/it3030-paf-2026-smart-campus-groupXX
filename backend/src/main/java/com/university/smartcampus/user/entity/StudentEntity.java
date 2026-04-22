@@ -76,12 +76,6 @@ public class StudentEntity extends TimestampedEntity {
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
-    @Column(name = "email_notifications_enabled")
-    private Boolean emailNotificationsEnabled;
-
-    @Column(name = "sms_notifications_enabled")
-    private Boolean smsNotificationsEnabled;
-
     public UUID getUserId() {
         return userId;
     }
@@ -184,21 +178,5 @@ public class StudentEntity extends TimestampedEntity {
 
     public void setProfileImageUrl(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
-    }
-
-    public Boolean getEmailNotificationsEnabled() {
-        return emailNotificationsEnabled;
-    }
-
-    public void setEmailNotificationsEnabled(Boolean emailNotificationsEnabled) {
-        this.emailNotificationsEnabled = emailNotificationsEnabled;
-    }
-
-    public Boolean getSmsNotificationsEnabled() {
-        return smsNotificationsEnabled;
-    }
-
-    public void setSmsNotificationsEnabled(Boolean smsNotificationsEnabled) {
-        this.smsNotificationsEnabled = smsNotificationsEnabled;
     }
 }

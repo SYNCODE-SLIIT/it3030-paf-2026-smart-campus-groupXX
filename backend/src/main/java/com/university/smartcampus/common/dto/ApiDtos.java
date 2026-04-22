@@ -34,9 +34,7 @@ public final class ApiDtos {
         StudentProgram programName,
         AcademicYear academicYear,
         Semester semester,
-        String profileImageUrl,
-        Boolean emailNotificationsEnabled,
-        Boolean smsNotificationsEnabled
+        String profileImageUrl
     ) {
     }
 

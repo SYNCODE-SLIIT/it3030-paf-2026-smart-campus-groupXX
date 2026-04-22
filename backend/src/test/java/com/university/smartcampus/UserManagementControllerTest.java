@@ -359,9 +359,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                         "facultyName": "FACULTY_OF_COMPUTING",
                         "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
                         "academicYear": "YEAR_2",
-                        "semester": "SEMESTER_1",
-                        "emailNotificationsEnabled": true,
-                        "smsNotificationsEnabled": false
+                                                "semester": "SEMESTER_1"
                       }
                     }
                     """))
@@ -518,9 +516,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
                       "programName": "BSC_HONS_INFORMATION_TECHNOLOGY",
                       "academicYear": "YEAR_3",
                       "semester": "SEMESTER_2",
-                      "profileImageUrl": null,
-                      "emailNotificationsEnabled": true,
-                      "smsNotificationsEnabled": false
+                                            "profileImageUrl": null
                     }
                     """))
             .andExpect(status().isOk())

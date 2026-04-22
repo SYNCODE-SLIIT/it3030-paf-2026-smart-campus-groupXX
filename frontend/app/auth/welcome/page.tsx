@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Mail, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Mail, ShieldCheck } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { PasswordSetupCard } from '@/components/account/PasswordSetupCard';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Input } from '@/components/ui';
+import { Alert, Button, Card, Chip, Divider } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api-client';
 import { getPostAuthRedirect, needsStudentOnboarding } from '@/lib/auth-routing';
 import {
@@ -30,6 +30,15 @@ type NoticeState = {
   title: string;
   message: string;
 } | null;
+
+const WELCOME_PASSWORD_POLICY_HOST_ID = 'welcome-password-policy-host';
+const PASSWORD_POLICY_ITEMS = [
+  'At least 8 characters',
+  'One uppercase letter',
+  'One lowercase letter',
+  'One number',
+  'One special character',
+];
 
 function GoogleLogo({ size = 16 }: { size?: number }) {
   return (
@@ -86,9 +95,10 @@ function authReasonNotice(reason: string | null, remainingAttempts: number | nul
       return {
         variant: 'warning' as const,
         title: flow === 'recovery' ? 'Recovery link expired' : 'Invite link expired',
-        message: flow === 'recovery'
-          ? 'This recovery link is invalid or has expired. Request a new password reset email from the login page.'
-          : 'This invite link is invalid or has expired. Ask an administrator to send a new invite email.',
+        message:
+          flow === 'recovery'
+            ? 'This recovery link is invalid or has expired. Request a new password reset email from the login page.'
+            : 'This invite link is invalid or has expired. Ask an administrator to send a new invite email.',
       };
     case 'recovery_expired':
       return {
@@ -125,13 +135,250 @@ function authReasonNotice(reason: string | null, remainingAttempts: number | nul
       return {
         variant: 'warning' as const,
         title: flow === 'recovery' ? 'Recovery session required' : 'Invite session required',
-        message: flow === 'recovery'
-          ? 'Your recovery session is not active. Re-open the reset link from your email.'
-          : 'Your invite session is not active. Re-open the invite link from your email.',
+        message:
+          flow === 'recovery'
+            ? 'Your recovery session is not active. Re-open the reset link from your email.'
+            : 'Your invite session is not active. Re-open the invite link from your email.',
       };
     default:
       return null;
   }
+}
+
+function StaticPasswordPolicyList() {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gap: 10,
+        padding: '14px 16px',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid rgba(255,255,255,.12)',
+        background: 'rgba(255,255,255,.045)',
+      }}
+    >
+      {PASSWORD_POLICY_ITEMS.map((item) => (
+        <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CheckCircle2 size={15} color="var(--yellow-300)" />
+          <span style={{ color: 'var(--text-on-contrast-muted)', fontSize: 13, fontWeight: 600 }}>{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AuthWelcomeSideCards({ useLivePolicy = false }: { useLivePolicy?: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, height: '100%' }}>
+      <Card variant="dark" hoverable style={{ flex: 1 }}>
+        <div style={{ marginBottom: 16 }}>
+          <Chip color="glass" size="sm">
+            Password Policy
+          </Chip>
+        </div>
+        <h2
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 20,
+            fontWeight: 700,
+            lineHeight: 1.25,
+            margin: '0 0 12px',
+            color: 'var(--text-on-contrast)',
+          }}
+        >
+          Protect your campus account.
+        </h2>
+        <p
+          style={{
+            margin: '0 0 18px',
+            color: 'var(--text-on-contrast-muted)',
+            fontSize: 13,
+            lineHeight: 1.6,
+          }}
+        >
+          Your password must meet every rule before account activation can continue.
+        </p>
+        <div id={useLivePolicy ? WELCOME_PASSWORD_POLICY_HOST_ID : undefined}>
+          {useLivePolicy ? null : <StaticPasswordPolicyList />}
+        </div>
+      </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <Card hoverable>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              minHeight: 96,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 28,
+                fontWeight: 800,
+                lineHeight: 1,
+                marginBottom: 4,
+                color: 'var(--text-h)',
+              }}
+            >
+              5<span style={{ color: 'var(--yellow-400)' }}>+</span>
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: '.1em',
+                textTransform: 'uppercase',
+                color: 'var(--text-muted)',
+                lineHeight: 1.4,
+              }}
+            >
+              Security
+              <br />
+              Rules
+            </div>
+          </div>
+        </Card>
+
+        <Card hoverable>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              minHeight: 96,
+            }}
+          >
+            <p
+              style={{
+                margin: '0 0 8px',
+                color: 'var(--text-body)',
+                fontSize: 11,
+                fontStyle: 'italic',
+                fontWeight: 500,
+                lineHeight: 1.6,
+                opacity: 0.7,
+              }}
+            >
+              Google and Microsoft sign-in stay available after activation.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--yellow-400)',
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: '.12em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                Auth Options
+              </span>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function AuthWelcomeShell({
+  children,
+  ariaLabel = 'Account access',
+  sideContent,
+}: {
+  children: React.ReactNode;
+  ariaLabel?: string;
+  sideContent?: React.ReactNode;
+}) {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+      <main
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '112px 24px 80px',
+        }}
+      >
+        <section
+          aria-label={ariaLabel}
+          className="grid w-full grid-cols-1 md:grid-cols-12 gap-6 items-stretch"
+          style={{ maxWidth: 1100 }}
+        >
+          <div className="col-span-1 md:col-span-7">{children}</div>
+          <aside className="col-span-1 md:col-span-5 flex flex-col">
+            {sideContent ?? <AuthWelcomeSideCards />}
+          </aside>
+        </section>
+      </main>
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          height: 6,
+          background: 'var(--yellow-400)',
+          zIndex: 10,
+        }}
+      />
+    </div>
+  );
+}
+
+function WelcomeStatusCard({
+  title,
+  message,
+  children,
+}: {
+  title: string;
+  message: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <AuthWelcomeShell>
+      <Card hoverable>
+        <div style={{ marginBottom: children ? 24 : 0 }}>
+          <h1
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 32,
+              fontWeight: 800,
+              letterSpacing: 0,
+              color: 'var(--text-h)',
+              margin: '0 0 8px',
+              lineHeight: 1.15,
+            }}
+          >
+            {title}
+          </h1>
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 14, fontWeight: 500, lineHeight: 1.55 }}>
+            {message}
+          </p>
+        </div>
+        {children}
+      </Card>
+    </AuthWelcomeShell>
+  );
 }
 
 function AuthWelcomeContent() {
@@ -291,51 +538,26 @@ function AuthWelcomeContent() {
     void refreshMe().finally(() => setIsHydratingUser(false));
   }, [appUser, isHydratingUser, lastHydratedSessionUserId, loading, refreshMe, session]);
 
-  const displayEmail = expectedAuthEmail ?? session?.user?.email ?? appUser?.email ?? (
-    isRecoveryFlow ? 'Recovery account' : 'Invited account'
-  );
+  const displayEmail =
+    expectedAuthEmail ?? session?.user?.email ?? appUser?.email ?? (isRecoveryFlow ? 'Recovery account' : 'Invited account');
 
   if (loading || isHydratingUser) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 24,
-          background:
-            'radial-gradient(circle at top left, rgba(238,202,68,.18), transparent 28%), linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%)',
-        }}
-      >
-        <Card style={{ width: '100%', maxWidth: 620 }}>
-          <p
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 26,
-              fontWeight: 700,
-              letterSpacing: '-0.03em',
-              color: 'var(--text-h)',
-            }}
-          >
-            Preparing your invited access
-          </p>
-          <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, color: 'var(--text-body)' }}>
-            Final checks are running before we continue to your account.
-          </p>
-        </Card>
-      </div>
+      <WelcomeStatusCard
+        title="Preparing Your Access"
+        message="Final checks are running before we continue to your account."
+      />
     );
   }
 
   if (!hasInviteContext) {
     const emptyInviteTitle = isRecoveryFlow
       ? reason === 'recovery_expired' || reason === 'invite_expired'
-        ? 'Recovery link expired'
-        : 'Recovery session required'
+        ? 'Recovery Link Expired'
+        : 'Recovery Session Required'
       : reason === 'invite_expired'
-        ? 'Invite link expired'
-        : 'Invite session required';
+        ? 'Invite Link Expired'
+        : 'Invite Session Required';
     const emptyInviteMessage = isRecoveryFlow
       ? 'Open the password reset link from your email, or request a new reset link from the login page.'
       : reason === 'invite_expired'
@@ -343,41 +565,13 @@ function AuthWelcomeContent() {
         : 'Open the generated invite link from your email to continue onboarding.';
 
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 24,
-          background:
-            'radial-gradient(circle at top left, rgba(238,202,68,.18), transparent 28%), linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%)',
-        }}
-      >
-        <Card style={{ width: '100%', maxWidth: 620 }}>
-          <div style={{ display: 'grid', gap: 12 }}>
-            <p
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 26,
-                fontWeight: 700,
-                letterSpacing: '-0.03em',
-                color: 'var(--text-h)',
-              }}
-            >
-              {emptyInviteTitle}
-            </p>
-            {visibleNotice && (
-              <Alert variant={visibleNotice.variant} title={visibleNotice.title}>
-                {visibleNotice.message}
-              </Alert>
-            )}
-            <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-body)' }}>
-              {emptyInviteMessage}
-            </p>
-          </div>
-        </Card>
-      </div>
+      <WelcomeStatusCard title={emptyInviteTitle} message={emptyInviteMessage}>
+        {visibleNotice && (
+          <Alert variant={visibleNotice.variant} title={visibleNotice.title}>
+            {visibleNotice.message}
+          </Alert>
+        )}
+      </WelcomeStatusCard>
     );
   }
 
@@ -391,6 +585,25 @@ function AuthWelcomeContent() {
     return query ? `/auth/welcome?${query}` : '/auth/welcome';
   })();
   const shouldShowStandaloneProviderActions = !isLinkExpired && (!session || shouldHidePasswordSetup);
+  const statusLabel = session
+    ? isRecoveryFlow
+      ? 'Recovery Link Verified'
+      : 'Secure Link Verified'
+    : isRecoveryFlow
+      ? 'Recovery Link Ready'
+      : 'Invite Link Ready';
+  const heading = isRecoveryFlow ? 'Reset Password' : 'Finalize Account';
+  const description = isRecoveryFlow
+    ? 'Your secure recovery link is verified. Set a new password or continue with Google or Microsoft.'
+    : 'Set your password to activate secure access for your invited account.';
+  const canShowPasswordSetup = Boolean(session && !shouldHidePasswordSetup && !isLinkExpired);
+  const providerButtonStyle: React.CSSProperties = {
+    background: 'var(--neutral-900)',
+    color: '#f8f8f8',
+    border: '1px solid var(--neutral-700)',
+    textTransform: 'none',
+    letterSpacing: '0.01em',
+  };
 
   function handleSwitchAccount() {
     setNotice({
@@ -516,354 +729,67 @@ function AuthWelcomeContent() {
   }
 
   return (
-    <div className="welcome-page">
-      <div aria-hidden="true" className="welcome-page-glow welcome-page-glow-left" />
-      <div aria-hidden="true" className="welcome-page-glow welcome-page-glow-right" />
-      <style>{`
-        .welcome-page {
-          min-height: 100dvh;
-          position: relative;
-          padding: clamp(6px, 1.1vw, 14px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow-x: hidden;
-          overflow-y: auto;
-          background:
-            radial-gradient(circle at 8% 10%, rgba(238,202,68,.14), transparent 30%),
-            radial-gradient(circle at 92% 92%, rgba(70,66,55,.32), transparent 28%),
-            linear-gradient(180deg, #121212 0%, #161514 100%);
-        }
-        .welcome-page-glow {
-          position: absolute;
-          width: 340px;
-          height: 340px;
-          border-radius: 50%;
-          pointer-events: none;
-        }
-        .welcome-page-glow-left {
-          inset: 10% auto auto 6%;
-          background: rgba(238,202,68,.11);
-          filter: blur(92px);
-        }
-        .welcome-page-glow-right {
-          inset: auto 3% 8% auto;
-          background: rgba(72,68,60,.35);
-          filter: blur(100px);
-        }
-        .welcome-auth-frame {
-          width: min(100%, 1000px);
-          display: grid;
-          grid-template-columns: minmax(310px, .95fr) minmax(410px, 1.05fr);
-          border-radius: 18px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,.06);
-          background: rgba(14,14,14,.72);
-          backdrop-filter: blur(14px) saturate(1.2);
-          -webkit-backdrop-filter: blur(14px) saturate(1.2);
-          box-shadow: 0 18px 42px rgba(0,0,0,.46);
-          position: relative;
-          z-index: 1;
-          height: clamp(560px, 70vh, 640px);
-          max-height: min(640px, calc(100dvh - 26px));
-          min-height: min(540px, calc(100dvh - 26px));
-        }
-        .welcome-auth-media {
-          position: relative;
-          min-height: 100%;
-          background-image: linear-gradient(to top, rgba(9,9,9,.84), rgba(9,9,9,.26)), url("https://lh3.googleusercontent.com/aida-public/AB6AXuDnT0tV9Fe6bH-VywONGR08nUjMNWDUoxZhHI3B6CeJRXPS2uxlKuQ560IzVfcbO7s5eUpOX9msH72XJXKRrtHfdmI7MiroC0h-67ya4UyqsYiiKOsFFawAra6W-lgsN0pN_vNgc8xDKq1uXJujhtN0L2re700rN27pO1EMIG0qi3cArdjq2gyGgHKCkAaDdt6Q1uSwlokgufna7MbKiQ31-hTMwBnOhaNQBL6RJbKbtrJ6yj_8RFyX3TP_-7qV_Wqonz1sWnOjIgI");
-          background-size: cover;
-          background-position: center;
-          filter: grayscale(.1) contrast(1.05);
-        }
-        .welcome-auth-media-copy {
-          position: absolute;
-          left: 26px;
-          right: 26px;
-          bottom: 22px;
-          display: grid;
-          gap: 10px;
-        }
-        .welcome-auth-media-policy-shell {
-          width: min(100%, 370px);
-          display: flex;
-        }
-        .welcome-auth-media-policy-host {
-          width: 100%;
-        }
-        .welcome-auth-media-copy h2 {
-          margin: 0;
-          font-family: var(--font-display);
-          font-size: clamp(28px, 3vw, 42px);
-          line-height: 1.07;
-          font-weight: 900;
-          color: var(--yellow-400);
-        }
-        .welcome-auth-media-copy p {
-          margin: 0;
-          font-size: 14px;
-          line-height: 1.55;
-          color: rgba(255,255,255,.8);
-          max-width: 420px;
-        }
-        .welcome-auth-panel {
-          padding: clamp(12px, 1.9vw, 24px);
-          display: grid;
-          gap: 10px;
-          align-content: start;
-          min-height: 0;
-          overflow-y: auto;
-          overscroll-behavior: contain;
-        }
-        .welcome-auth-panel::-webkit-scrollbar {
-          width: 9px;
-        }
-        .welcome-auth-panel::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,.12);
-          border-radius: 999px;
-        }
-        .welcome-banner {
-          border: 1px solid rgba(177,207,167,.3);
-          background: rgba(177,207,167,.18);
-          border-radius: 12px;
-          padding: 10px 12px;
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          color: #bddbb4;
-          font-family: var(--font-display);
-          font-size: 10px;
-          letter-spacing: .07em;
-          text-transform: uppercase;
-          font-weight: 800;
-        }
-        .welcome-banner.warning {
-          border-color: rgba(238,202,68,.3);
-          background: rgba(238,202,68,.12);
-          color: var(--yellow-300);
-        }
-        .welcome-heading {
-          display: grid;
-          gap: 8px;
-        }
-        .welcome-heading h1 {
-          margin: 0;
-          font-family: var(--font-display);
-          font-size: clamp(22px, 2.2vw, 42px);
-          font-weight: 900;
-          line-height: 1.05;
-          color: var(--text-h);
-        }
-        .welcome-heading p {
-          margin: 0;
-          color: var(--text-muted);
-          font-size: 13.5px;
-          line-height: 1.5;
-        }
-        .welcome-divider {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin: 4px 0 0;
-        }
-        .welcome-divider span {
-          flex: 1;
-          height: 1px;
-          background: rgba(255,255,255,.08);
-        }
-        .welcome-divider p {
-          margin: 0;
-          color: var(--text-muted);
-          font-family: var(--font-mono);
-          font-size: 8px;
-          letter-spacing: .22em;
-          text-transform: uppercase;
-          font-weight: 700;
-        }
-        .welcome-terms {
-          margin: 0;
-          text-align: center;
-          font-size: 10.5px;
-          line-height: 1.45;
-          color: color-mix(in srgb, var(--text-muted) 78%, transparent);
-        }
-        .welcome-terms a {
-          color: var(--yellow-300);
-          text-decoration: none;
-        }
-        .welcome-terms a:hover {
-          text-decoration: underline;
-        }
-        .welcome-auth-actions {
-          display: grid;
-          gap: 8px;
-        }
-        .welcome-auth-provider-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
-        }
-        @media (prefers-color-scheme: light) {
-          .welcome-page {
-            background:
-              radial-gradient(circle at 8% 10%, rgba(238,202,68,.18), transparent 32%),
-              radial-gradient(circle at 92% 92%, rgba(171,167,156,.2), transparent 30%),
-              linear-gradient(180deg, #f8f6f0 0%, #f3f1ea 100%);
-          }
-          .welcome-page-glow-left {
-            background: rgba(238,202,68,.14);
-          }
-          .welcome-page-glow-right {
-            background: rgba(126,123,114,.24);
-          }
-          .welcome-auth-frame {
-            border: 1px solid rgba(20,18,12,.08);
-            background: rgba(255,255,255,.86);
-            box-shadow: 0 16px 38px rgba(20,18,12,.18);
-          }
-          .welcome-auth-media {
-            background-image: linear-gradient(to top, rgba(250,249,246,.84), rgba(250,249,246,.2)), url("https://lh3.googleusercontent.com/aida-public/AB6AXuDnT0tV9Fe6bH-VywONGR08nUjMNWDUoxZhHI3B6CeJRXPS2uxlKuQ560IzVfcbO7s5eUpOX9msH72XJXKRrtHfdmI7MiroC0h-67ya4UyqsYiiKOsFFawAra6W-lgsN0pN_vNgc8xDKq1uXJujhtN0L2re700rN27pO1EMIG0qi3cArdjq2gyGgHKCkAaDdt6Q1uSwlokgufna7MbKiQ31-hTMwBnOhaNQBL6RJbKbtrJ6yj_8RFyX3TP_-7qV_Wqonz1sWnOjIgI");
-            filter: grayscale(.02) contrast(1.01);
-          }
-          .welcome-auth-media-copy h2 {
-            color: var(--yellow-700);
-          }
-          .welcome-auth-media-copy p {
-            color: var(--text-body);
-          }
-          .welcome-auth-panel::-webkit-scrollbar-thumb {
-            background: rgba(20,18,12,.18);
-          }
-          .welcome-banner {
-            border-color: rgba(20,164,87,.26);
-            background: rgba(20,164,87,.12);
-            color: #0a5e30;
-          }
-          .welcome-banner.warning {
-            border-color: rgba(176,140,20,.36);
-            background: rgba(238,202,68,.18);
-            color: #5b4408;
-          }
-          .welcome-divider span {
-            background: rgba(20,18,12,.1);
-          }
-          .welcome-terms {
-            color: var(--text-body);
-          }
-          .welcome-terms a {
-            color: var(--yellow-700);
-          }
-        }
-        @media (max-height: 850px) {
-          .welcome-auth-frame {
-            height: clamp(520px, 72vh, 600px);
-            max-height: calc(100dvh - 14px);
-            min-height: min(500px, calc(100dvh - 14px));
-          }
-          .welcome-auth-panel {
-            padding: 10px 14px;
-            gap: 8px;
-          }
-          .welcome-banner {
-            padding: 9px 11px;
-            font-size: 10px;
-          }
-          .welcome-heading h1 {
-            font-size: clamp(20px, 2vw, 34px);
-          }
-          .welcome-auth-media-copy {
-            left: 18px;
-            right: 18px;
-            bottom: 16px;
-            gap: 8px;
-          }
-          .welcome-auth-media-copy p {
-            font-size: 13px;
-            line-height: 1.45;
-          }
-        }
-        @media (max-height: 720px) {
-          .welcome-auth-frame {
-            height: auto;
-            min-height: 0;
-            max-height: none;
-          }
-          .welcome-auth-panel {
-            overflow-y: visible;
-          }
-        }
-        @media (max-width: 980px) {
-          .welcome-auth-frame {
-            grid-template-columns: 1fr;
-            width: min(100%, 760px);
-            min-height: unset;
-            max-height: none;
-            height: auto;
-          }
-          .welcome-auth-media {
-            display: none;
-          }
-          .welcome-auth-panel {
-            overflow-y: visible;
-            padding: 18px 16px;
-            gap: 12px;
-          }
-          .welcome-auth-media-policy-shell {
-            display: none;
-          }
-        }
-        @media (max-width: 620px) {
-          .welcome-auth-provider-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-      `}</style>
-
-      <div className="welcome-auth-frame">
-        <section className="welcome-auth-media">
-          <div className="welcome-auth-media-copy">
-            <div className="welcome-auth-media-policy-shell">
-              <div id="welcome-password-policy-host" className="welcome-auth-media-policy-host" />
-            </div>
-            <h2>Elevate Your Institution</h2>
-            <p>
-              Access your institution&apos;s central hub. Complete your credentials to enter the next generation of university management.
-            </p>
+    <AuthWelcomeShell
+      ariaLabel={isRecoveryFlow ? 'Password recovery' : 'Invite account setup'}
+      sideContent={<AuthWelcomeSideCards useLivePolicy={canShowPasswordSetup} />}
+    >
+      <Card hoverable>
+        <div style={{ marginBottom: 32 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              flexWrap: 'wrap',
+              marginBottom: 16,
+            }}
+          >
+            <Chip color={session ? 'green' : 'yellow'} size="md" dot>
+              <ShieldCheck size={13} />
+              {statusLabel}
+            </Chip>
+            <Chip color="neutral" size="md" style={{ maxWidth: '100%' }}>
+              <Mail size={13} />
+              <span
+                style={{
+                  display: 'inline-block',
+                  maxWidth: 240,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {displayEmail}
+              </span>
+            </Chip>
           </div>
-        </section>
+          <h1
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 32,
+              fontWeight: 800,
+              letterSpacing: 0,
+              color: 'var(--text-h)',
+              margin: '0 0 8px',
+              lineHeight: 1.15,
+            }}
+          >
+            {heading}
+          </h1>
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 14, fontWeight: 500, lineHeight: 1.55 }}>
+            {description}
+          </p>
+        </div>
 
-        <section className="welcome-auth-panel">
-          <div className={`welcome-banner ${session ? '' : 'warning'}`}>
-            <ShieldCheck size={15} />
-            {session
-              ? isRecoveryFlow ? 'Recovery Link Verified' : 'Secure Link Verified'
-              : isRecoveryFlow ? 'Recovery Link Ready' : 'Invite Link Ready'}
-          </div>
-
-          <div className="welcome-heading">
-            <h1>{isRecoveryFlow ? 'Reset Password' : 'Finalize Account'}</h1>
-            <p>
-              {isRecoveryFlow
-                ? 'Your secure recovery link is verified. Set a new password or continue with your Google or Microsoft account.'
-                : 'Set your password to activate secure access for your invited account.'}
-            </p>
-          </div>
-
-          <Input
-            label={isRecoveryFlow ? 'Account Email Address' : 'Academic Email Address'}
-            value={displayEmail}
-            readOnly
-            disabled
-            iconLeft={<Mail size={15} />}
-          />
-
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {visibleNotice && (
             <Alert variant={visibleNotice.variant} title={visibleNotice.title}>
               {visibleNotice.message}
             </Alert>
           )}
 
-          {session && !shouldHidePasswordSetup && !isLinkExpired ? (
+          {canShowPasswordSetup ? (
             <PasswordSetupCard
               compact
               title={isRecoveryFlow ? 'Set New Password' : 'Create Password'}
@@ -873,7 +799,7 @@ function AuthWelcomeContent() {
                   : 'Use an industry-standard password to protect this portal account, or continue below with Google or Microsoft.'
               }
               onPasswordSaved={handlePasswordSaved}
-              policyPortalTargetId="welcome-password-policy-host"
+              policyPortalTargetId={WELCOME_PASSWORD_POLICY_HOST_ID}
               policyVisualStyle="overlay"
               submitLabel={isRecoveryFlow ? 'Update Password' : 'Activate Account'}
               showProviderActions
@@ -906,107 +832,74 @@ function AuthWelcomeContent() {
           {requiresAccountSwitch ? (
             <Button
               variant="primary"
-              size="md"
+              size="lg"
+              fullWidth
               disabled={isGoogleLoading || isMicrosoftLoading || isPasswordRedirecting}
               onClick={handleSwitchAccount}
             >
-              Switch account
+              Switch Account
             </Button>
           ) : null}
 
           {shouldShowStandaloneProviderActions ? (
-            <>
-              <div className="welcome-divider">
-                <span />
-                <p>OR SIGN IN WITH</p>
-                <span />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Divider label="OR SIGN IN WITH" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                <Button
+                  variant="subtle"
+                  size="lg"
+                  fullWidth
+                  loading={isGoogleLoading}
+                  disabled={isMicrosoftLoading || isPasswordRedirecting || requiresAccountSwitch}
+                  iconLeft={<GoogleLogo size={18} />}
+                  onClick={() => {
+                    void handleGoogleSignIn();
+                  }}
+                  style={providerButtonStyle}
+                >
+                  Google
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="lg"
+                  fullWidth
+                  loading={isMicrosoftLoading}
+                  disabled={isGoogleLoading || isPasswordRedirecting || requiresAccountSwitch}
+                  iconLeft={<MicrosoftLogo size={18} />}
+                  onClick={() => {
+                    void handleMicrosoftSignIn();
+                  }}
+                  style={providerButtonStyle}
+                >
+                  Microsoft
+                </Button>
               </div>
 
-              <div className="welcome-auth-actions">
-                <div className="welcome-auth-provider-grid">
-                  <Button
-                    variant="subtle"
-                    size="md"
-                    loading={isGoogleLoading}
-                    disabled={isMicrosoftLoading || isPasswordRedirecting || requiresAccountSwitch}
-                    iconLeft={<GoogleLogo size={18} />}
-                    onClick={() => {
-                      void handleGoogleSignIn();
-                    }}
-                    style={{
-                      background: 'var(--surface)',
-                      color: 'var(--text-h)',
-                      border: '1px solid var(--border-strong)',
-                      textTransform: 'none',
-                      letterSpacing: '0.01em',
-                    }}
-                  >
-                    Google
-                  </Button>
-                  <Button
-                    variant="subtle"
-                    size="md"
-                    loading={isMicrosoftLoading}
-                    disabled={isGoogleLoading || isPasswordRedirecting || requiresAccountSwitch}
-                    iconLeft={<MicrosoftLogo size={18} />}
-                    onClick={() => {
-                      void handleMicrosoftSignIn();
-                    }}
-                    style={{
-                      background: 'var(--surface)',
-                      color: 'var(--text-h)',
-                      border: '1px solid var(--border-strong)',
-                      textTransform: 'none',
-                      letterSpacing: '0.01em',
-                    }}
-                  >
-                    Microsoft
-                  </Button>
-                </div>
-
-                <p className="welcome-terms">
-                  By continuing, you agree to our <a href="#">Institutional Security Terms</a> and{' '}
-                  <a href="#">Data Governance Policy</a>.
-                </p>
-              </div>
-            </>
+              <p style={{ margin: 0, textAlign: 'center', fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+                By continuing, you agree to our{' '}
+                <a href="#" style={{ color: 'var(--yellow-600)', textDecoration: 'none' }}>
+                  Institutional Security Terms
+                </a>{' '}
+                and{' '}
+                <a href="#" style={{ color: 'var(--yellow-600)', textDecoration: 'none' }}>
+                  Data Governance Policy
+                </a>
+                .
+              </p>
+            </div>
           ) : null}
-        </section>
-      </div>
-    </div>
+        </div>
+      </Card>
+    </AuthWelcomeShell>
   );
 }
 
 function AuthWelcomeFallback() {
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-        background:
-          'radial-gradient(circle at top left, rgba(238,202,68,.18), transparent 28%), linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%)',
-      }}
-    >
-      <Card style={{ width: '100%', maxWidth: 620 }}>
-        <p
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 26,
-            fontWeight: 700,
-            letterSpacing: '-0.03em',
-            color: 'var(--text-h)',
-          }}
-        >
-          Preparing your invited access
-        </p>
-        <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, color: 'var(--text-body)' }}>
-          Final checks are running before we continue to your account.
-        </p>
-      </Card>
-    </div>
+    <WelcomeStatusCard
+      title="Preparing Your Access"
+      message="Final checks are running before we continue to your account."
+    />
   );
 }
 

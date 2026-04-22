@@ -138,9 +138,7 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
                 StudentProgram.BSC_HONS_IT_SOFTWARE_ENGINEERING,
                 AcademicYear.YEAR_2,
                 Semester.SEMESTER_1,
-                null,
-                true,
-                false
+                null
             )
         );
 
@@ -173,9 +171,7 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
                 StudentProgram.BSC_HONS_IT_SOFTWARE_ENGINEERING,
                 AcademicYear.YEAR_2,
                 Semester.SEMESTER_1,
-                null,
-                true,
-                false
+                null
             )
         ))
             .isInstanceOf(BadRequestException.class)

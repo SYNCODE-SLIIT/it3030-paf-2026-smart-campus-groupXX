@@ -454,9 +454,6 @@ public class UserManagementService {
         if (StringUtils.hasText(request.profileImageUrl())) {
             student.setProfileImageUrl(request.profileImageUrl().trim());
         }
-        student.setEmailNotificationsEnabled(defaultBoolean(request.emailNotificationsEnabled(), Boolean.TRUE));
-        student.setSmsNotificationsEnabled(defaultBoolean(request.smsNotificationsEnabled(), Boolean.FALSE));
-
         student.setOnboardingCompleted(true);
         if (managedUser.getAccountStatus() == AccountStatus.INVITED) {
             managedUser.setAccountStatus(AccountStatus.ACTIVE);
@@ -616,8 +613,6 @@ public class UserManagementService {
         student.setAcademicYear(input.academicYear());
         student.setSemester(input.semester());
         assignStudentRegistrationNumberIfMissing(student);
-        student.setEmailNotificationsEnabled(defaultBoolean(input.emailNotificationsEnabled(), Boolean.TRUE));
-        student.setSmsNotificationsEnabled(defaultBoolean(input.smsNotificationsEnabled(), Boolean.FALSE));
 
         if (StringUtils.hasText(input.profileImageUrl())) {
             student.setProfileImageUrl(input.profileImageUrl().trim());
@@ -733,8 +728,6 @@ public class UserManagementService {
             snapshot.put("student.academicYear", enumName(student.getAcademicYear()));
             snapshot.put("student.semester", enumName(student.getSemester()));
             snapshot.put("student.profileImageUrl", student.getProfileImageUrl());
-            snapshot.put("student.emailNotificationsEnabled", student.getEmailNotificationsEnabled());
-            snapshot.put("student.smsNotificationsEnabled", student.getSmsNotificationsEnabled());
         }
 
         if (user.getFacultyProfile() != null) {

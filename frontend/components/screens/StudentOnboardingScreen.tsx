@@ -2,19 +2,17 @@
 
 import React from 'react';
 import {
-  ArrowLeft,
-  ArrowRight,
   CheckCircle2,
-  GraduationCap,
-  ImageUp,
   Mail,
   MessageSquare,
-  UserRound,
+  Move,
+  ZoomIn,
+  ImageUp,
   X,
 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Avatar, Button, Chip, Input, Select, Skeleton, Toggle } from '@/components/ui';
+import { Alert, Button, Card, Chip, Dialog, Input, Select, Skeleton, Toggle } from '@/components/ui';
 import {
   completeStudentOnboarding,
   getErrorMessage,
@@ -43,7 +41,6 @@ type PhoneCountryCode = 'US' | 'LK' | 'GB' | 'IN' | 'AU' | 'SG' | 'MY' | 'AE' | 
 interface PhoneCountryOption {
   code: PhoneCountryCode;
   name: string;
-  flag: string;
   dialCode: string;
   minNationalDigits: number;
   maxNationalDigits: number;
@@ -52,16 +49,16 @@ interface PhoneCountryOption {
 const DEFAULT_PHONE_COUNTRY: PhoneCountryCode = 'US';
 
 const PHONE_COUNTRIES: PhoneCountryOption[] = [
-  { code: 'US', name: 'United States', flag: '🇺🇸', dialCode: '+1', minNationalDigits: 10, maxNationalDigits: 10 },
-  { code: 'LK', name: 'Sri Lanka', flag: '🇱🇰', dialCode: '+94', minNationalDigits: 9, maxNationalDigits: 9 },
-  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', dialCode: '+44', minNationalDigits: 9, maxNationalDigits: 10 },
-  { code: 'IN', name: 'India', flag: '🇮🇳', dialCode: '+91', minNationalDigits: 10, maxNationalDigits: 10 },
-  { code: 'AU', name: 'Australia', flag: '🇦🇺', dialCode: '+61', minNationalDigits: 9, maxNationalDigits: 9 },
-  { code: 'SG', name: 'Singapore', flag: '🇸🇬', dialCode: '+65', minNationalDigits: 8, maxNationalDigits: 8 },
-  { code: 'MY', name: 'Malaysia', flag: '🇲🇾', dialCode: '+60', minNationalDigits: 9, maxNationalDigits: 10 },
-  { code: 'AE', name: 'United Arab Emirates', flag: '🇦🇪', dialCode: '+971', minNationalDigits: 9, maxNationalDigits: 9 },
-  { code: 'DE', name: 'Germany', flag: '🇩🇪', dialCode: '+49', minNationalDigits: 10, maxNationalDigits: 11 },
-  { code: 'JP', name: 'Japan', flag: '🇯🇵', dialCode: '+81', minNationalDigits: 9, maxNationalDigits: 10 },
+  { code: 'US', name: 'United States', dialCode: '+1', minNationalDigits: 10, maxNationalDigits: 10 },
+  { code: 'LK', name: 'Sri Lanka', dialCode: '+94', minNationalDigits: 9, maxNationalDigits: 9 },
+  { code: 'GB', name: 'United Kingdom', dialCode: '+44', minNationalDigits: 9, maxNationalDigits: 10 },
+  { code: 'IN', name: 'India', dialCode: '+91', minNationalDigits: 10, maxNationalDigits: 10 },
+  { code: 'AU', name: 'Australia', dialCode: '+61', minNationalDigits: 9, maxNationalDigits: 9 },
+  { code: 'SG', name: 'Singapore', dialCode: '+65', minNationalDigits: 8, maxNationalDigits: 8 },
+  { code: 'MY', name: 'Malaysia', dialCode: '+60', minNationalDigits: 9, maxNationalDigits: 10 },
+  { code: 'AE', name: 'United Arab Emirates', dialCode: '+971', minNationalDigits: 9, maxNationalDigits: 9 },
+  { code: 'DE', name: 'Germany', dialCode: '+49', minNationalDigits: 10, maxNationalDigits: 11 },
+  { code: 'JP', name: 'Japan', dialCode: '+81', minNationalDigits: 9, maxNationalDigits: 10 },
 ];
 
 const PHONE_COUNTRY_BY_CODE = PHONE_COUNTRIES.reduce<Record<PhoneCountryCode, PhoneCountryOption>>((map, country) => {
@@ -107,26 +104,91 @@ function formatPhoneForSubmit(countryCode: PhoneCountryCode, nationalNumber: str
   return `${country.dialCode}${normalizedNational}`;
 }
 
-function getPhoneValidationError(countryCode: PhoneCountryCode, nationalNumber: string) {
-  const country = PHONE_COUNTRY_BY_CODE[countryCode] ?? PHONE_COUNTRY_BY_CODE[DEFAULT_PHONE_COUNTRY];
-  const normalizedNational = normalizePhoneDigits(nationalNumber);
+const PORTRAIT_CROP_VIEW_WIDTH = 264;
+const PORTRAIT_CROP_VIEW_HEIGHT = 352;
+const PORTRAIT_OUTPUT_WIDTH = 720;
+const PORTRAIT_OUTPUT_HEIGHT = 960;
+const MAX_PORTRAIT_ZOOM = 3;
 
-  if (!normalizedNational) {
-    return `Phone number is required for ${country.name}.`;
+interface CropEditorState {
+  file: File;
+  sourceUrl: string;
+  width: number;
+  height: number;
+}
+
+interface CropOffset {
+  x: number;
+  y: number;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function stripFileExtension(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return 'profile';
   }
 
-  if (
-    normalizedNational.length < country.minNationalDigits ||
-    normalizedNational.length > country.maxNationalDigits
-  ) {
-    if (country.minNationalDigits === country.maxNationalDigits) {
-      return `Enter a valid ${country.name} number with ${country.minNationalDigits} digits after ${country.dialCode}.`;
-    }
+  const extensionIndex = trimmed.lastIndexOf('.');
 
-    return `Enter a valid ${country.name} number with ${country.minNationalDigits}-${country.maxNationalDigits} digits after ${country.dialCode}.`;
+  if (extensionIndex <= 0) {
+    return trimmed;
   }
 
-  return null;
+  return trimmed.slice(0, extensionIndex);
+}
+
+function extensionForMimeType(mimeType: string) {
+  if (mimeType === 'image/png') {
+    return 'png';
+  }
+
+  if (mimeType === 'image/webp') {
+    return 'webp';
+  }
+
+  return 'jpg';
+}
+
+function loadImageDimensions(sourceUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      resolve({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
+    };
+    image.onerror = () => {
+      reject(new Error('Unable to load the selected image.'));
+    };
+    image.src = sourceUrl;
+  });
+}
+
+function loadImageElement(sourceUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Unable to prepare the image for cropping.'));
+    image.src = sourceUrl;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+
+      reject(new Error('Unable to generate the cropped portrait.'));
+    }, mimeType, quality);
+  });
 }
 
 interface OnboardingFormState {
@@ -140,11 +202,7 @@ interface OnboardingFormState {
   academicYear: AcademicYear | '';
   semester: Semester | '';
   profileImageUrl: string;
-  emailNotificationsEnabled: boolean;
-  smsNotificationsEnabled: boolean;
 }
-
-type OnboardingStep = 'personal' | 'academic';
 
 function toFormState(profile: UserResponse['studentProfile']): OnboardingFormState {
   const parsedPhone = parsePhoneForForm(profile?.phoneNumber ?? '');
@@ -160,8 +218,6 @@ function toFormState(profile: UserResponse['studentProfile']): OnboardingFormSta
     academicYear: profile?.academicYear ?? '',
     semester: profile?.semester ?? '',
     profileImageUrl: profile?.profileImageUrl ?? '',
-    emailNotificationsEnabled: profile?.emailNotificationsEnabled ?? true,
-    smsNotificationsEnabled: profile?.smsNotificationsEnabled ?? false,
   };
 }
 
@@ -171,7 +227,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
   const [formState, setFormState] = React.useState<OnboardingFormState>(() =>
     toFormState(resolvedUser?.studentProfile ?? null),
   );
-  const [currentStep, setCurrentStep] = React.useState<OnboardingStep>('personal');
   const [loadingState, setLoadingState] = React.useState(true);
   const [alert, setAlert] = React.useState<{
     variant: 'error' | 'success' | 'info' | 'warning' | 'neutral';
@@ -182,7 +237,44 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
   const [selectedImageFile, setSelectedImageFile] = React.useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(null);
   const [submitStage, setSubmitStage] = React.useState<string | null>(null);
+  const [cropEditorOpen, setCropEditorOpen] = React.useState(false);
+  const [cropEditorState, setCropEditorState] = React.useState<CropEditorState | null>(null);
+  const [cropZoom, setCropZoom] = React.useState(1);
+  const [cropOffset, setCropOffset] = React.useState<CropOffset>({ x: 0, y: 0 });
+  const [isCropDragging, setIsCropDragging] = React.useState(false);
+  const [isApplyingCrop, setIsApplyingCrop] = React.useState(false);
   const imageInputRef = React.useRef<HTMLInputElement | null>(null);
+  const cropDragStartRef = React.useRef<{
+    pointerId: number;
+    originX: number;
+    originY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+  } | null>(null);
+
+  const cropMetrics = React.useMemo(() => {
+    if (!cropEditorState) {
+      return null;
+    }
+
+    const baseScale = Math.max(
+      PORTRAIT_CROP_VIEW_WIDTH / cropEditorState.width,
+      PORTRAIT_CROP_VIEW_HEIGHT / cropEditorState.height,
+    );
+    const renderScale = baseScale * cropZoom;
+    const renderedWidth = cropEditorState.width * renderScale;
+    const renderedHeight = cropEditorState.height * renderScale;
+
+    return {
+      renderScale,
+      renderedWidth,
+      renderedHeight,
+      maxOffsetX: Math.max(0, (renderedWidth - PORTRAIT_CROP_VIEW_WIDTH) / 2),
+      maxOffsetY: Math.max(0, (renderedHeight - PORTRAIT_CROP_VIEW_HEIGHT) / 2),
+    };
+  }, [cropEditorState, cropZoom]);
+  const cropOffsetLimitX = cropMetrics?.maxOffsetX ?? 0;
+  const cropOffsetLimitY = cropMetrics?.maxOffsetY ?? 0;
 
   React.useEffect(() => {
     return () => {
@@ -191,6 +283,21 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       }
     };
   }, [imagePreviewUrl]);
+
+  React.useEffect(() => {
+    return () => {
+      if (cropEditorState?.sourceUrl) {
+        URL.revokeObjectURL(cropEditorState.sourceUrl);
+      }
+    };
+  }, [cropEditorState]);
+
+  React.useEffect(() => {
+    setCropOffset((current) => ({
+      x: clamp(current.x, -cropOffsetLimitX, cropOffsetLimitX),
+      y: clamp(current.y, -cropOffsetLimitY, cropOffsetLimitY),
+    }));
+  }, [cropOffsetLimitX, cropOffsetLimitY]);
 
   React.useEffect(() => {
     if (resolvedUser) {
@@ -263,8 +370,43 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }));
   }
 
+  function closeCropEditor() {
+    setCropEditorOpen(false);
+    setCropZoom(1);
+    setCropOffset({ x: 0, y: 0 });
+    setCropEditorState(null);
+    setIsApplyingCrop(false);
+    setIsCropDragging(false);
+    cropDragStartRef.current = null;
+  }
+
+  async function openCropEditor(file: File) {
+    const sourceUrl = URL.createObjectURL(file);
+
+    try {
+      const { width, height } = await loadImageDimensions(sourceUrl);
+
+      if (width < 64 || height < 64) {
+        throw new Error('Please choose an image that is at least 64 x 64 pixels.');
+      }
+
+      setCropZoom(1);
+      setCropOffset({ x: 0, y: 0 });
+      setCropEditorState({ file, sourceUrl, width, height });
+      setCropEditorOpen(true);
+      setAlert(null);
+    } catch (error) {
+      URL.revokeObjectURL(sourceUrl);
+      setAlert({
+        variant: 'error',
+        title: 'Image unavailable',
+        message: getErrorMessage(error, 'We could not read that image. Please choose another file.'),
+      });
+    }
+  }
+
   function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
+    const file = event.currentTarget.files?.[0] ?? null;
 
     if (!file) {
       return;
@@ -290,13 +432,138 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       return;
     }
 
-    if (imagePreviewUrl) {
-      URL.revokeObjectURL(imagePreviewUrl);
+    event.currentTarget.value = '';
+    void openCropEditor(file);
+  }
+
+  function handleCropPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!cropMetrics) {
+      return;
     }
 
-    setSelectedImageFile(file);
-    setImagePreviewUrl(URL.createObjectURL(file));
-    setAlert(null);
+    cropDragStartRef.current = {
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+      startOffsetX: cropOffset.x,
+      startOffsetY: cropOffset.y,
+    };
+    setIsCropDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleCropPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!cropMetrics || !cropDragStartRef.current) {
+      return;
+    }
+
+    const dragState = cropDragStartRef.current;
+
+    if (dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.originX;
+    const deltaY = event.clientY - dragState.originY;
+
+    setCropOffset({
+      x: clamp(dragState.startOffsetX + deltaX, -cropMetrics.maxOffsetX, cropMetrics.maxOffsetX),
+      y: clamp(dragState.startOffsetY + deltaY, -cropMetrics.maxOffsetY, cropMetrics.maxOffsetY),
+    });
+  }
+
+  function handleCropPointerEnd(event: React.PointerEvent<HTMLDivElement>) {
+    if (!cropDragStartRef.current || cropDragStartRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    setIsCropDragging(false);
+    cropDragStartRef.current = null;
+  }
+
+  async function handleApplyCrop() {
+    if (!cropEditorState || !cropMetrics) {
+      return;
+    }
+
+    setIsApplyingCrop(true);
+
+    try {
+      const sourceImage = await loadImageElement(cropEditorState.sourceUrl);
+      const canvas = document.createElement('canvas');
+      canvas.width = PORTRAIT_OUTPUT_WIDTH;
+      canvas.height = PORTRAIT_OUTPUT_HEIGHT;
+
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        throw new Error('Unable to initialize the image cropper canvas.');
+      }
+
+      const imageLeft = PORTRAIT_CROP_VIEW_WIDTH / 2 - cropMetrics.renderedWidth / 2 + cropOffset.x;
+      const imageTop = PORTRAIT_CROP_VIEW_HEIGHT / 2 - cropMetrics.renderedHeight / 2 + cropOffset.y;
+      const sourceX = clamp((0 - imageLeft) / cropMetrics.renderScale, 0, sourceImage.naturalWidth);
+      const sourceY = clamp((0 - imageTop) / cropMetrics.renderScale, 0, sourceImage.naturalHeight);
+      const sourceWidth = clamp(
+        PORTRAIT_CROP_VIEW_WIDTH / cropMetrics.renderScale,
+        1,
+        sourceImage.naturalWidth - sourceX,
+      );
+      const sourceHeight = clamp(
+        PORTRAIT_CROP_VIEW_HEIGHT / cropMetrics.renderScale,
+        1,
+        sourceImage.naturalHeight - sourceY,
+      );
+
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      context.drawImage(
+        sourceImage,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        PORTRAIT_OUTPUT_WIDTH,
+        PORTRAIT_OUTPUT_HEIGHT,
+      );
+
+      const outputMimeType =
+        cropEditorState.file.type === 'image/png' || cropEditorState.file.type === 'image/webp'
+          ? cropEditorState.file.type
+          : 'image/jpeg';
+      const blob = await canvasToBlob(canvas, outputMimeType, 0.92);
+      const croppedFile = new File(
+        [blob],
+        `${stripFileExtension(cropEditorState.file.name)}-portrait.${extensionForMimeType(outputMimeType)}`,
+        {
+          type: outputMimeType,
+          lastModified: Date.now(),
+        },
+      );
+
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+
+      setSelectedImageFile(croppedFile);
+      setImagePreviewUrl(URL.createObjectURL(croppedFile));
+      setAlert(null);
+      closeCropEditor();
+    } catch (error) {
+      setAlert({
+        variant: 'error',
+        title: 'Crop failed',
+        message: getErrorMessage(error, 'We could not crop this image right now. Please try again.'),
+      });
+    } finally {
+      setIsApplyingCrop(false);
+    }
   }
 
   function handleRemoveImage() {
@@ -315,18 +582,22 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       setAlert({
         variant: 'error',
         title: 'Personal details required',
-        message: 'Enter your first and last name before continuing.',
+        message: 'Enter your first and last name before completing onboarding.',
       });
       return false;
     }
 
-    const phoneValidationError = getPhoneValidationError(formState.phoneCountryCode, formState.phoneNumber);
+    const selectedCountry = PHONE_COUNTRY_BY_CODE[formState.phoneCountryCode] ?? PHONE_COUNTRY_BY_CODE[DEFAULT_PHONE_COUNTRY];
+    const phoneDigits = normalizePhoneDigits(formState.phoneNumber);
 
-    if (phoneValidationError) {
+    if (
+      phoneDigits.length < selectedCountry.minNationalDigits ||
+      phoneDigits.length > selectedCountry.maxNationalDigits
+    ) {
       setAlert({
         variant: 'error',
-        title: 'Invalid phone number',
-        message: phoneValidationError,
+        title: 'Valid phone number required',
+        message: `Use ${selectedCountry.minNationalDigits}-${selectedCountry.maxNationalDigits} digits for ${selectedCountry.name}.`,
       });
       return false;
     }
@@ -352,27 +623,8 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     return { facultyName, programName, academicYear, semester };
   }
 
-  function handleNextStep() {
-    if (!validatePersonalInfo()) {
-      return;
-    }
-
-    setAlert(null);
-    setCurrentStep('academic');
-  }
-
-  function handleBackStep() {
-    setAlert(null);
-    setCurrentStep('personal');
-  }
-
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (currentStep === 'personal') {
-      handleNextStep();
-      return;
-    }
 
     if (!session?.access_token) {
       setAlert({
@@ -384,14 +636,12 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }
 
     if (!validatePersonalInfo()) {
-      setCurrentStep('personal');
       return;
     }
 
     const academicInfo = validateAcademicInfo();
 
     if (!academicInfo) {
-      setCurrentStep('academic');
       return;
     }
 
@@ -420,6 +670,9 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
             profileImageUrl: uploadedProfileImageUrl,
           }));
           setSelectedImageFile(null);
+          if (imagePreviewUrl) {
+            URL.revokeObjectURL(imagePreviewUrl);
+          }
           setImagePreviewUrl(null);
           if (imageInputRef.current) {
             imageInputRef.current.value = '';
@@ -439,8 +692,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           academicYear,
           semester,
           profileImageUrl,
-          emailNotificationsEnabled: formState.emailNotificationsEnabled,
-          smsNotificationsEnabled: formState.smsNotificationsEnabled,
         };
 
         await completeStudentOnboarding(session.access_token, payload);
@@ -469,1241 +720,578 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
   }
 
   const programOptions = formState.facultyName ? programOptionsByFaculty[formState.facultyName] : [];
-  const selectedPhoneCountry =
-    PHONE_COUNTRY_BY_CODE[formState.phoneCountryCode] ?? PHONE_COUNTRY_BY_CODE[DEFAULT_PHONE_COUNTRY];
-  const phoneDigitsHint =
-    selectedPhoneCountry.minNationalDigits === selectedPhoneCountry.maxNationalDigits
-      ? `${selectedPhoneCountry.minNationalDigits} digits`
-      : `${selectedPhoneCountry.minNationalDigits}-${selectedPhoneCountry.maxNationalDigits} digits`;
-  const heroImageUrl = '/onboarding-hero.jpg';
-  const isPersonalStep = currentStep === 'personal';
-  const currentStepNumber = isPersonalStep ? 1 : 2;
+  const phoneCountryOptions = PHONE_COUNTRIES.map((country) => ({
+    value: country.code,
+    label: `${country.name} (${country.dialCode})`,
+  }));
+  const selectedPhoneCountry = PHONE_COUNTRY_BY_CODE[formState.phoneCountryCode] ?? PHONE_COUNTRY_BY_CODE[DEFAULT_PHONE_COUNTRY];
+  const portraitPreviewUrl = imagePreviewUrl ?? formState.profileImageUrl;
+  const hasStagedPortrait = Boolean(selectedImageFile || imagePreviewUrl);
+  const portraitStatus: { color: 'green' | 'blue' | 'neutral'; label: string } = selectedImageFile
+    ? { color: 'green', label: 'Ready To Upload' }
+    : portraitPreviewUrl
+      ? { color: 'blue', label: 'Portrait Added' }
+      : { color: 'neutral', label: 'Portrait Optional' };
+  const reviewName = `${formState.firstName.trim()} ${formState.lastName.trim()}`.trim() || 'Add your name';
+  const reviewProgram = formState.programName || 'Select your academic program';
+  const reviewTerm =
+    formState.academicYear && formState.semester
+      ? `${formState.academicYear} - ${formState.semester}`
+      : 'Select year and semester';
   const profileInitials =
     `${formState.firstName?.[0] ?? resolvedUser.email[0] ?? 'S'}${formState.lastName?.[0] ?? ''}`.toUpperCase();
 
   return (
-    <div className="onboarding-page">
-      <div aria-hidden="true" className="onboarding-page-glow onboarding-page-glow-left" />
-      <div aria-hidden="true" className="onboarding-page-glow onboarding-page-glow-right" />
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       <style>{`
-        .onboarding-page {
-          min-height: 100dvh;
-          position: relative;
-          padding: clamp(6px, 1.1vw, 14px);
+        .onboarding-main {
+          flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
-          overflow-x: hidden;
-          overflow-y: auto;
-          background:
-            radial-gradient(circle at 8% 10%, rgba(238,202,68,.14), transparent 30%),
-            radial-gradient(circle at 92% 92%, rgba(70,66,55,.32), transparent 28%),
-            linear-gradient(180deg, #121212 0%, #161514 100%);
+          padding: clamp(28px, 5vh, 56px) 24px 48px;
         }
-
-        .onboarding-page-glow {
-          position: absolute;
-          width: 300px;
-          height: 300px;
-          border-radius: 50%;
-          pointer-events: none;
-        }
-
-        .onboarding-page-glow-left {
-          inset: 10% auto auto 6%;
-          background: rgba(238,202,68,.1);
-          filter: blur(88px);
-        }
-
-        .onboarding-page-glow-right {
-          inset: auto 3% 8% auto;
-          background: rgba(72,68,60,.34);
-          filter: blur(96px);
-        }
-
-        .onboarding-layout {
-          width: min(100%, 1180px);
+        .onboarding-form-layout {
           display: grid;
-          grid-template-columns: minmax(300px, .95fr) minmax(460px, 1.05fr);
-          border-radius: 18px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,.06);
-          background: rgba(14,14,14,.74);
-          backdrop-filter: blur(14px) saturate(1.2);
-          -webkit-backdrop-filter: blur(14px) saturate(1.2);
-          box-shadow: 0 18px 42px rgba(0,0,0,.46);
-          height: clamp(560px, 74vh, 720px);
-          max-height: min(720px, calc(100dvh - 26px));
-          min-height: min(540px, calc(100dvh - 26px));
-          position: relative;
-          z-index: 1;
+          gap: 24px;
         }
-
-        .onboarding-hero {
-          position: relative;
-          overflow: hidden;
-          border-right: 1px solid rgba(255,255,255,.06);
-          background: #0f0f10;
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          filter: grayscale(.08) contrast(1.04);
-        }
-
-        .onboarding-hero::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(9,9,9,.2) 0%, rgba(9,9,9,.62) 70%, rgba(9,9,9,.78) 100%);
-          z-index: 1;
-        }
-
-        .onboarding-hero::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(circle at 80% 20%, rgba(238,202,68,.16), transparent 38%);
-          z-index: 1;
-        }
-
-        .onboarding-hero-copy {
-          position: absolute;
-          left: 26px;
-          right: 26px;
-          bottom: 22px;
-          z-index: 2;
-          max-width: 360px;
+        .onboarding-form-grid {
           display: grid;
-          gap: 8px;
+          grid-template-columns: minmax(0, 1.28fr) minmax(0, 0.92fr);
+          gap: 24px;
+          align-items: start;
         }
-
-        .onboarding-hero-heading {
+        .onboarding-column {
+          display: grid;
+          gap: 24px;
+          align-content: start;
+        }
+        .onboarding-form-card {
+          display: flex;
+          flex-direction: column;
+        }
+        .onboarding-card-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .onboarding-section {
+          display: grid;
+          gap: 15px;
+        }
+        .onboarding-section-title {
           margin: 0;
           font-family: var(--font-display);
-          font-size: clamp(34px, 3.4vw, 48px);
-          line-height: 1.03;
+          font-size: 22px;
+          line-height: 1.12;
           font-weight: 800;
-          color: #f2ca50;
-          letter-spacing: -.02em;
+          color: var(--text-h);
         }
-
-        .onboarding-hero-rule {
-          width: 48px;
-          height: 3px;
-          border-radius: 999px;
-          background: linear-gradient(90deg, #f2ca50, #d4af37);
-        }
-
-        .onboarding-hero-desc {
-          margin: 0;
-          color: rgba(221,214,200,.7);
+        .onboarding-section-copy {
+          margin: 6px 0 0;
+          color: var(--text-muted);
           font-size: 13.5px;
           line-height: 1.55;
         }
-
-        .onboarding-form-panel {
-          min-height: 0;
-          overflow-y: auto;
-          overscroll-behavior: contain;
-          padding: clamp(12px, 1.9vw, 24px);
-          display: grid;
-          gap: 10px;
-          align-content: start;
-          background:
-            radial-gradient(circle at top right, rgba(238,202,68,.16), transparent 28%),
-            linear-gradient(180deg, #0b0b0c 0%, #0f0f11 100%);
-        }
-
-        .onboarding-form-panel::-webkit-scrollbar {
-          width: 7px;
-        }
-
-        .onboarding-form-panel::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .onboarding-form-panel::-webkit-scrollbar-thumb {
-          background: rgba(212,174,40,.33);
-          border-radius: 999px;
-        }
-
-        .onboarding-form-content {
-          max-width: 840px;
-          width: 100%;
-          margin: 0 auto;
-          display: grid;
-          gap: 14px;
-        }
-
-        .onboarding-header {
-          display: grid;
-          gap: 8px;
-        }
-
-        .onboarding-kicker {
-          margin: 0;
-          font-family: var(--font-mono);
-          font-size: 9px;
-          letter-spacing: .2em;
-          text-transform: uppercase;
-          color: #f2ca50;
-        }
-
-        .onboarding-title {
-          margin: 0;
-          font-family: var(--font-display);
-          font-size: clamp(22px, 2.2vw, 30px);
-          line-height: 1.06;
-          letter-spacing: -.02em;
-          color: #f4f2ec;
-          font-weight: 800;
-        }
-
-        .onboarding-meta {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-
-        .onboarding-form {
-          display: grid;
-          gap: 14px;
-        }
-
-        .onboarding-panel {
-          border-radius: 16px;
-          border: 1px solid rgba(255,255,255,.08);
-          background: rgba(25,25,27,.92);
-          box-shadow: 0 10px 36px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.03);
-        }
-
-        .onboarding-profile-panel {
-          padding: 14px 16px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-
-        .onboarding-profile-main {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-
-        .onboarding-profile-title {
-          margin: 0;
-          font-family: var(--font-display);
-          color: #f4f2ec;
-          font-size: 18px;
-          font-weight: 700;
-          line-height: 1.1;
-        }
-
-        .onboarding-profile-subtitle {
-          margin: 6px 0 0;
-          color: #8a8477;
-          font-size: 13.5px;
-        }
-
-        .onboarding-profile-actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-        }
-
-        .onboarding-grid {
+        .onboarding-field-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
+          gap: 14px;
         }
-
-        .onboarding-grid-full {
+        .onboarding-field-full {
           grid-column: 1 / -1;
         }
-
-        .onboarding-phone-stack {
+        .onboarding-phone-grid {
           display: grid;
-          gap: 7px;
-        }
-
-        .onboarding-phone-label {
-          margin: 0;
-          font-family: var(--font-mono);
-          font-size: 9px;
-          letter-spacing: .2em;
-          text-transform: uppercase;
-          color: var(--text-label);
-        }
-
-        .onboarding-phone-row {
-          display: flex;
+          grid-template-columns: minmax(112px, .28fr) minmax(0, .72fr);
           gap: 10px;
+        }
+        .onboarding-portrait-stage {
+          display: grid;
+          gap: 14px;
+          padding: 14px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          background: linear-gradient(160deg, rgba(238,202,68,.12), rgba(255,255,255,.02));
+        }
+        .onboarding-portrait-frame {
+          width: min(100%, 260px);
+          aspect-ratio: 3 / 4;
+          justify-self: center;
+          border-radius: 20px;
+          overflow: hidden;
+          position: relative;
+          border: 2px solid rgba(238,202,68,.5);
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 14px 28px rgba(0,0,0,.18);
+          background: radial-gradient(circle at 20% 20%, rgba(238,202,68,.22), rgba(22,22,20,.9));
+        }
+        .onboarding-portrait-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+        .onboarding-portrait-fallback {
+          width: 100%;
+          height: 100%;
+          display: grid;
+          place-items: center;
+          gap: 8px;
+          color: rgba(255,255,255,.92);
+          text-align: center;
+          padding: 14px;
+        }
+        .onboarding-portrait-initials {
+          display: inline-flex;
           align-items: center;
+          justify-content: center;
+          width: 84px;
+          height: 84px;
+          border-radius: 50%;
+          background: rgba(238,202,68,.26);
+          border: 1px solid rgba(238,202,68,.55);
+          font-family: var(--font-display);
+          font-size: 30px;
+          font-weight: 800;
+          letter-spacing: .06em;
         }
-
-        .onboarding-phone-country {
-          height: 46px;
-          min-width: 150px;
-          border-radius: var(--radius-md);
-          border: 1.5px solid var(--input-border);
-          background: #0a0a0a;
-          color: #ece7db;
-          font-size: 14px;
-          padding: 0 10px;
-          outline: none;
-          transition: border-color .18s, box-shadow .18s;
+        .onboarding-profile-actions {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
         }
-
-        .onboarding-phone-country:focus {
-          border-color: rgba(238,202,68,.65);
-          box-shadow: 0 0 0 3px rgba(238,202,68,.16);
-        }
-
-        .onboarding-phone-country option {
-          background: #0a0a0a;
-          color: #ece7db;
-        }
-
-        .onboarding-phone-input {
-          flex: 1;
-          height: 46px;
-          border-radius: var(--radius-md);
-          border: 1.5px solid var(--input-border);
-          background: #0a0a0a;
-          color: #ece7db;
-          padding: 0 14px;
-          outline: none;
-          transition: border-color .18s, box-shadow .18s;
-        }
-
-        .onboarding-phone-input::placeholder {
-          color: #5f5b53;
-        }
-
-        .onboarding-phone-input:focus {
-          border-color: rgba(238,202,68,.65);
-          box-shadow: 0 0 0 3px rgba(238,202,68,.16);
-        }
-
-        .onboarding-phone-hint {
+        .onboarding-profile-caption {
           margin: 0;
-          color: #8a8477;
-          font-size: 12px;
+          color: var(--text-muted);
+          font-size: 12.5px;
+          line-height: 1.45;
         }
-
-        .onboarding-section {
+        .onboarding-review-grid {
           display: grid;
           gap: 10px;
         }
-
-        .onboarding-section-title {
-          margin: 0;
-          padding-left: 12px;
-          border-left: 4px solid #f2ca50;
-          font-family: var(--font-display);
-          font-size: clamp(20px, 2vw, 24px);
-          color: #f4f2ec;
-          font-weight: 700;
-          letter-spacing: -.02em;
-        }
-
-        .onboarding-notice-panel {
-          padding: 14px 16px;
-          display: grid;
-          gap: 2px;
-        }
-
-        .onboarding-notice-title {
-          margin: 0;
-          color: #f4f2ec;
-          font-family: var(--font-display);
-          font-size: clamp(20px, 2vw, 24px);
-          line-height: 1.06;
-          font-weight: 700;
-          letter-spacing: -.02em;
-        }
-
-        .onboarding-notice-subtitle {
-          margin: 0;
-          color: #8a8477;
-          font-size: 13.5px;
-        }
-
-        .onboarding-toggle-row {
+        .onboarding-review-item {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
-          padding: 12px 0;
-          border-bottom: 1px solid rgba(255,255,255,.07);
+          gap: 10px;
+          padding: 10px 12px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: var(--surface-2);
         }
-
-        .onboarding-toggle-row:last-child {
-          border-bottom: none;
-          padding-bottom: 2px;
+        .onboarding-review-label {
+          color: var(--text-muted);
+          font-size: 11px;
+          font-family: var(--font-mono);
+          letter-spacing: .16em;
+          text-transform: uppercase;
         }
-
+        .onboarding-review-value {
+          color: var(--text-h);
+          font-size: 13px;
+          font-weight: 700;
+          text-align: right;
+        }
+        .onboarding-notification-strip {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          flex-wrap: wrap;
+          padding: 12px 14px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          background: var(--surface-2);
+        }
+        .onboarding-notification-copy {
+          min-width: 190px;
+        }
+        .onboarding-notification-title {
+          margin: 0;
+          font-family: var(--font-display);
+          font-size: 15px;
+          font-weight: 800;
+          color: var(--text-h);
+        }
+        .onboarding-notification-caption {
+          margin: 3px 0 0;
+          color: var(--text-muted);
+          font-size: 12.5px;
+          line-height: 1.35;
+        }
+        .onboarding-notification-options {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .onboarding-toggle-pill {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          min-width: 116px;
+          padding: 8px 10px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: var(--surface);
+        }
         .onboarding-toggle-copy {
           display: flex;
           align-items: center;
-          gap: 10px;
-        }
-
-        .onboarding-toggle-copy p {
-          margin: 0;
-        }
-
-        .onboarding-toggle-label {
-          color: #f4f2ec;
-          font-size: 14px;
-          font-weight: 600;
-        }
-
-        .onboarding-toggle-hint {
-          color: #8a8477;
-          font-size: 13px;
-          margin-top: 3px;
-        }
-
-        .onboarding-submit-row {
-          display: grid;
-          gap: 8px;
-          margin-top: 4px;
-        }
-
-        .onboarding-submit-status {
-          margin: 0;
-          font-size: 13.5px;
-          color: #a8a192;
-        }
-
-        @media (prefers-color-scheme: light) {
-          .onboarding-page {
-            background:
-              radial-gradient(circle at 8% 10%, rgba(238,202,68,.18), transparent 32%),
-              radial-gradient(circle at 92% 92%, rgba(171,167,156,.2), transparent 30%),
-              linear-gradient(180deg, #f8f6f0 0%, #f3f1ea 100%);
-          }
-
-          .onboarding-page-glow-left {
-            background: rgba(238,202,68,.14);
-          }
-
-          .onboarding-page-glow-right {
-            background: rgba(126,123,114,.24);
-          }
-
-          .onboarding-layout {
-            border: 1px solid rgba(20,18,12,.08);
-            background: rgba(255,255,255,.86);
-            box-shadow: 0 16px 38px rgba(20,18,12,.18);
-          }
-
-          .onboarding-hero {
-            border-right: 1px solid rgba(20,18,12,.08);
-            filter: grayscale(.02) contrast(1.01);
-          }
-
-          .onboarding-hero::before {
-            background: linear-gradient(180deg, rgba(250,249,246,.22) 0%, rgba(250,249,246,.66) 70%, rgba(250,249,246,.84) 100%);
-          }
-
-          .onboarding-hero::after {
-            background: radial-gradient(circle at 80% 20%, rgba(176,140,20,.16), transparent 40%);
-          }
-
-          .onboarding-hero-heading {
-            color: var(--yellow-700);
-          }
-
-          .onboarding-hero-desc {
-            color: var(--text-body);
-          }
-
-          .onboarding-form-panel {
-            background:
-              radial-gradient(circle at top right, rgba(238,202,68,.14), transparent 30%),
-              linear-gradient(180deg, #f8f6f0 0%, #f3f1ea 100%);
-          }
-
-          .onboarding-form-panel::-webkit-scrollbar-thumb {
-            background: rgba(176,140,20,.34);
-          }
-
-          .onboarding-kicker {
-            color: var(--yellow-700);
-          }
-
-          .onboarding-title,
-          .onboarding-profile-title,
-          .onboarding-section-title,
-          .onboarding-notice-title,
-          .onboarding-toggle-label {
-            color: var(--text-h);
-          }
-
-          .onboarding-profile-subtitle,
-          .onboarding-notice-subtitle,
-          .onboarding-toggle-hint,
-          .onboarding-submit-status,
-          .onboarding-phone-hint,
-          .onboarding-hero-desc {
-            color: var(--text-body);
-          }
-
-          .onboarding-panel {
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,.9);
-            box-shadow: 0 10px 30px rgba(20,18,12,.14);
-          }
-
-          .onboarding-phone-country,
-          .onboarding-phone-input {
-            background: var(--surface);
-            border-color: var(--input-border);
-            color: var(--input-text);
-          }
-
-          .onboarding-phone-country option {
-            background: #ffffff;
-            color: var(--input-text);
-          }
-
-          .onboarding-phone-input::placeholder {
-            color: var(--input-ph);
-          }
-
-          .onboarding-toggle-row {
-            border-bottom: 1px solid rgba(20,18,12,.08);
-          }
-        }
-
-        @media (max-height: 850px) {
-          .onboarding-layout {
-            height: clamp(520px, 72vh, 640px);
-            max-height: calc(100dvh - 16px);
-            min-height: min(500px, calc(100dvh - 16px));
-          }
-
-          .onboarding-form-panel {
-            padding: 10px 14px;
-            gap: 8px;
-          }
-
-          .onboarding-form-content {
-            gap: 10px;
-          }
-
-          .onboarding-hero-copy {
-            left: 18px;
-            right: 18px;
-            bottom: 16px;
-          }
-
-          .onboarding-hero-desc {
-            font-size: 13px;
-            line-height: 1.45;
-          }
-        }
-
-        @media (max-height: 720px) {
-          .onboarding-layout {
-            height: auto;
-            min-height: 0;
-            max-height: none;
-          }
-
-          .onboarding-form-panel {
-            overflow-y: visible;
-          }
-        }
-
-        @media (max-width: 1080px) {
-          .onboarding-layout {
-            grid-template-columns: 1fr;
-            width: min(100%, 760px);
-            min-height: unset;
-            max-height: none;
-            height: auto;
-          }
-
-          .onboarding-hero {
-            display: none;
-          }
-
-          .onboarding-form-panel {
-            overflow-y: visible;
-            padding: 18px 16px;
-            gap: 12px;
-          }
-        }
-
-        @media (max-width: 800px) {
-          .onboarding-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        @media (max-width: 680px) {
-          .onboarding-form-panel {
-            padding: 16px 14px;
-          }
-
-          .onboarding-title {
-            font-size: 24px;
-          }
-
-          .onboarding-section-title {
-            font-size: 21px;
-          }
-
-          .onboarding-notice-title {
-            font-size: 21px;
-          }
-        }
-
-        .onboarding-layout {
-          grid-template-columns: minmax(0, 1fr) minmax(250px, 310px);
-          width: min(100%, 1240px);
-          height: auto;
-          min-height: min(680px, calc(100dvh - 26px));
-          max-height: none;
-          overflow: hidden;
-        }
-
-        .onboarding-form-panel {
-          order: 1;
-          padding: clamp(18px, 2.4vw, 34px);
-          overflow-y: auto;
-        }
-
-        .onboarding-form-content {
-          max-width: 880px;
-          gap: 18px;
-        }
-
-        .onboarding-hero {
-          order: 2;
-          min-height: 100%;
-          border-right: none;
-          border-left: 1px solid rgba(255,255,255,.07);
-        }
-
-        .onboarding-hero-copy {
-          inset: auto 20px 20px;
-          max-width: none;
-        }
-
-        .onboarding-hero-heading {
-          font-size: clamp(26px, 2.5vw, 34px);
-          letter-spacing: 0;
-        }
-
-        .onboarding-hero-desc,
-        .onboarding-title,
-        .onboarding-section-title,
-        .onboarding-profile-title,
-        .onboarding-notice-title,
-        .onboarding-toggle-label {
-          letter-spacing: 0;
-        }
-
-        .onboarding-header {
-          grid-template-columns: minmax(0, 1fr) auto;
-          align-items: end;
-          gap: 12px;
-        }
-
-        .onboarding-header-copy {
-          display: grid;
-          gap: 8px;
-        }
-
-        .onboarding-title {
-          font-size: clamp(30px, 4vw, 46px);
-          line-height: 1.04;
-        }
-
-        .onboarding-header-text {
-          margin: 0;
-          color: var(--text-muted);
-          font-size: 14px;
-          line-height: 1.55;
-          max-width: 620px;
-        }
-
-        .onboarding-step-pill {
-          justify-self: end;
-          min-width: 96px;
-          height: 40px;
-          border-radius: 999px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid rgba(238,202,68,.22);
-          color: var(--yellow-300);
-          background: rgba(238,202,68,.08);
-          font-family: var(--font-mono);
-          font-size: 10px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: .12em;
-        }
-
-        .onboarding-stepper {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-
-        .onboarding-step {
-          border: 1px solid rgba(255,255,255,.1);
-          background: rgba(255,255,255,.035);
-          border-radius: 12px;
-          padding: 12px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          min-width: 0;
-        }
-
-        .onboarding-step.active {
-          border-color: rgba(238,202,68,.42);
-          background: rgba(238,202,68,.1);
-        }
-
-        .onboarding-step.complete {
-          border-color: rgba(20,164,87,.34);
-          background: rgba(20,164,87,.09);
-        }
-
-        .onboarding-step-icon {
-          width: 30px;
-          height: 30px;
-          border-radius: 999px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--yellow-900);
-          background: var(--yellow-400);
-          flex-shrink: 0;
-        }
-
-        .onboarding-step.complete .onboarding-step-icon {
-          color: #fff;
-          background: var(--green-500);
-        }
-
-        .onboarding-step-copy {
-          min-width: 0;
-        }
-
-        .onboarding-step-copy p {
-          margin: 0;
-        }
-
-        .onboarding-step-label {
+          gap: 7px;
           color: var(--text-h);
-          font-weight: 800;
           font-size: 13px;
+          font-weight: 700;
         }
-
-        .onboarding-step-caption {
-          color: var(--text-muted);
-          font-size: 12px;
-          line-height: 1.35;
-        }
-
-        .onboarding-progress-track {
-          height: 6px;
-          border-radius: 999px;
-          overflow: hidden;
-          background: rgba(255,255,255,.08);
-        }
-
-        .onboarding-progress-fill {
-          height: 100%;
-          width: 50%;
-          border-radius: inherit;
-          background: linear-gradient(90deg, var(--yellow-400), var(--green-500));
-          transition: width .2s ease;
-        }
-
-        .onboarding-progress-fill.complete {
-          width: 100%;
-        }
-
-        .onboarding-step-card {
-          border: 1px solid rgba(255,255,255,.08);
-          border-radius: 16px;
-          background: rgba(13,13,14,.74);
-          padding: clamp(16px, 2vw, 22px);
-          display: grid;
-          gap: 18px;
-          box-shadow: 0 16px 34px rgba(0,0,0,.24);
-        }
-
-        .onboarding-personal-card {
-          gap: 12px;
-          padding: clamp(12px, 1.45vw, 18px);
-        }
-
-        .onboarding-step-heading {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 14px;
-        }
-
-        .onboarding-step-heading h2 {
-          margin: 0;
-          color: var(--text-h);
-          font-family: var(--font-display);
-          font-size: clamp(22px, 2.5vw, 30px);
-          line-height: 1.08;
-          font-weight: 850;
-          letter-spacing: 0;
-        }
-
-        .onboarding-step-heading p {
-          margin: 6px 0 0;
-          color: var(--text-muted);
-          font-size: 13.5px;
-          line-height: 1.55;
-          max-width: 620px;
-        }
-
-        .onboarding-personal-card .onboarding-step-heading p {
-          margin-top: 4px;
-          font-size: 12.5px;
-          line-height: 1.4;
-        }
-
-        .onboarding-profile-panel {
-          padding: 14px;
-          background: rgba(255,255,255,.035);
-          border: 1px solid rgba(255,255,255,.08);
-          border-radius: 14px;
-          box-shadow: none;
-        }
-
-        .onboarding-personal-card .onboarding-profile-panel {
-          padding: 10px 12px;
-          gap: 10px;
-        }
-
-        .onboarding-personal-card .onboarding-profile-main {
-          gap: 10px;
-        }
-
-        .onboarding-personal-card .onboarding-profile-title {
-          font-size: 15px;
-          line-height: 1.15;
-        }
-
-        .onboarding-personal-card .onboarding-profile-subtitle {
-          font-size: 12px;
-          line-height: 1.35;
-        }
-
-        .onboarding-grid {
-          gap: 14px;
-        }
-
-        .onboarding-personal-grid {
-          gap: 10px;
-        }
-
-        .onboarding-phone-row {
-          align-items: flex-start;
-        }
-
-        .onboarding-phone-country {
-          min-width: 168px;
-        }
-
-        .onboarding-notice-panel {
-          padding: 14px 16px;
-          background: rgba(255,255,255,.035);
-          border: 1px solid rgba(255,255,255,.08);
-          border-radius: 14px;
-          box-shadow: none;
-        }
-
-        .onboarding-compact-notifications {
-          padding: 10px 12px;
-          grid-template-columns: minmax(140px, .75fr) minmax(260px, 1fr);
-          align-items: center;
-          gap: 10px;
-        }
-
-        .onboarding-notice-heading {
-          display: grid;
-          gap: 2px;
-          min-width: 0;
-        }
-
-        .onboarding-compact-notifications .onboarding-notice-title {
-          font-size: 15px;
-          line-height: 1.15;
-        }
-
-        .onboarding-compact-notifications .onboarding-notice-subtitle {
-          font-size: 12px;
-          line-height: 1.35;
-        }
-
-        .onboarding-notification-options {
+        .onboarding-academic-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 8px;
+          gap: 14px;
         }
-
-        .onboarding-compact-notifications .onboarding-toggle-row {
-          border: 1px solid rgba(255,255,255,.08);
-          border-radius: 12px;
-          padding: 9px 10px;
-          background: rgba(255,255,255,.035);
+        .onboarding-submit-section {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          align-items: stretch;
+          padding-top: 2px;
         }
-
-        .onboarding-compact-notifications .onboarding-toggle-row:last-child {
-          padding-bottom: 9px;
+        .onboarding-primary-action {
+          width: 100%;
         }
-
-        .onboarding-compact-notifications .onboarding-toggle-copy {
-          gap: 8px;
-        }
-
-        .onboarding-compact-notifications .onboarding-toggle-label {
+        .onboarding-status {
+          margin: 0;
+          color: var(--text-muted);
           font-size: 13px;
         }
-
-        .onboarding-actions {
+        .onboarding-crop-body {
           display: grid;
-          grid-template-columns: auto minmax(180px, 1fr);
-          align-items: center;
-          gap: 12px;
-          margin-top: 4px;
+          gap: 16px;
+          padding: 20px 24px 24px;
         }
-
-        .onboarding-actions.personal {
-          grid-template-columns: minmax(180px, 1fr);
+        .onboarding-crop-viewport {
+          width: min(100%, ${PORTRAIT_CROP_VIEW_WIDTH}px);
+          height: ${PORTRAIT_CROP_VIEW_HEIGHT}px;
+          justify-self: center;
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(238,202,68,.5);
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), 0 12px 30px rgba(0,0,0,.24);
+          position: relative;
+          background: radial-gradient(circle at 20% 15%, rgba(238,202,68,.2), rgba(22,22,20,.95));
+          cursor: grab;
+          touch-action: none;
         }
-
-        .onboarding-actions.personal .onboarding-primary-action {
-          justify-self: end;
-          width: min(100%, 280px);
+        .onboarding-crop-viewport.dragging {
+          cursor: grabbing;
         }
-
-        .onboarding-primary-action {
-          justify-self: end;
-          width: min(100%, 300px);
+        .onboarding-crop-image {
+          position: absolute;
+          user-select: none;
+          pointer-events: none;
+          -webkit-user-drag: none;
+          max-width: none;
+          max-height: none;
         }
-
-        .onboarding-submit-status {
-          grid-column: 1 / -1;
+        .onboarding-crop-guide {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          border: 2px solid rgba(255,255,255,.72);
+          border-radius: 18px;
+          box-shadow: inset 0 0 0 999px rgba(0,0,0,.24);
         }
-
-        .onboarding-summary {
+        .onboarding-crop-control {
           display: grid;
-          gap: 12px;
+          gap: 8px;
         }
-
-        .onboarding-summary-card {
-          border: 1px solid rgba(255,255,255,.1);
-          background: rgba(12,12,13,.66);
-          border-radius: 14px;
-          padding: 14px;
-          display: grid;
-          gap: 10px;
-        }
-
-        .onboarding-summary-title {
-          margin: 0;
-          color: var(--text-h);
-          font-family: var(--font-display);
-          font-size: 16px;
-          font-weight: 800;
-          letter-spacing: 0;
-        }
-
-        .onboarding-summary-text {
-          margin: 0;
-          color: rgba(255,255,255,.72);
-          font-size: 12.5px;
-          line-height: 1.55;
-        }
-
-        .onboarding-summary-list {
-          display: grid;
-          gap: 9px;
-          margin: 0;
-          padding: 0;
-          list-style: none;
-        }
-
-        .onboarding-summary-list li {
+        .onboarding-crop-control-head {
           display: flex;
           align-items: center;
-          gap: 9px;
-          color: rgba(255,255,255,.72);
-          font-size: 12.5px;
+          justify-content: space-between;
+          gap: 8px;
+          color: var(--text-h);
+          font-size: 12px;
+          font-weight: 700;
         }
-
-        @media (prefers-color-scheme: light) {
-          .onboarding-step,
-          .onboarding-step-card,
-          .onboarding-profile-panel,
-          .onboarding-notice-panel,
-          .onboarding-summary-card {
-            border-color: rgba(20,18,12,.1);
-            background: rgba(255,255,255,.82);
-          }
-
-          .onboarding-step.active {
-            border-color: rgba(176,140,20,.36);
-            background: rgba(238,202,68,.14);
-          }
-
-          .onboarding-step.complete {
-            border-color: rgba(20,164,87,.28);
-            background: rgba(20,164,87,.1);
-          }
-
-          .onboarding-progress-track {
-            background: rgba(20,18,12,.1);
-          }
-
-          .onboarding-summary-text,
-          .onboarding-summary-list li {
-            color: var(--text-body);
-          }
+        .onboarding-crop-range {
+          width: 100%;
+          accent-color: var(--yellow-400);
         }
-
-        @media (max-width: 1080px) {
-          .onboarding-layout {
+        .onboarding-crop-actions {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        @media (max-width: 1120px) {
+          .onboarding-form-grid {
             grid-template-columns: 1fr;
-            width: min(100%, 820px);
           }
-
-          .onboarding-hero {
+        }
+        @media (max-width: 760px) {
+          .onboarding-main {
+            align-items: flex-start;
+            padding: 28px 16px 36px;
+          }
+          .onboarding-form-grid,
+          .onboarding-column {
+            gap: 20px;
+          }
+          .onboarding-field-grid,
+          .onboarding-profile-actions,
+          .onboarding-phone-grid,
+          .onboarding-academic-grid,
+          .onboarding-crop-actions {
+            grid-template-columns: 1fr;
+          }
+          .onboarding-notification-strip,
+          .onboarding-notification-options,
+          .onboarding-toggle-pill {
+            align-items: stretch;
+            width: 100%;
+          }
+          .onboarding-submit-section {
+            width: 100%;
+          }
+          .onboarding-crop-body {
+            padding: 16px 16px 18px;
+          }
+        }
+        @media (max-height: 760px) and (min-width: 761px) {
+          .onboarding-main {
+            align-items: flex-start;
+            padding: 26px 24px 32px;
+          }
+          .onboarding-form-layout {
+            gap: 12px;
+          }
+          .onboarding-section {
+            gap: 12px;
+          }
+          .onboarding-form-grid,
+          .onboarding-column {
+            gap: 16px;
+          }
+          .onboarding-section-copy,
+          .onboarding-notification-caption {
             display: none;
           }
-
-          .onboarding-form-panel {
-            overflow-y: visible;
+          .onboarding-portrait-stage,
+          .onboarding-notification-strip {
+            padding: 10px 12px;
           }
-        }
-
-        @media (max-width: 720px) {
-          .onboarding-header {
-            grid-template-columns: 1fr;
-          }
-
-          .onboarding-step-pill {
-            justify-self: start;
-          }
-
-          .onboarding-stepper,
-          .onboarding-grid,
-          .onboarding-actions,
-          .onboarding-actions.personal {
-            grid-template-columns: 1fr;
-          }
-
-          .onboarding-actions.personal .onboarding-primary-action,
-          .onboarding-primary-action {
-            width: 100%;
-            justify-self: stretch;
-          }
-
-          .onboarding-phone-row {
-            display: grid;
-            grid-template-columns: 1fr;
-          }
-
-          .onboarding-phone-country {
-            min-width: 0;
-            width: 100%;
-          }
-
-          .onboarding-compact-notifications {
-            grid-template-columns: 1fr;
-          }
-
-          .onboarding-notification-options {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        @media (max-height: 800px) and (min-width: 721px) {
-          .onboarding-layout {
-            min-height: min(610px, calc(100dvh - 18px));
-          }
-
-          .onboarding-form-panel {
-            padding: 14px 18px;
-          }
-
-          .onboarding-form-content {
+          .onboarding-field-grid,
+          .onboarding-academic-grid {
             gap: 10px;
-          }
-
-          .onboarding-header {
-            gap: 8px;
-          }
-
-          .onboarding-title {
-            font-size: clamp(26px, 3vw, 34px);
-          }
-
-          .onboarding-header-text {
-            display: none;
-          }
-
-          .onboarding-step {
-            padding: 8px 10px;
-          }
-
-          .onboarding-step-caption {
-            display: none;
-          }
-
-          .onboarding-progress-track {
-            height: 5px;
-          }
-
-          .onboarding-step-card,
-          .onboarding-personal-card {
-            padding: 12px;
-            gap: 9px;
-          }
-
-          .onboarding-step-heading h2 {
-            font-size: 22px;
-          }
-
-          .onboarding-personal-card .onboarding-step-heading p {
-            display: none;
-          }
-
-          .onboarding-personal-card .onboarding-profile-panel,
-          .onboarding-compact-notifications {
-            padding: 8px 10px;
-          }
-
-          .onboarding-personal-grid {
-            gap: 8px;
-          }
-
-          .onboarding-phone-hint {
-            margin-top: 3px;
-            font-size: 11px;
-          }
-
-          .onboarding-actions {
-            margin-top: 0;
-          }
-        }
-
-        @media (max-height: 680px) and (min-width: 721px) {
-          .onboarding-hero {
-            display: none;
-          }
-
-          .onboarding-layout {
-            grid-template-columns: 1fr;
-            width: min(100%, 900px);
-          }
-
-          .onboarding-form-panel {
-            overflow-y: visible;
           }
         }
       `}</style>
+      <main className="onboarding-main">
+        <section
+          aria-label="Student onboarding"
+          className="w-full"
+          style={{ maxWidth: 1100, margin: '0 auto' }}
+        >
+          <div style={{ marginBottom: 40 }}>
+            <h1
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 32,
+                fontWeight: 800,
+                letterSpacing: 0,
+                color: 'var(--text-h)',
+                margin: '0 0 8px',
+                lineHeight: 1.15,
+              }}
+            >
+              Complete Profile
+            </h1>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 14, fontWeight: 500, marginBottom: 16 }}>
+              Finish student onboarding to unlock your Smart Campus workspace
+            </p>
+          </div>
 
-      <div className="onboarding-layout">
-        <section className="onboarding-form-panel">
-          <div className="onboarding-form-content">
-            <header className="onboarding-header">
-              <div className="onboarding-header-copy">
-                <p className="onboarding-kicker">Student onboarding</p>
-                <h1 className="onboarding-title">Complete your profile</h1>
-                <p className="onboarding-header-text">
-                  Add the details your academic workspace needs. You can review personal details first, then confirm
-                  your academic placement.
-                </p>
-                <div className="onboarding-meta">
-                  <Chip color="glass">{resolvedUser.email}</Chip>
+          {alert && (
+            <div style={{ marginBottom: 20 }}>
+              <Alert variant={alert.variant} title={alert.title}>
+                {alert.message}
+              </Alert>
+            </div>
+          )}
+
+          {loadingState ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
+              <Card>
+                <div style={{ display: 'grid', gap: 14 }}>
+                  <Skeleton variant="line" height={18} width="46%" />
+                  <Skeleton variant="rect" height={86} />
+                  <Skeleton variant="rect" height={190} />
+                  <Skeleton variant="line" height={48} width="40%" />
                 </div>
-              </div>
-              <div className="onboarding-step-pill">{`Step ${currentStepNumber} of 2`}</div>
-            </header>
-
-            {alert && <Alert variant={alert.variant} title={alert.title}>{alert.message}</Alert>}
-
-            {loadingState ? (
-              <div className="onboarding-panel" style={{ padding: 22, display: 'grid', gap: 12 }}>
-                <Skeleton variant="line" height={24} width="32%" />
-                <Skeleton variant="rect" height={92} />
-                <Skeleton variant="rect" height={240} />
-                <Skeleton variant="line" height={44} width="40%" />
-              </div>
-            ) : (
-              <form className="onboarding-form" onSubmit={handleSubmit}>
-                <div className="onboarding-stepper" aria-label="Onboarding progress">
-                  <div
-                    className={`onboarding-step ${isPersonalStep ? 'active' : 'complete'}`}
-                    aria-current={isPersonalStep ? 'step' : undefined}
-                  >
-                    <span className="onboarding-step-icon">
-                      {isPersonalStep ? <UserRound size={16} /> : <CheckCircle2 size={17} />}
-                    </span>
-                    <div className="onboarding-step-copy">
-                      <p className="onboarding-step-label">Personal info</p>
-                      <p className="onboarding-step-caption">Identity, phone, and notifications</p>
-                    </div>
-                  </div>
-                  <div className={`onboarding-step ${!isPersonalStep ? 'active' : ''}`} aria-current={!isPersonalStep ? 'step' : undefined}>
-                    <span className="onboarding-step-icon">
-                      <GraduationCap size={17} />
-                    </span>
-                    <div className="onboarding-step-copy">
-                      <p className="onboarding-step-label">Academic info</p>
-                      <p className="onboarding-step-caption">Faculty, program, year, and semester</p>
-                    </div>
-                  </div>
+              </Card>
+              <Card>
+                <div style={{ display: 'grid', gap: 14 }}>
+                  <Skeleton variant="line" height={18} width="46%" />
+                  <Skeleton variant="rect" height={48} />
+                  <Skeleton variant="rect" height={48} />
+                  <Skeleton variant="rect" height={48} />
+                  <Skeleton variant="rect" height={48} />
                 </div>
-
-                <div className="onboarding-progress-track" aria-hidden="true">
-                  <div className={`onboarding-progress-fill ${!isPersonalStep ? 'complete' : ''}`} />
-                </div>
-
-                {isPersonalStep ? (
-                  <section className="onboarding-step-card onboarding-personal-card" aria-labelledby="personal-info-title">
-                    <div className="onboarding-step-heading">
-                      <div>
-                        <h2 id="personal-info-title">Personal information</h2>
-                        <p>Confirm your identity and contact preferences.</p>
+              </Card>
+            </div>
+          ) : (
+            <form className="onboarding-form-layout" onSubmit={handleSubmit}>
+              <div className="onboarding-form-grid">
+                <div className="onboarding-column">
+                  <Card hoverable className="onboarding-form-card">
+                    <section className="onboarding-section" aria-labelledby="personal-info-title">
+                      <div className="onboarding-card-header">
+                        <h2 id="personal-info-title" className="onboarding-section-title">Personal Information</h2>
+                        <Chip color="glass">{resolvedUser.email}</Chip>
                       </div>
-                    </div>
+                      <p className="onboarding-section-copy">
+                        Add your core details once so campus teams can route support and urgent updates correctly.
+                      </p>
 
-                    <div className="onboarding-profile-panel">
-                      <div className="onboarding-profile-main">
-                        <Avatar
-                          size="lg"
-                          src={(imagePreviewUrl ?? formState.profileImageUrl) || undefined}
-                          initials={profileInitials}
+                      <div className="onboarding-field-grid">
+                        <Input
+                          label="First Name"
+                          placeholder="e.g. Julian"
+                          value={formState.firstName}
+                          onChange={(event) => setField('firstName', event.target.value)}
+                          disabled={isSubmitting}
+                          required
                         />
-                        <div>
-                          <p className="onboarding-profile-title">Profile portrait</p>
-                          <p className="onboarding-profile-subtitle">JPG, PNG, or WebP. 2 MB max.</p>
+                        <Input
+                          label="Last Name"
+                          placeholder="e.g. Ashford"
+                          value={formState.lastName}
+                          onChange={(event) => setField('lastName', event.target.value)}
+                          disabled={isSubmitting}
+                          required
+                        />
+                        <div className="onboarding-field-full">
+                          <Input
+                            label="Preferred Name (Optional)"
+                            placeholder="Name shown on help desk and ticket updates"
+                            value={formState.preferredName}
+                            onChange={(event) => setField('preferredName', event.target.value)}
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                        <div className="onboarding-field-full">
+                          <div className="onboarding-phone-grid">
+                            <Select
+                              label="Country"
+                              value={formState.phoneCountryCode}
+                              onChange={(event) => setField('phoneCountryCode', event.target.value as PhoneCountryCode)}
+                              options={phoneCountryOptions}
+                              disabled={isSubmitting}
+                              required
+                            />
+                            <Input
+                              label={`Phone Number (${selectedPhoneCountry.dialCode})`}
+                              placeholder={`Use ${selectedPhoneCountry.minNationalDigits}-${selectedPhoneCountry.maxNationalDigits} digits`}
+                              inputMode="numeric"
+                              autoComplete="tel-national"
+                              value={formState.phoneNumber}
+                              onChange={(event) => setField('phoneNumber', normalizePhoneDigits(event.target.value))}
+                              disabled={isSubmitting}
+                              required
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className="onboarding-profile-actions">
+
+                      <p className="onboarding-section-copy" style={{ marginTop: -2 }}>
+                        Phone details are used for urgent scheduling and campus safety notifications.
+                      </p>
+                    </section>
+                  </Card>
+
+                  <Card hoverable className="onboarding-form-card">
+                    <section className="onboarding-section" aria-labelledby="academic-info-title">
+                      <div>
+                        <h2 id="academic-info-title" className="onboarding-section-title">Academic Information</h2>
+                        <p className="onboarding-section-copy">
+                          Select the placement details used for advising, course access, and semester records.
+                        </p>
+                      </div>
+
+                      <div className="onboarding-academic-grid">
+                        <Select
+                          label="Faculty / School"
+                          value={formState.facultyName}
+                          onChange={(event) => handleFacultyChange(event.target.value as StudentFaculty | '')}
+                          options={facultyOptions}
+                          placeholder="Choose faculty"
+                          disabled={isSubmitting}
+                          required
+                        />
+                        <Select
+                          label="Academic Program"
+                          value={formState.programName}
+                          onChange={(event) => setField('programName', event.target.value as StudentProgram | '')}
+                          options={programOptions}
+                          placeholder="Choose program"
+                          disabled={!formState.facultyName || isSubmitting}
+                          required
+                        />
+                        <Select
+                          label="Academic Year"
+                          value={formState.academicYear}
+                          onChange={(event) => setField('academicYear', event.target.value as AcademicYear | '')}
+                          options={academicYearOptions}
+                          placeholder="Choose year"
+                          disabled={isSubmitting}
+                          required
+                        />
+                        <Select
+                          label="Semester"
+                          value={formState.semester}
+                          onChange={(event) => setField('semester', event.target.value as Semester | '')}
+                          options={semesterOptions}
+                          placeholder="Choose semester"
+                          disabled={isSubmitting}
+                          required
+                        />
+                      </div>
+                    </section>
+                  </Card>
+                </div>
+
+                <div className="onboarding-column">
+                  <Card hoverable className="onboarding-form-card">
+                    <section className="onboarding-section" aria-labelledby="portrait-title">
+                      <div className="onboarding-card-header">
+                        <h2 id="portrait-title" className="onboarding-section-title">Profile Portrait</h2>
+                        <Chip color={portraitStatus.color}>{portraitStatus.label}</Chip>
+                      </div>
+                      <p className="onboarding-section-copy">
+                        Upload a clear portrait. If your image is landscape, you can zoom and reposition before saving.
+                      </p>
+
+                      <div className="onboarding-portrait-stage">
+                        <div className="onboarding-portrait-frame">
+                          {portraitPreviewUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={portraitPreviewUrl}
+                              alt="Profile portrait preview"
+                              className="onboarding-portrait-image"
+                            />
+                          ) : (
+                            <div className="onboarding-portrait-fallback">
+                              <span className="onboarding-portrait-initials">{profileInitials}</span>
+                              <span style={{ fontSize: 12, opacity: 0.88 }}>No portrait uploaded yet</span>
+                            </div>
+                          )}
+                        </div>
+
                         <input
                           ref={imageInputRef}
                           type="file"
@@ -1712,237 +1300,214 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           onChange={handleImageChange}
                           style={{ display: 'none' }}
                         />
-                        <Button
-                          type="button"
-                          variant="subtle"
-                          size="sm"
-                          iconLeft={<ImageUp size={14} />}
-                          disabled={isSubmitting}
-                          onClick={() => imageInputRef.current?.click()}
-                        >
-                          {selectedImageFile ? 'Replace Image' : 'Choose Image'}
-                        </Button>
-                        {(selectedImageFile || imagePreviewUrl) && (
+
+                        <div className="onboarding-profile-actions">
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            iconLeft={<ImageUp size={14} />}
+                            disabled={isSubmitting}
+                            onClick={() => imageInputRef.current?.click()}
+                          >
+                            {selectedImageFile ? 'Replace + Re-Crop' : 'Upload + Crop Portrait'}
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             iconLeft={<X size={14} />}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || !hasStagedPortrait}
                             onClick={handleRemoveImage}
                           >
-                            Remove
+                            Remove Staged
                           </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="onboarding-grid onboarding-personal-grid">
-                      <Input
-                        label="First Name"
-                        placeholder="e.g. Julian"
-                        value={formState.firstName}
-                        onChange={(event) => setField('firstName', event.target.value)}
-                        required
-                      />
-                      <Input
-                        label="Last Name"
-                        placeholder="e.g. Ashford"
-                        value={formState.lastName}
-                        onChange={(event) => setField('lastName', event.target.value)}
-                        required
-                      />
-                      <Input
-                        label="Preferred Name"
-                        placeholder="Optional"
-                        value={formState.preferredName}
-                        onChange={(event) => setField('preferredName', event.target.value)}
-                      />
-
-                      <div className="onboarding-phone-stack">
-                        <p className="onboarding-phone-label">Phone Number</p>
-                        <div className="onboarding-phone-row">
-                          <select
-                            className="onboarding-phone-country"
-                            value={formState.phoneCountryCode}
-                            onChange={(event) => setField('phoneCountryCode', event.target.value as PhoneCountryCode)}
-                            aria-label="Phone country code"
-                            disabled={isSubmitting}
-                          >
-                            {PHONE_COUNTRIES.map((country) => (
-                              <option key={country.code} value={country.code}>
-                                {`${country.code} ${country.dialCode}`}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="tel"
-                            className="onboarding-phone-input"
-                            value={formState.phoneNumber}
-                            onChange={(event) => setField('phoneNumber', event.target.value.replace(/\D/g, ''))}
-                            placeholder="Enter phone number"
-                            inputMode="numeric"
-                            required
-                          />
-                        </div>
-                        <p className="onboarding-phone-hint">
-                          {`${selectedPhoneCountry.name}: ${phoneDigitsHint} after ${selectedPhoneCountry.dialCode}`}
-                        </p>
-                      </div>
-                    </div>
-
-                    <section className="onboarding-notice-panel onboarding-compact-notifications" aria-label="Notification preferences">
-                      <div className="onboarding-notice-heading">
-                        <p className="onboarding-notice-title">Notifications</p>
-                        <p className="onboarding-notice-subtitle">Choose the channels you want enabled.</p>
-                      </div>
-
-                      <div className="onboarding-notification-options">
-                        <div className="onboarding-toggle-row">
-                          <div className="onboarding-toggle-copy">
-                            <Mail size={17} color="#f2ca50" />
-                            <p className="onboarding-toggle-label">Email</p>
-                          </div>
-                          <Toggle
-                            ariaLabel="Email notifications"
-                            label={undefined}
-                            checked={formState.emailNotificationsEnabled}
-                            onChange={(checked) => setField('emailNotificationsEnabled', checked)}
-                            disabled={isSubmitting}
-                          />
                         </div>
 
-                        <div className="onboarding-toggle-row">
-                          <div className="onboarding-toggle-copy">
-                            <MessageSquare size={17} color="#f2ca50" />
-                            <p className="onboarding-toggle-label">SMS</p>
-                          </div>
-                          <Toggle
-                            ariaLabel="SMS notifications"
-                            label={undefined}
-                            checked={formState.smsNotificationsEnabled}
-                            onChange={(checked) => setField('smsNotificationsEnabled', checked)}
-                            disabled={isSubmitting}
-                          />
-                        </div>
+                        <p className="onboarding-profile-caption">JPG, PNG, or WebP. Maximum file size: 2 MB.</p>
                       </div>
                     </section>
-                  </section>
-                ) : (
-                  <section className="onboarding-step-card" aria-labelledby="academic-info-title">
-                    <div className="onboarding-step-heading">
+                  </Card>
+
+                  <Card hoverable className="onboarding-form-card">
+                    <section className="onboarding-section" aria-labelledby="review-finish-title">
                       <div>
-                        <h2 id="academic-info-title">Academic information</h2>
-                        <p>Select the placement details used for advising, course access, and semester records.</p>
+                        <h2 id="review-finish-title" className="onboarding-section-title">Review & Finish</h2>
+                        <p className="onboarding-section-copy">
+                          Quick summary from your selections so far. You can update these later in account settings.
+                        </p>
                       </div>
-                    </div>
 
-                    <div className="onboarding-grid">
-                      <Select
-                        label="Faculty / School"
-                        value={formState.facultyName}
-                        onChange={(event) => handleFacultyChange(event.target.value as StudentFaculty | '')}
-                        options={facultyOptions}
-                        placeholder="Choose faculty"
-                        required
-                      />
-                      <Select
-                        label="Academic Program"
-                        value={formState.programName}
-                        onChange={(event) => setField('programName', event.target.value as StudentProgram | '')}
-                        options={programOptions}
-                        placeholder="Choose program"
-                        disabled={!formState.facultyName}
-                        required
-                      />
-                      <Select
-                        label="Academic Year"
-                        value={formState.academicYear}
-                        onChange={(event) => setField('academicYear', event.target.value as AcademicYear | '')}
-                        options={academicYearOptions}
-                        placeholder="Choose year"
-                        required
-                      />
-                      <Select
-                        label="Semester"
-                        value={formState.semester}
-                        onChange={(event) => setField('semester', event.target.value as Semester | '')}
-                        options={semesterOptions}
-                        placeholder="Choose semester"
-                        required
-                      />
-                    </div>
-                  </section>
-                )}
+                      <div className="onboarding-review-grid">
+                        <div className="onboarding-review-item">
+                          <span className="onboarding-review-label">Name</span>
+                          <span className="onboarding-review-value">{reviewName}</span>
+                        </div>
+                        <div className="onboarding-review-item">
+                          <span className="onboarding-review-label">Program</span>
+                          <span className="onboarding-review-value">{reviewProgram}</span>
+                        </div>
+                        <div className="onboarding-review-item">
+                          <span className="onboarding-review-label">Current Term</span>
+                          <span className="onboarding-review-value">{reviewTerm}</span>
+                        </div>
+                      </div>
 
-                <div className={`onboarding-actions ${isPersonalStep ? 'personal' : ''}`}>
-                  {submitStage && <p className="onboarding-submit-status">{submitStage}</p>}
-                  {!isPersonalStep && (
-                    <Button
-                      type="button"
-                      variant="subtle"
-                      size="lg"
-                      iconLeft={<ArrowLeft size={16} />}
-                      disabled={isSubmitting}
-                      onClick={handleBackStep}
-                    >
-                      Back
-                    </Button>
-                  )}
-                  {isPersonalStep ? (
-                    <Button
-                      type="button"
-                      variant="glass"
-                      size="lg"
-                      iconRight={<ArrowRight size={16} />}
-                      className="onboarding-primary-action"
-                      disabled={isSubmitting}
-                      onClick={handleNextStep}
-                    >
-                      Next
-                    </Button>
-                  ) : (
-                  <Button
-                    type="submit"
-                    variant="glass"
-                    size="lg"
-                    loading={isSubmitting}
-                    iconLeft={<CheckCircle2 size={16} />}
-                    className="onboarding-primary-action"
-                    style={{
-                      height: 58,
-                      fontSize: 13,
-                      borderRadius: 14,
-                      letterSpacing: '.08em',
-                    }}
-                  >
-                    Complete Onboarding
-                  </Button>
-                  )}
+                      <div className="onboarding-submit-section">
+                        {submitStage && <p className="onboarding-status">{submitStage}</p>}
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          size="lg"
+                          loading={isSubmitting}
+                          iconLeft={<CheckCircle2 size={16} />}
+                          className="onboarding-primary-action"
+                        >
+                          {isSubmitting ? 'Completing Onboarding...' : 'Complete Onboarding'}
+                        </Button>
+                      </div>
+                    </section>
+                  </Card>
                 </div>
-              </form>
-            )}
-          </div>
+              </div>
+            </form>
+          )}
         </section>
+      </main>
 
-        <aside className="onboarding-hero" aria-hidden="true" style={{ backgroundImage: `url(${heroImageUrl})` }}>
-          <div className="onboarding-hero-copy">
-            <p className="onboarding-hero-heading">Profile Details</p>
-            <div className="onboarding-hero-rule" />
-            <p className="onboarding-hero-desc">
-              Your student profile connects identity, academic placement, and campus notifications.
-            </p>
-            <div className="onboarding-summary-card">
-              <p className="onboarding-summary-title">Onboarding checklist</p>
-              <ul className="onboarding-summary-list">
-                <li><CheckCircle2 size={15} /> Personal contact details</li>
-                <li><GraduationCap size={15} /> Academic placement</li>
-                <li><Mail size={15} /> Notification preferences</li>
-              </ul>
-            </div>
+      <Dialog
+        open={cropEditorOpen}
+        onClose={() => {
+          if (!isApplyingCrop) {
+            closeCropEditor();
+          }
+        }}
+        closeOnBackdropClick={!isApplyingCrop}
+        title="Adjust Portrait"
+        size="md"
+      >
+        <div className="onboarding-crop-body">
+          <p className="onboarding-section-copy" style={{ marginTop: 0 }}>
+            Drag the photo to reposition it and use zoom to fit your portrait.
+          </p>
+          <div
+            className={`onboarding-crop-viewport${isCropDragging ? ' dragging' : ''}`}
+            onPointerDown={handleCropPointerDown}
+            onPointerMove={handleCropPointerMove}
+            onPointerUp={handleCropPointerEnd}
+            onPointerCancel={handleCropPointerEnd}
+          >
+            {cropEditorState && cropMetrics && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={cropEditorState.sourceUrl}
+                alt="Portrait crop preview"
+                className="onboarding-crop-image"
+                draggable={false}
+                style={{
+                  width: cropMetrics.renderedWidth,
+                  height: cropMetrics.renderedHeight,
+                  left: PORTRAIT_CROP_VIEW_WIDTH / 2 - cropMetrics.renderedWidth / 2 + cropOffset.x,
+                  top: PORTRAIT_CROP_VIEW_HEIGHT / 2 - cropMetrics.renderedHeight / 2 + cropOffset.y,
+                }}
+              />
+            )}
+            <div className="onboarding-crop-guide" />
           </div>
-        </aside>
-      </div>
+
+          <div className="onboarding-crop-control">
+            <div className="onboarding-crop-control-head">
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <ZoomIn size={14} />
+                Zoom
+              </span>
+              <span>{cropZoom.toFixed(2)}x</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={MAX_PORTRAIT_ZOOM}
+              step={0.01}
+              value={cropZoom}
+              disabled={!cropMetrics}
+              onChange={(event) => setCropZoom(Number(event.target.value))}
+              className="onboarding-crop-range"
+            />
+          </div>
+
+          <div className="onboarding-crop-control">
+            <div className="onboarding-crop-control-head">
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Move size={14} />
+                Horizontal
+              </span>
+              <span>{Math.round(cropOffset.x)} px</span>
+            </div>
+            <input
+              type="range"
+              min={-cropOffsetLimitX}
+              max={cropOffsetLimitX}
+              step={0.5}
+              value={cropOffset.x}
+              disabled={!cropMetrics || cropOffsetLimitX === 0}
+              onChange={(event) =>
+                setCropOffset((current) => ({
+                  ...current,
+                  x: Number(event.target.value),
+                }))
+              }
+              className="onboarding-crop-range"
+            />
+          </div>
+
+          <div className="onboarding-crop-control">
+            <div className="onboarding-crop-control-head">
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Move size={14} />
+                Vertical
+              </span>
+              <span>{Math.round(cropOffset.y)} px</span>
+            </div>
+            <input
+              type="range"
+              min={-cropOffsetLimitY}
+              max={cropOffsetLimitY}
+              step={0.5}
+              value={cropOffset.y}
+              disabled={!cropMetrics || cropOffsetLimitY === 0}
+              onChange={(event) =>
+                setCropOffset((current) => ({
+                  ...current,
+                  y: Number(event.target.value),
+                }))
+              }
+              className="onboarding-crop-range"
+            />
+          </div>
+
+          <div className="onboarding-crop-actions">
+            <Button type="button" variant="ghost" size="sm" disabled={isApplyingCrop} onClick={closeCropEditor}>
+              Cancel
+            </Button>
+            <Button type="button" variant="primary" size="sm" loading={isApplyingCrop} onClick={handleApplyCrop}>
+              Apply Portrait
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          height: 6,
+          background: 'var(--yellow-400)',
+          zIndex: 10,
+        }}
+      />
     </div>
   );
 }
