@@ -189,7 +189,7 @@ export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading 
             style={{ width: '100%' }}
             options={[
               { value: '', label: 'Select a resource' },
-              ...filteredResources.map((resource) => ({ value: resource.id, label: `${resource.code} - ${resource.name}` })),
+              ...filteredResources.map((resource) => ({ value: resource.id, label: resource.name })),
             ]}
           />
           {errors.resourceId && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.resourceId}</p>}

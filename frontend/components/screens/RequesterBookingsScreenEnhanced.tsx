@@ -12,6 +12,7 @@ import {
   Chip,
   Input,
   Select,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -49,6 +50,7 @@ import { BookingModificationModal } from '@/components/booking/BookingModificati
 import { BookingCheckInPanel } from '@/components/booking/BookingCheckInPanel';
 import { NotificationCenter } from '@/components/booking/NotificationCenter';
 import { BookingCalendar } from '@/components/booking/BookingCalendar';
+import { BookingScreenSkeleton } from '@/components/booking/BookingScreenSkeleton';
 
 type TabType = 'bookings' | 'recurring' | 'calendar' | 'notifications';
 
@@ -398,11 +400,27 @@ export function RequesterBookingsScreenEnhanced({
     )
     : categoryFilteredResources;
   const selectedSubcategoryHint = DURATION_HINTS[normalizeSubcategory(form.subcategory)] ?? null;
+  const elevatedCardStyle: React.CSSProperties = {
+    padding: 20,
+    border: '1px solid color-mix(in srgb, var(--border) 75%, transparent)',
+    boxShadow: '0 16px 40px rgba(8, 20, 56, 0.08)',
+    background:
+      'linear-gradient(140deg, color-mix(in srgb, var(--bg-card) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 96%, #c7d8ff 4%))',
+  };
 
   return (
     <div style={{ display: 'grid', gap: 28 }}>
       {/* Header */}
-      <div>
+      <div
+        style={{
+          padding: '22px 24px',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid color-mix(in srgb, var(--border) 72%, transparent)',
+          background:
+            'radial-gradient(circle at 84% -30%, rgba(70, 150, 255, 0.18), transparent 58%), linear-gradient(155deg, color-mix(in srgb, var(--bg-card) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 97%, #d9e7ff 3%))',
+          boxShadow: '0 20px 44px rgba(20, 32, 68, 0.1)',
+        }}
+      >
         <p style={{ margin: '0 0 8px', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 900, letterSpacing: '.35em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
           {workspaceLabel}
         </p>
@@ -416,21 +434,33 @@ export function RequesterBookingsScreenEnhanced({
 
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border)' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          padding: 8,
+          border: '1px solid color-mix(in srgb, var(--border) 78%, transparent)',
+          borderRadius: 'var(--radius-lg)',
+          background: 'color-mix(in srgb, var(--bg-card) 95%, #f4f7ff 5%)',
+        }}
+      >
         {(['bookings', 'recurring', 'calendar', 'notifications'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
-              padding: '12px 16px',
+              padding: '11px 14px',
               border: 'none',
-              background: 'none',
               cursor: 'pointer',
               fontSize: 13,
-              fontWeight: activeTab === tab ? 600 : 500,
-              color: activeTab === tab ? 'var(--primary)' : 'var(--text-secondary)',
-              borderBottom: activeTab === tab ? '2px solid var(--primary)' : 'none',
-              transition: 'all 0.2s',
+              borderRadius: 10,
+              fontWeight: activeTab === tab ? 700 : 600,
+              color: activeTab === tab ? '#114db8' : 'var(--text-secondary)',
+              background: activeTab === tab
+                ? 'linear-gradient(140deg, rgba(64, 131, 255, 0.2), rgba(180, 215, 255, 0.18))'
+                : 'transparent',
+              boxShadow: activeTab === tab ? 'inset 0 0 0 1px rgba(64, 131, 255, 0.18)' : 'none',
+              transition: 'all 0.2s ease',
             }}
           >
             {tab === 'bookings' && 'My Bookings'}
@@ -452,9 +482,7 @@ export function RequesterBookingsScreenEnhanced({
 
       {/* Tab Content */}
       {loading ? (
-        <Alert variant="info" title="Loading">
-          Please wait while we load your bookings...
-        </Alert>
+        <BookingScreenSkeleton variant="requester" />
       ) : loadError ? (
         <Alert variant="error" title="Error">
           {loadError}
@@ -465,7 +493,7 @@ export function RequesterBookingsScreenEnhanced({
           {activeTab === 'bookings' && (
             <div style={{ display: 'grid', gap: 16 }}>
               {/* Create New Booking Form */}
-              <Card style={{ padding: 20 }}>
+              <Card style={elevatedCardStyle}>
                 <form onSubmit={handleCreateBooking} style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Category</label>
@@ -514,7 +542,7 @@ export function RequesterBookingsScreenEnhanced({
                         { value: '', label: 'Select resource' },
                         ...filteredResources.map((resource) => ({
                           value: resource.id,
-                          label: `${resource.code} - ${resource.name}`,
+                          label: resource.name,
                         })),
                       ]}
                     />
@@ -539,7 +567,7 @@ export function RequesterBookingsScreenEnhanced({
                 </form>
               </Card>
 
-              <Card style={{ padding: 16 }}>
+              <Card style={{ ...elevatedCardStyle, padding: 16 }}>
                 <div style={{ display: 'grid', gap: 8 }}>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-h)' }}>Remaining Time Ranges</p>
                   {!form.resourceId && (
@@ -548,7 +576,7 @@ export function RequesterBookingsScreenEnhanced({
                     </p>
                   )}
                   {availabilityLoading && (
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Loading remaining ranges...</p>
+                    <Skeleton variant="line" height={12} width="36%" />
                   )}
                   {availabilityError && (
                     <p style={{ margin: 0, fontSize: 12, color: 'var(--text-error)' }}>{availabilityError}</p>
@@ -577,7 +605,15 @@ export function RequesterBookingsScreenEnhanced({
                   You haven't created any bookings yet.
                 </Alert>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
+                <div
+                  style={{
+                    overflowX: 'auto',
+                    border: '1px solid color-mix(in srgb, var(--border) 72%, transparent)',
+                    borderRadius: 'var(--radius-lg)',
+                    background: 'color-mix(in srgb, var(--bg-card) 96%, #f7f9ff 4%)',
+                    boxShadow: '0 12px 32px rgba(10, 24, 58, 0.08)',
+                  }}
+                >
                   <Table>
                     <TableHead>
                       <TableRow>
@@ -593,9 +629,7 @@ export function RequesterBookingsScreenEnhanced({
                       {bookings.map((booking) => (
                         <TableRow key={booking.id}>
                           <TableCell>
-                            <strong>{booking.resource.code}</strong>
-                            <br />
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{booking.resource.name}</span>
+                            <strong>{booking.resource.name}</strong>
                           </TableCell>
                           <TableCell style={{ fontSize: 12 }}>{formatDateTime(booking.startTime)}</TableCell>
                           <TableCell style={{ fontSize: 12 }}>{formatDateTime(booking.endTime)}</TableCell>
@@ -634,7 +668,11 @@ export function RequesterBookingsScreenEnhanced({
           {/* Recurring Tab */}
           {activeTab === 'recurring' && (
             <div style={{ display: 'grid', gap: 16 }}>
-              <Button onClick={() => setShowRecurringForm(!showRecurringForm)} variant="primary">
+              <Button
+                onClick={() => setShowRecurringForm(!showRecurringForm)}
+                variant="primary"
+                style={{ boxShadow: '0 12px 24px rgba(49, 117, 255, 0.28)' }}
+              >
                 <Plus size={16} style={{ marginRight: 6 }} />
                 Create Recurring Booking
               </Button>
@@ -655,7 +693,15 @@ export function RequesterBookingsScreenEnhanced({
               ) : (
                 <div style={{ display: 'grid', gap: 12 }}>
                   {recurringBookings.map((recurring) => (
-                    <Card key={recurring.id} style={{ padding: 16 }}>
+                    <Card
+                      key={recurring.id}
+                      style={{
+                        ...elevatedCardStyle,
+                        padding: 16,
+                        background:
+                          'linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 94%, #ffffff 6%), color-mix(in srgb, var(--bg-card) 96%, #e7efff 4%))',
+                      }}
+                    >
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start' }}>
                         <div>
                           <div style={{ fontWeight: 600, marginBottom: 6 }}>
@@ -726,7 +772,7 @@ export function RequesterBookingsScreenEnhanced({
           <div style={{ padding: '20px 24px', display: 'grid', gap: 12 }}>
             <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--text-body)' }}>
               Are you sure you want to cancel booking for{' '}
-              <strong style={{ color: 'var(--text-h)' }}>{cancellationBooking.resource.code}</strong>?
+              <strong style={{ color: 'var(--text-h)' }}>{cancellationBooking.resource.name}</strong>?
             </p>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 6 }}>

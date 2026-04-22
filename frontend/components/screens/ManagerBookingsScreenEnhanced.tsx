@@ -21,6 +21,7 @@ import {
 } from '@/lib/api-client';
 import type { BookingResponse, BookingStatus, ResourceResponse, BookingModificationResponse } from '@/lib/api-types';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
+import { BookingScreenSkeleton } from '@/components/booking/BookingScreenSkeleton';
 
 type TabType = 'bookings' | 'modifications' | 'checkins';
 
@@ -176,7 +177,7 @@ export function ManagerBookingsScreenEnhanced() {
         )
         .map((resource) => ({
           value: resource.id,
-          label: `${resource.code} - ${resource.name}`,
+          label: resource.name,
         })),
     [categoryFilteredResources, subcategoryFilter],
   );
@@ -236,7 +237,7 @@ export function ManagerBookingsScreenEnhanced() {
     try {
       await approveBooking(accessToken, booking.id);
       await reload();
-      showToast('success', 'Booking approved', `${booking.resource.code} has been approved.`);
+      showToast('success', 'Booking approved', `${booking.resource.name} has been approved.`);
     } catch (error) {
       showToast('error', 'Approval failed', getErrorMessage(error, 'Could not approve this booking.'));
     } finally {
@@ -260,7 +261,7 @@ export function ManagerBookingsScreenEnhanced() {
     try {
       await rejectBooking(accessToken, booking.id, { reason: reason.trim() });
       await reload();
-      showToast('success', 'Booking rejected', `${booking.resource.code} was rejected.`);
+      showToast('success', 'Booking rejected', `${booking.resource.name} was rejected.`);
     } catch (error) {
       showToast('error', 'Rejection failed', getErrorMessage(error, 'Could not reject this booking.'));
     } finally {
@@ -274,7 +275,7 @@ export function ManagerBookingsScreenEnhanced() {
       return;
     }
 
-    const confirmed = window.confirm(`Cancel approved booking ${booking.resource.code}?`);
+    const confirmed = window.confirm(`Cancel approved booking ${booking.resource.name}?`);
     if (!confirmed) {
       return;
     }
@@ -285,7 +286,7 @@ export function ManagerBookingsScreenEnhanced() {
     try {
       await cancelApprovedBookingAsManager(accessToken, booking.id, reason ? { reason } : undefined);
       await reload();
-      showToast('success', 'Booking cancelled', `${booking.resource.code} was cancelled.`);
+      showToast('success', 'Booking cancelled', `${booking.resource.name} was cancelled.`);
     } catch (error) {
       showToast('error', 'Cancellation failed', getErrorMessage(error, 'Could not cancel this booking.'));
     } finally {
@@ -346,7 +347,7 @@ export function ManagerBookingsScreenEnhanced() {
       return;
     }
 
-    const confirmed = window.confirm(`Mark booking as no-show? ${booking.resource.code}`);
+    const confirmed = window.confirm(`Mark booking as no-show? ${booking.resource.name}`);
     if (!confirmed) return;
 
     setActiveBookingId(booking.id);
@@ -387,10 +388,26 @@ export function ManagerBookingsScreenEnhanced() {
     setResourceFilter('');
   }
 
+  const elevatedCardStyle: React.CSSProperties = {
+    border: '1px solid color-mix(in srgb, var(--border) 74%, transparent)',
+    boxShadow: '0 16px 40px rgba(10, 24, 58, 0.08)',
+    background:
+      'linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 97%, #dce8ff 3%))',
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
-      <div>
+      <div
+        style={{
+          padding: '22px 24px',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid color-mix(in srgb, var(--border) 72%, transparent)',
+          background:
+            'radial-gradient(circle at 88% -25%, rgba(52, 132, 255, 0.2), transparent 60%), linear-gradient(150deg, color-mix(in srgb, var(--bg-card) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 97%, #e5eeff 3%))',
+          boxShadow: '0 22px 44px rgba(14, 32, 70, 0.1)',
+        }}
+      >
         <p
           style={{
             margin: '0 0 8px',
@@ -449,21 +466,33 @@ export function ManagerBookingsScreenEnhanced() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border)' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          padding: 8,
+          border: '1px solid color-mix(in srgb, var(--border) 78%, transparent)',
+          borderRadius: 'var(--radius-lg)',
+          background: 'color-mix(in srgb, var(--bg-card) 95%, #f4f7ff 5%)',
+        }}
+      >
         {(['bookings', 'modifications', 'checkins'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
-              padding: '12px 16px',
+              padding: '11px 14px',
               border: 'none',
-              background: 'none',
               cursor: 'pointer',
               fontSize: 13,
-              fontWeight: activeTab === tab ? 600 : 500,
-              color: activeTab === tab ? 'var(--primary)' : 'var(--text-secondary)',
-              borderBottom: activeTab === tab ? '2px solid var(--primary)' : 'none',
-              transition: 'all 0.2s',
+              borderRadius: 10,
+              fontWeight: activeTab === tab ? 700 : 600,
+              color: activeTab === tab ? '#114db8' : 'var(--text-secondary)',
+              background: activeTab === tab
+                ? 'linear-gradient(140deg, rgba(64, 131, 255, 0.2), rgba(180, 215, 255, 0.18))'
+                : 'transparent',
+              boxShadow: activeTab === tab ? 'inset 0 0 0 1px rgba(64, 131, 255, 0.18)' : 'none',
+              transition: 'all 0.2s ease',
             }}
           >
             {tab === 'bookings' && 'Booking Requests'}
@@ -475,9 +504,7 @@ export function ManagerBookingsScreenEnhanced() {
 
       {/* Tab Content */}
       {loading ? (
-        <Alert variant="info" title="Loading">
-          Loading bookings and modifications...
-        </Alert>
+        <BookingScreenSkeleton variant="manager" />
       ) : loadError ? (
         <Alert variant="error" title="Error">
           {loadError}
@@ -486,7 +513,7 @@ export function ManagerBookingsScreenEnhanced() {
         <>
           {/* Bookings Tab */}
           {activeTab === 'bookings' && (
-            <Card>
+            <Card style={{ ...elevatedCardStyle, padding: 20 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
                 <Input
                   id="manager-booking-search"
@@ -554,7 +581,15 @@ export function ManagerBookingsScreenEnhanced() {
                 </div>
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
+              <div
+                style={{
+                  overflowX: 'auto',
+                  border: '1px solid color-mix(in srgb, var(--border) 70%, transparent)',
+                  borderRadius: 'var(--radius-lg)',
+                  background: 'color-mix(in srgb, var(--bg-card) 96%, #f6f9ff 4%)',
+                  boxShadow: '0 12px 30px rgba(10, 24, 58, 0.08)',
+                }}
+              >
                 <Table>
                   <TableHead>
                     <TableRow hoverable={false}>
@@ -583,8 +618,7 @@ export function ManagerBookingsScreenEnhanced() {
                         <TableRow key={booking.id}>
                           <TableCell>
                             <div style={{ display: 'grid', gap: 4 }}>
-                              <strong style={{ color: 'var(--text-h)' }}>{booking.resource.code}</strong>
-                              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{booking.resource.name}</span>
+                              <strong style={{ color: 'var(--text-h)' }}>{booking.resource.name}</strong>
                             </div>
                           </TableCell>
                           <TableCell>{booking.requesterRegistrationNumber ?? shortId(booking.requesterId)}</TableCell>
@@ -702,7 +736,7 @@ export function ManagerBookingsScreenEnhanced() {
                     const actionBusy = activeBookingId === mod.id;
 
                     return (
-                      <Card key={mod.id} style={{ padding: 16 }}>
+                      <Card key={mod.id} style={{ ...elevatedCardStyle, padding: 16 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start' }}>
                           <div style={{ display: 'grid', gap: 12 }}>
                             {booking && (
@@ -710,7 +744,7 @@ export function ManagerBookingsScreenEnhanced() {
                                 <div>
                                   <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Resource</p>
                                   <p style={{ margin: '4px 0 0', fontWeight: 600 }}>
-                                    {booking.resource.code} - {booking.resource.name}
+                                    {booking.resource.name}
                                   </p>
                                 </div>
 
@@ -795,8 +829,15 @@ export function ManagerBookingsScreenEnhanced() {
                   There are no bookings to manage check-ins for.
                 </Alert>
               ) : (
-                <Card>
-                  <div style={{ overflowX: 'auto' }}>
+                <Card style={{ ...elevatedCardStyle, padding: 20 }}>
+                  <div
+                    style={{
+                      overflowX: 'auto',
+                      border: '1px solid color-mix(in srgb, var(--border) 70%, transparent)',
+                      borderRadius: 'var(--radius-lg)',
+                      background: 'color-mix(in srgb, var(--bg-card) 96%, #f6f9ff 4%)',
+                    }}
+                  >
                     <Table>
                       <TableHead>
                         <TableRow hoverable={false}>
@@ -817,9 +858,7 @@ export function ManagerBookingsScreenEnhanced() {
                               <TableRow key={booking.id}>
                                 <TableCell>
                                   <div>
-                                    <strong>{booking.resource.code}</strong>
-                                    <br />
-                                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{booking.resource.name}</span>
+                                    <strong>{booking.resource.name}</strong>
                                   </div>
                                 </TableCell>
                                 <TableCell style={{ fontSize: 12 }}>
