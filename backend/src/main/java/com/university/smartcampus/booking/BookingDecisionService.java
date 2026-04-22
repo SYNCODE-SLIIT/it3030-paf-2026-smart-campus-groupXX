@@ -21,17 +21,20 @@ public class BookingDecisionService {
     private final BookingValidator bookingValidator;
     private final BookingService bookingService;
     private final BookingNotificationService notificationService;
+    private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
 
     public BookingDecisionService(
         BookingRepository bookingRepository,
         BookingValidator bookingValidator,
         BookingService bookingService,
-        BookingNotificationService notificationService
+        BookingNotificationService notificationService,
+        BookingResourceAvailabilityService bookingResourceAvailabilityService
     ) {
         this.bookingRepository = bookingRepository;
         this.bookingValidator = bookingValidator;
         this.bookingService = bookingService;
         this.notificationService = notificationService;
+        this.bookingResourceAvailabilityService = bookingResourceAvailabilityService;
     }
 
     @Transactional
@@ -39,6 +42,7 @@ public class BookingDecisionService {
         Objects.requireNonNull(approver, "Approver is required.");
         BookingEntity booking = bookingService.requireBooking(bookingId);
         requirePending(booking);
+        bookingResourceAvailabilityService.ensureResourceAvailableForProgression(booking);
         bookingValidator.ensureNoApprovedOverlap(
             booking.getResource().getId(),
             booking.getStartTime(),

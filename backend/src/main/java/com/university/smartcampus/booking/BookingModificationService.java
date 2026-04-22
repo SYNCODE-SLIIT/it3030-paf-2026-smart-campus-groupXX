@@ -21,17 +21,20 @@ public class BookingModificationService {
     private final BookingRepository bookingRepository;
     private final BookingValidator bookingValidator;
     private final BookingNotificationService notificationService;
+    private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
 
     public BookingModificationService(
         BookingModificationRepository modificationRepository,
         BookingRepository bookingRepository,
         BookingValidator bookingValidator,
-        BookingNotificationService notificationService
+        BookingNotificationService notificationService,
+        BookingResourceAvailabilityService bookingResourceAvailabilityService
     ) {
         this.modificationRepository = modificationRepository;
         this.bookingRepository = bookingRepository;
         this.bookingValidator = bookingValidator;
         this.notificationService = notificationService;
+        this.bookingResourceAvailabilityService = bookingResourceAvailabilityService;
     }
 
     @Transactional
@@ -55,6 +58,8 @@ public class BookingModificationService {
             booking.getStatus() != com.university.smartcampus.AppEnums.BookingStatus.APPROVED) {
             throw new BadRequestException("Only pending or approved bookings can be modified.");
         }
+
+        bookingResourceAvailabilityService.ensureResourceAvailableForProgression(booking);
 
         if (request.requestedStartTime() == null || request.requestedEndTime() == null) {
             throw new BadRequestException("New start and end times are required.");
@@ -94,6 +99,7 @@ public class BookingModificationService {
         }
 
         BookingEntity booking = modification.getBooking();
+        bookingResourceAvailabilityService.ensureResourceAvailableForProgression(booking);
 
         // Check for conflicts with new time
         bookingValidator.validateDuration(booking.getResource(), modification.getRequestedStartTime(), modification.getRequestedEndTime());

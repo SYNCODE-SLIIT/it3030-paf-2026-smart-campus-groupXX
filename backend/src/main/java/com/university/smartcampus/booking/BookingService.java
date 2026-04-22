@@ -18,6 +18,8 @@ import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
 import com.university.smartcampus.resource.ResourceEntity;
 import com.university.smartcampus.resource.ResourceService;
+import com.university.smartcampus.user.entity.FacultyEntity;
+import com.university.smartcampus.user.entity.StudentEntity;
 import com.university.smartcampus.user.entity.UserEntity;
 
 @Service
@@ -32,15 +34,18 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final ResourceService resourceService;
     private final BookingValidator bookingValidator;
+    private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
 
     public BookingService(
         BookingRepository bookingRepository,
         ResourceService resourceService,
-        BookingValidator bookingValidator
+        BookingValidator bookingValidator,
+        BookingResourceAvailabilityService bookingResourceAvailabilityService
     ) {
         this.bookingRepository = bookingRepository;
         this.resourceService = resourceService;
         this.bookingValidator = bookingValidator;
+        this.bookingResourceAvailabilityService = bookingResourceAvailabilityService;
     }
 
     @Transactional
@@ -78,34 +83,41 @@ public class BookingService {
     }
 
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<BookingDtos.BookingResponse> listBookingsForUser(UserEntity requester) {
         Objects.requireNonNull(requester, "Requester is required.");
-        return bookingRepository.findAllByRequesterIdOrderByStartTimeDesc(requester.getId()).stream()
+        List<BookingEntity> bookings = bookingRepository.findAllByRequesterIdOrderByStartTimeDesc(requester.getId());
+        bookingResourceAvailabilityService.reconcileFutureBookings(bookings);
+        return bookings.stream()
             .map(this::toResponse)
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public BookingDtos.BookingResponse getBookingForUser(UserEntity requester, UUID bookingId) {
         Objects.requireNonNull(requester, "Requester is required.");
         BookingEntity booking = requireBooking(bookingId);
         if (!booking.getRequester().getId().equals(requester.getId())) {
             throw new ForbiddenException("You cannot view this booking.");
         }
+        bookingResourceAvailabilityService.reconcileFutureBookings(List.of(booking));
         return toResponse(booking);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<BookingDtos.BookingResponse> listAllBookings() {
-        return bookingRepository.findAllByOrderByStartTimeDesc().stream()
+        List<BookingEntity> bookings = bookingRepository.findAllByOrderByStartTimeDesc();
+        bookingResourceAvailabilityService.reconcileFutureBookings(bookings);
+        return bookings.stream()
             .map(this::toResponse)
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public BookingDtos.BookingResponse getBooking(UUID bookingId) {
-        return toResponse(requireBooking(bookingId));
+        BookingEntity booking = requireBooking(bookingId);
+        bookingResourceAvailabilityService.reconcileFutureBookings(List.of(booking));
+        return toResponse(booking);
     }
 
     @Transactional(readOnly = true)
@@ -219,6 +231,7 @@ public class BookingService {
             booking.getId(),
             resourceService.toSummary(booking.getResource()),
             booking.getRequester() != null ? booking.getRequester().getId() : null,
+            resolveRequesterRegistrationNumber(booking.getRequester()),
             booking.getStatus(),
             booking.getStartTime(),
             booking.getEndTime(),
@@ -234,5 +247,23 @@ public class BookingService {
 
     private String normalizeReason(String reason) {
         return StringUtils.hasText(reason) ? reason.trim() : null;
+    }
+
+    private String resolveRequesterRegistrationNumber(UserEntity requester) {
+        if (requester == null) {
+            return null;
+        }
+
+        StudentEntity student = requester.getStudentProfile();
+        if (student != null && StringUtils.hasText(student.getRegistrationNumber())) {
+            return student.getRegistrationNumber().trim();
+        }
+
+        FacultyEntity faculty = requester.getFacultyProfile();
+        if (faculty != null && StringUtils.hasText(faculty.getEmployeeNumber())) {
+            return faculty.getEmployeeNumber().trim();
+        }
+
+        return requester.getId() != null ? requester.getId().toString() : null;
     }
 }

@@ -40,6 +40,7 @@ public final class BookingDtos {
         UUID id,
         ResourceDtos.ResourceSummary resource,
         UUID requesterId,
+        String requesterRegistrationNumber,
         BookingStatus status,
         Instant startTime,
         Instant endTime,

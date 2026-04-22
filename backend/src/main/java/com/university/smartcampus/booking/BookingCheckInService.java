@@ -19,10 +19,16 @@ public class BookingCheckInService {
 
     private final BookingRepository bookingRepository;
     private final BookingValidator bookingValidator;
+    private final BookingResourceAvailabilityService bookingResourceAvailabilityService;
 
-    public BookingCheckInService(BookingRepository bookingRepository, BookingValidator bookingValidator) {
+    public BookingCheckInService(
+        BookingRepository bookingRepository,
+        BookingValidator bookingValidator,
+        BookingResourceAvailabilityService bookingResourceAvailabilityService
+    ) {
         this.bookingRepository = bookingRepository;
         this.bookingValidator = bookingValidator;
+        this.bookingResourceAvailabilityService = bookingResourceAvailabilityService;
     }
 
     @Transactional
@@ -41,6 +47,8 @@ public class BookingCheckInService {
         if (booking.getStatus() != BookingStatus.APPROVED) {
             throw new BadRequestException("Only approved bookings can be checked in.");
         }
+
+        bookingResourceAvailabilityService.ensureResourceAvailableForProgression(booking);
 
         Instant now = bookingValidator.currentInstant();
         if (now.isBefore(booking.getStartTime())) {

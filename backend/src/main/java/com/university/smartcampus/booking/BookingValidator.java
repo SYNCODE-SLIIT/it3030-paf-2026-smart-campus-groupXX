@@ -38,6 +38,13 @@ public class BookingValidator {
         }
     }
 
+    public void requireResourceAvailableForBooking(ResourceEntity resource) {
+        requireActiveResource(resource);
+        if (!resource.isBookable()) {
+            throw new BadRequestException("This resource is not available for booking.");
+        }
+    }
+
     public void validateTimeRange(Instant startTime, Instant endTime) {
         Objects.requireNonNull(startTime, "Start time is required.");
         Objects.requireNonNull(endTime, "End time is required.");

@@ -214,6 +214,7 @@ export function ManagerBookingsScreenEnhanced() {
         booking.resource.code.toLowerCase().includes(needle)
         || booking.resource.name.toLowerCase().includes(needle)
         || (booking.purpose ?? '').toLowerCase().includes(needle)
+        || (booking.requesterRegistrationNumber ?? '').toLowerCase().includes(needle)
         || booking.requesterId.toLowerCase().includes(needle)
       );
     });
@@ -491,7 +492,7 @@ export function ManagerBookingsScreenEnhanced() {
                   id="manager-booking-search"
                   name="manager-booking-search"
                   label="Search"
-                  placeholder="Search by resource, purpose, requester id"
+                  placeholder="Search by resource, purpose, registration number"
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
                   iconLeft={<Search size={14} />}
@@ -586,7 +587,7 @@ export function ManagerBookingsScreenEnhanced() {
                               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{booking.resource.name}</span>
                             </div>
                           </TableCell>
-                          <TableCell>{shortId(booking.requesterId)}</TableCell>
+                          <TableCell>{booking.requesterRegistrationNumber ?? shortId(booking.requesterId)}</TableCell>
                           <TableCell>
                             <div style={{ display: 'grid', gap: 4, fontSize: 12 }}>
                               <span>{formatDateTime(booking.startTime)}</span>

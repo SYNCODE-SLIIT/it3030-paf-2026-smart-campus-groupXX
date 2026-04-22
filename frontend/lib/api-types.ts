@@ -372,6 +372,7 @@ export interface BookingResponse {
   id: string;
   resource: ResourceSummary;
   requesterId: string;
+  requesterRegistrationNumber: string | null;
   status: BookingStatus;
   startTime: string;
   endTime: string;
