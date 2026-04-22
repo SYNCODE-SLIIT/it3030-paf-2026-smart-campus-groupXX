@@ -43,6 +43,7 @@ export function RouteProgressBar() {
   const tickIntervalRef = useRef<number | null>(null);
   const finishTimeoutRef = useRef<number | null>(null);
   const hideTimeoutRef = useRef<number | null>(null);
+  const queuedStartTimeoutRef = useRef<number | null>(null);
 
   const clearTimers = useCallback(() => {
     if (tickIntervalRef.current !== null) {
@@ -58,6 +59,11 @@ export function RouteProgressBar() {
     if (hideTimeoutRef.current !== null) {
       window.clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
+    }
+
+    if (queuedStartTimeoutRef.current !== null) {
+      window.clearTimeout(queuedStartTimeoutRef.current);
+      queuedStartTimeoutRef.current = null;
     }
   }, []);
 
@@ -83,6 +89,17 @@ export function RouteProgressBar() {
       });
     }, INCREMENT_INTERVAL_MS);
   }, [clearTimers]);
+
+  const scheduleStart = useCallback(() => {
+    if (isActiveRef.current || queuedStartTimeoutRef.current !== null) {
+      return;
+    }
+
+    queuedStartTimeoutRef.current = window.setTimeout(() => {
+      queuedStartTimeoutRef.current = null;
+      start();
+    }, 0);
+  }, [start]);
 
   const complete = useCallback(() => {
     if (!isActiveRef.current) {
@@ -126,7 +143,7 @@ export function RouteProgressBar() {
       }
 
       if (shouldTrackNavigation(anchor)) {
-        start();
+        scheduleStart();
       }
     };
 
@@ -135,15 +152,15 @@ export function RouteProgressBar() {
     return () => {
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
     };
-  }, [start]);
+  }, [scheduleStart]);
 
   useEffect(() => {
-    return listenRouteProgressStart(start);
-  }, [start]);
+    return listenRouteProgressStart(scheduleStart);
+  }, [scheduleStart]);
 
   useEffect(() => {
     const onPopState = () => {
-      start();
+      scheduleStart();
     };
 
     window.addEventListener('popstate', onPopState);
@@ -151,19 +168,19 @@ export function RouteProgressBar() {
     return () => {
       window.removeEventListener('popstate', onPopState);
     };
-  }, [start]);
+  }, [scheduleStart]);
 
   useEffect(() => {
     const originalPushState = window.history.pushState;
     const originalReplaceState = window.history.replaceState;
 
     window.history.pushState = function pushState(...args) {
-      start();
+      scheduleStart();
       return originalPushState.apply(this, args);
     };
 
     window.history.replaceState = function replaceState(...args) {
-      start();
+      scheduleStart();
       return originalReplaceState.apply(this, args);
     };
 
@@ -171,7 +188,7 @@ export function RouteProgressBar() {
       window.history.pushState = originalPushState;
       window.history.replaceState = originalReplaceState;
     };
-  }, [start]);
+  }, [scheduleStart]);
 
   useEffect(() => {
     complete();
