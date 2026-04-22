@@ -10,9 +10,11 @@ import { Alert, Button, Dialog, Skeleton, Textarea } from '@/components/ui';
 import {
   addTicketComment,
   assignTicket,
+  deleteResource,
   deleteTicket,
   deleteTicketComment,
   getErrorMessage,
+  getResource,
   getTicket,
   getTicketHistory,
   listTicketAttachments,
@@ -22,6 +24,7 @@ import {
   updateTicketStatus,
 } from '@/lib/api-client';
 import type {
+  ResourceResponse,
   TicketAttachmentResponse,
   TicketCommentResponse,
   TicketResponse,
@@ -39,6 +42,7 @@ import {
   TicketHeaderCard,
   TicketHistoryCard,
   TicketLifecycleCard,
+  TicketResourceCard,
 } from '@/components/tickets/detail';
 
 export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
@@ -72,6 +76,9 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
+  const [resource, setResource] = React.useState<ResourceResponse | null>(null);
+  const [deactivatingResource, setDeactivatingResource] = React.useState(false);
+
   const load = React.useCallback(async () => {
     if (!accessToken) { setLoading(false); setLoadError('Your session is unavailable.'); return; }
     setLoading(true);
@@ -89,6 +96,16 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
       setAttachments(attachmentsData);
       setHistory(historyData);
       setManagers(managersData);
+      if (ticketData.resourceId) {
+        try {
+          const resourceData = await getResource(accessToken, ticketData.resourceId);
+          setResource(resourceData);
+        } catch {
+          setResource(null);
+        }
+      } else {
+        setResource(null);
+      }
     } catch (error) {
       setLoadError(getErrorMessage(error, 'Could not load this ticket.'));
     } finally {
@@ -174,6 +191,20 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
     } catch (error) {
       showToast('error', 'Edit failed', getErrorMessage(error, 'Could not update the comment.'));
       throw error;
+    }
+  }
+
+  async function handleDeactivateResource() {
+    if (!accessToken || !resource) return;
+    setDeactivatingResource(true);
+    try {
+      await deleteResource(accessToken, resource.id);
+      setResource((prev) => prev ? { ...prev, status: 'INACTIVE' } : prev);
+      showToast('success', 'Resource deactivated', `${resource.name} is now inactive.`);
+    } catch (error) {
+      showToast('error', 'Failed', getErrorMessage(error, 'Could not deactivate resource.'));
+    } finally {
+      setDeactivatingResource(false);
     }
   }
 
@@ -320,6 +351,14 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
                 Delete Ticket
               </Button>
             </div>
+          )}
+          {resource && (
+            <TicketResourceCard
+              resource={resource}
+              canDeactivate
+              onDeactivate={() => { void handleDeactivateResource(); }}
+              deactivating={deactivatingResource}
+            />
           )}
           <TicketDetailsCard ticket={ticket} />
           <TicketLifecycleCard ticket={ticket} history={history} />

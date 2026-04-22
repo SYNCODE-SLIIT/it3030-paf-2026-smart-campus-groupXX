@@ -444,6 +444,10 @@ export async function listResources(accessToken: string) {
   });
 }
 
+export async function getResource(accessToken: string, resourceId: string) {
+  return request<ResourceResponse>(`/api/resources/${resourceId}`, { accessToken });
+}
+
 export async function listResourceTypeOptions(accessToken: string) {
   return request<ResourceTypeOption[]>('/api/resources/lookups/types', {
     accessToken,

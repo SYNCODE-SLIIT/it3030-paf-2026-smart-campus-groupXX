@@ -16,6 +16,7 @@ import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.TicketCategory;
 import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
 import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
+import com.university.smartcampus.AppEnums.ResourceStatus;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
@@ -99,6 +100,11 @@ public class TicketService {
             ResourceEntity resource = resolveResource(request.resourceId());
             ticket.setResource(resource);
             ticket.setLocation(resource.getLocationEntity());
+
+            if (request.priority() == TicketPriority.URGENT && resource.getStatus() == ResourceStatus.ACTIVE) {
+                resource.setStatus(ResourceStatus.INACTIVE);
+                resourceRepository.save(resource);
+            }
         }
 
         ticketRepository.save(ticket);

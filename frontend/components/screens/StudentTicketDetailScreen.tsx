@@ -13,6 +13,7 @@ import {
   deleteTicketAttachment,
   deleteTicketComment,
   getErrorMessage,
+  getResource,
   getTicket,
   getTicketHistory,
   listTicketAttachments,
@@ -22,6 +23,7 @@ import {
   uploadTicketAttachment,
 } from '@/lib/api-client';
 import type {
+  ResourceResponse,
   TicketAttachmentResponse,
   TicketCommentResponse,
   TicketPriority,
@@ -35,6 +37,7 @@ import {
   TicketDetailsCard,
   TicketHeaderCard,
   TicketHistoryCard,
+  TicketResourceCard,
 } from '@/components/tickets/detail';
 import { PRIORITY_LABELS, SEC_HD_LABEL } from '@/components/tickets/detail/ticketDetailHelpers';
 
@@ -86,6 +89,8 @@ export function RequesterTicketDetailScreen({
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
+  const [resource, setResource] = React.useState<ResourceResponse | null>(null);
+
   const load = React.useCallback(async () => {
     if (!accessToken) {
       setLoading(false);
@@ -106,6 +111,16 @@ export function RequesterTicketDetailScreen({
       setAttachments(attachmentsData);
       setHistory(historyData);
       setEditForm({ priority: ticketData.priority, contactNote: ticketData.contactNote ?? '' });
+      if (ticketData.resourceId) {
+        try {
+          const resourceData = await getResource(accessToken, ticketData.resourceId);
+          setResource(resourceData);
+        } catch {
+          setResource(null);
+        }
+      } else {
+        setResource(null);
+      }
     } catch (error) {
       setLoadError(getErrorMessage(error, 'We could not load this ticket.'));
     } finally {
@@ -309,6 +324,7 @@ export function RequesterTicketDetailScreen({
 
         {/* Sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {resource && <TicketResourceCard resource={resource} />}
           <TicketDetailsCard ticket={ticket} />
           <TicketHistoryCard history={history} />
 
