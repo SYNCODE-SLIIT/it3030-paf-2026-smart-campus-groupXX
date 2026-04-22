@@ -3,7 +3,7 @@
 import React from 'react';
 import { AlertCircle, Bell, CheckCircle2, Clock, Mail, ShieldAlert } from 'lucide-react';
 
-import { Alert, Badge, Button, Card, Chip } from '@/components/ui';
+import { Alert, Badge, Button, Card, Chip, Skeleton } from '@/components/ui';
 import type { NotificationDomain, NotificationResponse, NotificationSeverity } from '@/lib/api-types';
 
 interface NotificationCenterProps {
@@ -68,6 +68,37 @@ function formatTime(value: string) {
   }).format(parsed);
 }
 
+function NotificationListSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={`notification-skeleton-${index}`}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+            gap: 12,
+            alignItems: 'start',
+            padding: 14,
+            borderRadius: 8,
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
+          }}
+        >
+          <Skeleton variant="circle" width={16} height={16} style={{ marginTop: 2 }} />
+          <span style={{ display: 'grid', gap: 7, minWidth: 0 }}>
+            <Skeleton variant="line" width="48%" height={12} />
+            <Skeleton variant="line" width="92%" height={10} />
+            <Skeleton variant="line" width="64%" height={10} />
+            <Skeleton variant="line" width={86} height={8} />
+          </span>
+          <Skeleton variant="line" width={44} height={20} style={{ borderRadius: 100 }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function NotificationCenter({
   notifications,
   loading,
@@ -110,9 +141,7 @@ export function NotificationCenter({
       </div>
 
       {loading && notifications.length === 0 ? (
-        <Alert variant="info" title="Loading">
-          Loading notifications...
-        </Alert>
+        <NotificationListSkeleton />
       ) : notifications.length === 0 ? (
         <Card style={{ padding: 28, textAlign: 'center' }}>
           <Bell size={30} style={{ color: 'var(--text-muted)', margin: '0 auto 10px' }} />
