@@ -3,11 +3,13 @@
 import React from 'react';
 import {
   CheckCircle2,
+  Shield,
+  User,
   Mail,
   MessageSquare,
-  Move,
   ZoomIn,
   ImageUp,
+  Crop,
   X,
 } from 'lucide-react';
 
@@ -40,6 +42,7 @@ type PhoneCountryCode = 'US' | 'LK' | 'GB' | 'IN' | 'AU' | 'SG' | 'MY' | 'AE' | 
 
 interface PhoneCountryOption {
   code: PhoneCountryCode;
+  flag: string;
   name: string;
   dialCode: string;
   minNationalDigits: number;
@@ -49,16 +52,16 @@ interface PhoneCountryOption {
 const DEFAULT_PHONE_COUNTRY: PhoneCountryCode = 'US';
 
 const PHONE_COUNTRIES: PhoneCountryOption[] = [
-  { code: 'US', name: 'United States', dialCode: '+1', minNationalDigits: 10, maxNationalDigits: 10 },
-  { code: 'LK', name: 'Sri Lanka', dialCode: '+94', minNationalDigits: 9, maxNationalDigits: 9 },
-  { code: 'GB', name: 'United Kingdom', dialCode: '+44', minNationalDigits: 9, maxNationalDigits: 10 },
-  { code: 'IN', name: 'India', dialCode: '+91', minNationalDigits: 10, maxNationalDigits: 10 },
-  { code: 'AU', name: 'Australia', dialCode: '+61', minNationalDigits: 9, maxNationalDigits: 9 },
-  { code: 'SG', name: 'Singapore', dialCode: '+65', minNationalDigits: 8, maxNationalDigits: 8 },
-  { code: 'MY', name: 'Malaysia', dialCode: '+60', minNationalDigits: 9, maxNationalDigits: 10 },
-  { code: 'AE', name: 'United Arab Emirates', dialCode: '+971', minNationalDigits: 9, maxNationalDigits: 9 },
-  { code: 'DE', name: 'Germany', dialCode: '+49', minNationalDigits: 10, maxNationalDigits: 11 },
-  { code: 'JP', name: 'Japan', dialCode: '+81', minNationalDigits: 9, maxNationalDigits: 10 },
+  { code: 'US', flag: '🇺🇸', name: 'United States', dialCode: '+1', minNationalDigits: 10, maxNationalDigits: 10 },
+  { code: 'LK', flag: '🇱🇰', name: 'Sri Lanka', dialCode: '+94', minNationalDigits: 9, maxNationalDigits: 9 },
+  { code: 'GB', flag: '🇬🇧', name: 'United Kingdom', dialCode: '+44', minNationalDigits: 9, maxNationalDigits: 10 },
+  { code: 'IN', flag: '🇮🇳', name: 'India', dialCode: '+91', minNationalDigits: 10, maxNationalDigits: 10 },
+  { code: 'AU', flag: '🇦🇺', name: 'Australia', dialCode: '+61', minNationalDigits: 9, maxNationalDigits: 9 },
+  { code: 'SG', flag: '🇸🇬', name: 'Singapore', dialCode: '+65', minNationalDigits: 8, maxNationalDigits: 8 },
+  { code: 'MY', flag: '🇲🇾', name: 'Malaysia', dialCode: '+60', minNationalDigits: 9, maxNationalDigits: 10 },
+  { code: 'AE', flag: '🇦🇪', name: 'United Arab Emirates', dialCode: '+971', minNationalDigits: 9, maxNationalDigits: 9 },
+  { code: 'DE', flag: '🇩🇪', name: 'Germany', dialCode: '+49', minNationalDigits: 10, maxNationalDigits: 11 },
+  { code: 'JP', flag: '🇯🇵', name: 'Japan', dialCode: '+81', minNationalDigits: 9, maxNationalDigits: 10 },
 ];
 
 const PHONE_COUNTRY_BY_CODE = PHONE_COUNTRIES.reduce<Record<PhoneCountryCode, PhoneCountryOption>>((map, country) => {
@@ -104,9 +107,9 @@ function formatPhoneForSubmit(countryCode: PhoneCountryCode, nationalNumber: str
   return `${country.dialCode}${normalizedNational}`;
 }
 
-const PORTRAIT_CROP_VIEW_WIDTH = 264;
-const PORTRAIT_CROP_VIEW_HEIGHT = 352;
-const PORTRAIT_OUTPUT_WIDTH = 720;
+const PORTRAIT_CROP_VIEW_WIDTH = 320;
+const PORTRAIT_CROP_VIEW_HEIGHT = 320;
+const PORTRAIT_OUTPUT_WIDTH = 960;
 const PORTRAIT_OUTPUT_HEIGHT = 960;
 const MAX_PORTRAIT_ZOOM = 3;
 
@@ -236,6 +239,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
   const [isSubmitting, startSubmitTransition] = React.useTransition();
   const [selectedImageFile, setSelectedImageFile] = React.useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(null);
+  const [hasAppliedCrop, setHasAppliedCrop] = React.useState(false);
   const [submitStage, setSubmitStage] = React.useState<string | null>(null);
   const [cropEditorOpen, setCropEditorOpen] = React.useState(false);
   const [cropEditorState, setCropEditorState] = React.useState<CropEditorState | null>(null);
@@ -433,7 +437,23 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }
 
     event.currentTarget.value = '';
-    void openCropEditor(file);
+
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setSelectedImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setHasAppliedCrop(false);
+    setAlert(null);
+  }
+
+  function handleOpenCropEditor() {
+    if (!selectedImageFile || isSubmitting) {
+      return;
+    }
+
+    void openCropEditor(selectedImageFile);
   }
 
   function handleCropPointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -553,6 +573,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
 
       setSelectedImageFile(croppedFile);
       setImagePreviewUrl(URL.createObjectURL(croppedFile));
+      setHasAppliedCrop(true);
       setAlert(null);
       closeCropEditor();
     } catch (error) {
@@ -572,6 +593,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     }
     setSelectedImageFile(null);
     setImagePreviewUrl(null);
+    setHasAppliedCrop(false);
     if (imageInputRef.current) {
       imageInputRef.current.value = '';
     }
@@ -670,6 +692,7 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
             profileImageUrl: uploadedProfileImageUrl,
           }));
           setSelectedImageFile(null);
+          setHasAppliedCrop(false);
           if (imagePreviewUrl) {
             URL.revokeObjectURL(imagePreviewUrl);
           }
@@ -722,22 +745,18 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
   const programOptions = formState.facultyName ? programOptionsByFaculty[formState.facultyName] : [];
   const phoneCountryOptions = PHONE_COUNTRIES.map((country) => ({
     value: country.code,
-    label: `${country.name} (${country.dialCode})`,
+    label: `${country.flag} ${country.dialCode}`,
   }));
   const selectedPhoneCountry = PHONE_COUNTRY_BY_CODE[formState.phoneCountryCode] ?? PHONE_COUNTRY_BY_CODE[DEFAULT_PHONE_COUNTRY];
   const portraitPreviewUrl = imagePreviewUrl ?? formState.profileImageUrl;
   const hasStagedPortrait = Boolean(selectedImageFile || imagePreviewUrl);
   const portraitStatus: { color: 'green' | 'blue' | 'neutral'; label: string } = selectedImageFile
-    ? { color: 'green', label: 'Ready To Upload' }
+    ? hasAppliedCrop
+      ? { color: 'green', label: 'Cropped Ready' }
+      : { color: 'blue', label: 'Selected' }
     : portraitPreviewUrl
       ? { color: 'blue', label: 'Portrait Added' }
       : { color: 'neutral', label: 'Portrait Optional' };
-  const reviewName = `${formState.firstName.trim()} ${formState.lastName.trim()}`.trim() || 'Add your name';
-  const reviewProgram = formState.programName || 'Select your academic program';
-  const reviewTerm =
-    formState.academicYear && formState.semester
-      ? `${formState.academicYear} - ${formState.semester}`
-      : 'Select year and semester';
   const profileInitials =
     `${formState.firstName?.[0] ?? resolvedUser.email[0] ?? 'S'}${formState.lastName?.[0] ?? ''}`.toUpperCase();
 
@@ -766,9 +785,19 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           gap: 24px;
           align-content: start;
         }
+        .onboarding-column-secondary {
+          grid-template-rows: auto 1fr;
+        }
         .onboarding-form-card {
           display: flex;
           flex-direction: column;
+        }
+        .onboarding-form-card-fill {
+          height: 100%;
+        }
+        .onboarding-form-card-fill .onboarding-section {
+          height: 100%;
+          align-content: start;
         }
         .onboarding-card-header {
           display: flex;
@@ -810,17 +839,17 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
         }
         .onboarding-portrait-stage {
           display: grid;
-          gap: 14px;
-          padding: 14px;
+          gap: 12px;
+          padding: 12px;
           border: 1px solid var(--border);
           border-radius: var(--radius-lg);
           background: linear-gradient(160deg, rgba(238,202,68,.12), rgba(255,255,255,.02));
         }
         .onboarding-portrait-frame {
-          width: min(100%, 260px);
-          aspect-ratio: 3 / 4;
+          width: min(100%, 220px);
+          aspect-ratio: 1 / 1;
           justify-self: center;
-          border-radius: 20px;
+          border-radius: 50%;
           overflow: hidden;
           position: relative;
           border: 2px solid rgba(238,202,68,.5);
@@ -838,28 +867,64 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           height: 100%;
           display: grid;
           place-items: center;
-          gap: 8px;
+          gap: 0;
           color: rgba(255,255,255,.92);
           text-align: center;
-          padding: 14px;
+          padding: 0;
+          position: relative;
+          overflow: hidden;
+          background: radial-gradient(circle at 32% 28%, rgba(238,202,68,.28), rgba(238,202,68,.1) 58%, rgba(15,15,14,.94));
         }
-        .onboarding-portrait-initials {
+        .onboarding-portrait-placeholder {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          background: radial-gradient(circle at 32% 28%, rgba(238,202,68,.35), rgba(238,202,68,.14) 56%, rgba(15,15,14,.72));
+          border: 3px solid rgba(238,202,68,.65);
+          color: rgba(255,255,255,.92);
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.1);
+        }
+        .onboarding-verification-card {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 14px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          background: linear-gradient(150deg, rgba(238,202,68,.1), rgba(255,255,255,.02));
+        }
+        .onboarding-verification-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 84px;
-          height: 84px;
-          border-radius: 50%;
-          background: rgba(238,202,68,.26);
-          border: 1px solid rgba(238,202,68,.55);
+          background: rgba(238,202,68,.16);
+          border: 1px solid rgba(238,202,68,.3);
+          color: rgba(238,202,68,.95);
+        }
+        .onboarding-verification-title {
+          margin: 0;
           font-family: var(--font-display);
-          font-size: 30px;
+          font-size: 18px;
+          line-height: 1.1;
           font-weight: 800;
-          letter-spacing: .06em;
+          color: var(--text-h);
+        }
+        .onboarding-verification-copy {
+          margin: 4px 0 0;
+          color: var(--text-muted);
+          font-size: 12.5px;
+          line-height: 1.35;
         }
         .onboarding-profile-actions {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 10px;
         }
         .onboarding-profile-caption {
@@ -867,33 +932,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
           color: var(--text-muted);
           font-size: 12.5px;
           line-height: 1.45;
-        }
-        .onboarding-review-grid {
-          display: grid;
-          gap: 10px;
-        }
-        .onboarding-review-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          padding: 10px 12px;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: var(--surface-2);
-        }
-        .onboarding-review-label {
-          color: var(--text-muted);
-          font-size: 11px;
-          font-family: var(--font-mono);
-          letter-spacing: .16em;
-          text-transform: uppercase;
-        }
-        .onboarding-review-value {
-          color: var(--text-h);
-          font-size: 13px;
-          font-weight: 700;
-          text-align: right;
         }
         .onboarding-notification-strip {
           display: flex;
@@ -1153,9 +1191,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                         <h2 id="personal-info-title" className="onboarding-section-title">Personal Information</h2>
                         <Chip color="glass">{resolvedUser.email}</Chip>
                       </div>
-                      <p className="onboarding-section-copy">
-                        Add your core details once so campus teams can route support and urgent updates correctly.
-                      </p>
 
                       <div className="onboarding-field-grid">
                         <Input
@@ -1174,15 +1209,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           disabled={isSubmitting}
                           required
                         />
-                        <div className="onboarding-field-full">
-                          <Input
-                            label="Preferred Name (Optional)"
-                            placeholder="Name shown on help desk and ticket updates"
-                            value={formState.preferredName}
-                            onChange={(event) => setField('preferredName', event.target.value)}
-                            disabled={isSubmitting}
-                          />
-                        </div>
                         <div className="onboarding-field-full">
                           <div className="onboarding-phone-grid">
                             <Select
@@ -1206,10 +1232,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           </div>
                         </div>
                       </div>
-
-                      <p className="onboarding-section-copy" style={{ marginTop: -2 }}>
-                        Phone details are used for urgent scheduling and campus safety notifications.
-                      </p>
                     </section>
                   </Card>
 
@@ -1217,9 +1239,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                     <section className="onboarding-section" aria-labelledby="academic-info-title">
                       <div>
                         <h2 id="academic-info-title" className="onboarding-section-title">Academic Information</h2>
-                        <p className="onboarding-section-copy">
-                          Select the placement details used for advising, course access, and semester records.
-                        </p>
                       </div>
 
                       <div className="onboarding-academic-grid">
@@ -1260,20 +1279,31 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                           required
                         />
                       </div>
+
+                      <div className="onboarding-submit-section">
+                        {submitStage && <p className="onboarding-status">{submitStage}</p>}
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          size="lg"
+                          loading={isSubmitting}
+                          iconLeft={<CheckCircle2 size={16} />}
+                          className="onboarding-primary-action"
+                        >
+                          {isSubmitting ? 'Completing Onboarding...' : 'Complete Onboarding'}
+                        </Button>
+                      </div>
                     </section>
                   </Card>
                 </div>
 
-                <div className="onboarding-column">
+                <div className="onboarding-column onboarding-column-secondary">
                   <Card hoverable className="onboarding-form-card">
                     <section className="onboarding-section" aria-labelledby="portrait-title">
                       <div className="onboarding-card-header">
                         <h2 id="portrait-title" className="onboarding-section-title">Profile Portrait</h2>
                         <Chip color={portraitStatus.color}>{portraitStatus.label}</Chip>
                       </div>
-                      <p className="onboarding-section-copy">
-                        Upload a clear portrait. If your image is landscape, you can zoom and reposition before saving.
-                      </p>
 
                       <div className="onboarding-portrait-stage">
                         <div className="onboarding-portrait-frame">
@@ -1286,8 +1316,9 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                             />
                           ) : (
                             <div className="onboarding-portrait-fallback">
-                              <span className="onboarding-portrait-initials">{profileInitials}</span>
-                              <span style={{ fontSize: 12, opacity: 0.88 }}>No portrait uploaded yet</span>
+                              <span className="onboarding-portrait-placeholder" aria-hidden="true">
+                                <User size={86} strokeWidth={1.7} />
+                              </span>
                             </div>
                           )}
                         </div>
@@ -1310,7 +1341,17 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                             disabled={isSubmitting}
                             onClick={() => imageInputRef.current?.click()}
                           >
-                            {selectedImageFile ? 'Replace + Re-Crop' : 'Upload + Crop Portrait'}
+                            {selectedImageFile ? 'Replace Image' : 'Upload Image'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            iconLeft={<Crop size={14} />}
+                            disabled={isSubmitting || !selectedImageFile}
+                            onClick={handleOpenCropEditor}
+                          >
+                            Crop Image
                           </Button>
                           <Button
                             type="button"
@@ -1329,42 +1370,18 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
                     </section>
                   </Card>
 
-                  <Card hoverable className="onboarding-form-card">
-                    <section className="onboarding-section" aria-labelledby="review-finish-title">
-                      <div>
-                        <h2 id="review-finish-title" className="onboarding-section-title">Review & Finish</h2>
-                        <p className="onboarding-section-copy">
-                          Quick summary from your selections so far. You can update these later in account settings.
-                        </p>
-                      </div>
-
-                      <div className="onboarding-review-grid">
-                        <div className="onboarding-review-item">
-                          <span className="onboarding-review-label">Name</span>
-                          <span className="onboarding-review-value">{reviewName}</span>
+                  <Card hoverable className="onboarding-form-card onboarding-form-card-fill">
+                    <section className="onboarding-section" aria-labelledby="portrait-tips-title">
+                      <div className="onboarding-verification-card" id="portrait-tips-title">
+                        <span className="onboarding-verification-icon" aria-hidden="true">
+                          <Shield size={24} strokeWidth={2} />
+                        </span>
+                        <div>
+                          <h2 className="onboarding-verification-title">Student ID Verification</h2>
+                          <p className="onboarding-verification-copy">
+                            Your profile photo will be used for digital student IDs and verification on campus.
+                          </p>
                         </div>
-                        <div className="onboarding-review-item">
-                          <span className="onboarding-review-label">Program</span>
-                          <span className="onboarding-review-value">{reviewProgram}</span>
-                        </div>
-                        <div className="onboarding-review-item">
-                          <span className="onboarding-review-label">Current Term</span>
-                          <span className="onboarding-review-value">{reviewTerm}</span>
-                        </div>
-                      </div>
-
-                      <div className="onboarding-submit-section">
-                        {submitStage && <p className="onboarding-status">{submitStage}</p>}
-                        <Button
-                          type="submit"
-                          variant="primary"
-                          size="lg"
-                          loading={isSubmitting}
-                          iconLeft={<CheckCircle2 size={16} />}
-                          className="onboarding-primary-action"
-                        >
-                          {isSubmitting ? 'Completing Onboarding...' : 'Complete Onboarding'}
-                        </Button>
                       </div>
                     </section>
                   </Card>
@@ -1431,56 +1448,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
               value={cropZoom}
               disabled={!cropMetrics}
               onChange={(event) => setCropZoom(Number(event.target.value))}
-              className="onboarding-crop-range"
-            />
-          </div>
-
-          <div className="onboarding-crop-control">
-            <div className="onboarding-crop-control-head">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Move size={14} />
-                Horizontal
-              </span>
-              <span>{Math.round(cropOffset.x)} px</span>
-            </div>
-            <input
-              type="range"
-              min={-cropOffsetLimitX}
-              max={cropOffsetLimitX}
-              step={0.5}
-              value={cropOffset.x}
-              disabled={!cropMetrics || cropOffsetLimitX === 0}
-              onChange={(event) =>
-                setCropOffset((current) => ({
-                  ...current,
-                  x: Number(event.target.value),
-                }))
-              }
-              className="onboarding-crop-range"
-            />
-          </div>
-
-          <div className="onboarding-crop-control">
-            <div className="onboarding-crop-control-head">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Move size={14} />
-                Vertical
-              </span>
-              <span>{Math.round(cropOffset.y)} px</span>
-            </div>
-            <input
-              type="range"
-              min={-cropOffsetLimitY}
-              max={cropOffsetLimitY}
-              step={0.5}
-              value={cropOffset.y}
-              disabled={!cropMetrics || cropOffsetLimitY === 0}
-              onChange={(event) =>
-                setCropOffset((current) => ({
-                  ...current,
-                  y: Number(event.target.value),
-                }))
-              }
               className="onboarding-crop-range"
             />
           </div>

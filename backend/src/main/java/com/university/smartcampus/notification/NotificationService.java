@@ -825,9 +825,6 @@ public class NotificationService {
     }
 
     private boolean defaultEmailEnabled(UserEntity user) {
-        if (user.getUserType() == UserType.STUDENT && user.getStudentProfile() != null) {
-            return !Boolean.FALSE.equals(user.getStudentProfile().getEmailNotificationsEnabled());
-        }
         return user.getAccountStatus() == AccountStatus.ACTIVE;
     }
 
