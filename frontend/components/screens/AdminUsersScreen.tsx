@@ -1,21 +1,17 @@
 'use client';
 
 import React from 'react';
-import { Copy, Mail, Search, Trash2, UserPlus, X } from 'lucide-react';
+import { Mail, Search, Trash2, Upload, UserPlus, X } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
+import { BulkStudentImportDialog } from '@/components/screens/admin/BulkStudentImportDialog';
 import { CreateUserPanel } from '@/components/screens/admin/CreateUserPanel';
 import { UserStatsGrid } from '@/components/screens/admin/UserStatsGrid';
 import { UserTableCard, roleTabs, type RoleTab } from '@/components/screens/admin/UserTableCard';
-import { Alert, Button, Card, Input, Skeleton, Tabs, Textarea } from '@/components/ui';
+import { Alert, Button, Card, Input, Skeleton, Tabs } from '@/components/ui';
 import { deleteUser, getErrorMessage, getUser, listUsers, resendInvite } from '@/lib/api-client';
 import type { AccountStatus, UserResponse } from '@/lib/api-types';
-
-type CreatedInviteState = {
-  email: string;
-  link: string;
-} | null;
 
 type PendingUserAction = {
   type: 'reinvite' | 'delete';
@@ -29,6 +25,12 @@ type ActionNotice = {
 } | null;
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+type ReloadUserOptions = {
+  email?: string;
+  roleTab?: RoleTab;
+  statusFilter?: AccountStatus | '';
+};
 
 export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }) {
   const { session, appUser } = useAuth();
@@ -44,28 +46,31 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
   const [loadingUsers, setLoadingUsers] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
-  const [createdInvite, setCreatedInvite] = React.useState<CreatedInviteState>(null);
+  const [isBulkImportDialogOpen, setIsBulkImportDialogOpen] = React.useState(false);
   const [pendingUserAction, setPendingUserAction] = React.useState<PendingUserAction>(null);
   const [reinvitingUserId, setReinvitingUserId] = React.useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = React.useState<string | null>(null);
   const [actionNotice, setActionNotice] = React.useState<ActionNotice>(null);
-  const [isCopyingLink, startCopyLinkTransition] = React.useTransition();
 
-  const reloadUsers = React.useCallback(async () => {
+  const reloadUsers = React.useCallback(async (options: ReloadUserOptions = {}) => {
     if (!accessToken) {
       setLoadingUsers(false);
       setLoadError('The admin session is unavailable. Please sign in again.');
       return;
     }
 
+    const nextEmail = options.email ?? deferredEmail;
+    const nextRoleTab = options.roleTab ?? roleTab;
+    const nextStatusFilter = options.statusFilter ?? statusFilter;
+
     setLoadingUsers(true);
     setLoadError(null);
 
     try {
       const nextUsers = await listUsers(accessToken, {
-        email: deferredEmail || undefined,
-        userType: roleTab === 'ALL' ? '' : roleTab,
-        accountStatus: statusFilter,
+        email: nextEmail || undefined,
+        userType: nextRoleTab === 'ALL' ? '' : nextRoleTab,
+        accountStatus: nextStatusFilter,
       });
       setUsers(nextUsers);
     } catch (error) {
@@ -80,31 +85,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
     void reloadUsers();
   }, [reloadUsers]);
 
-  React.useEffect(() => {
-    if (!createdInvite) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      setCreatedInvite(null);
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createdInvite]);
-
-
-  function handleCopyGeneratedLink() {
-    if (!createdInvite?.link) return;
-    startCopyLinkTransition(async () => {
-      try {
-        await navigator.clipboard.writeText(createdInvite.link);
-        setActionNotice({ variant: 'success', title: 'Copied', message: 'Access link copied to clipboard.' });
-      } catch {
-        setActionNotice({ variant: 'error', title: 'Copy failed', message: 'Could not copy the access link.' });
-      }
-    });
-  }
-
   async function handleReinviteUser(targetUser: UserResponse) {
     if (!accessToken) {
       setActionNotice({ variant: 'error', title: 'Session unavailable', message: 'Please sign in again.' });
@@ -116,12 +96,12 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
       return;
     }
 
+    setActionNotice(null);
     setReinvitingUserId(targetUser.id);
     try {
       await resendInvite(accessToken, targetUser.id);
       const refreshed = await getUser(accessToken, targetUser.id);
       setUsers((current) => current.map((user) => (user.id === refreshed.id ? refreshed : user)));
-      setActionNotice({ variant: 'success', title: 'Email sent', message: `A fresh sign-in email was sent to ${targetUser.email}.` });
     } catch (error) {
       setActionNotice({ variant: 'error', title: 'Email send failed', message: getErrorMessage(error, 'We could not send a new sign-in email.') });
     } finally {
@@ -140,11 +120,11 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
       return;
     }
 
+    setActionNotice(null);
     setDeletingUserId(targetUser.id);
     try {
       await deleteUser(accessToken, targetUser.id);
       setUsers((current) => current.filter((user) => user.id !== targetUser.id));
-      setActionNotice({ variant: 'success', title: 'User deleted', message: `${targetUser.email} was removed.` });
     } catch (error) {
       setActionNotice({ variant: 'error', title: 'Delete failed', message: getErrorMessage(error, 'Could not delete this user.') });
     } finally {
@@ -302,14 +282,24 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
               iconLeft={<Search size={15} />}
             />
           </div>
-          <Button
-            variant="primary"
-            size="sm"
-            iconLeft={<UserPlus size={14} />}
-            onClick={() => setIsCreateDialogOpen(true)}
-          >
-            Add User
-          </Button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button
+              variant="subtle"
+              size="sm"
+              iconLeft={<Upload size={14} />}
+              onClick={() => setIsBulkImportDialogOpen(true)}
+            >
+              Import Students
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              iconLeft={<UserPlus size={14} />}
+              onClick={() => setIsCreateDialogOpen(true)}
+            >
+              Add User
+            </Button>
+          </div>
         </div>
 
         {/* Table */}
@@ -398,9 +388,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
                   >
                     Add User
                   </p>
-                  <p style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-body)' }}>
-                    Create the account and send the first sign-in email right away.
-                  </p>
                 </div>
                 <button
                   type="button"
@@ -415,14 +402,10 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
               <CreateUserPanel
                 embedded
                 accessToken={accessToken}
-                onCreated={async (createdUser) => {
+                onCreated={async () => {
                   setEmailFilter('');
-                  await reloadUsers();
+                  await reloadUsers({ email: '', roleTab, statusFilter });
                   setIsCreateDialogOpen(false);
-                  if (createdUser.lastInviteReference) {
-                    setCreatedInvite({ email: createdUser.email, link: createdUser.lastInviteReference });
-                    return;
-                  }
                 }}
                 onCancel={() => setIsCreateDialogOpen(false)}
               />
@@ -431,101 +414,18 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
         </div>
       )}
 
-      {/* Generated link dialog */}
-      {createdInvite && (
-        <div className="admin-dialog-overlay" onClick={() => setCreatedInvite(null)}>
-          <div
-            className="admin-dialog-shell"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="admin-generated-link-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Card>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                  alignItems: 'flex-start',
-                  marginBottom: 18,
-                }}
-              >
-                <div>
-                  <p
-                    id="admin-generated-link-title"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 24,
-                      fontWeight: 700,
-                      color: 'var(--text-h)',
-                    }}
-                  >
-                    Generated Link
-                  </p>
-                  <p style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-body)' }}>
-                    Open this link in a private window to test the new user sign-in flow.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="admin-dialog-close"
-                  aria-label="Close"
-                  onClick={() => setCreatedInvite(null)}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <Alert variant="success" title="User created" style={{ marginBottom: 16 }}>
-                The access link is ready. Open it in a private window so it does not interfere with your admin session.
-              </Alert>
-
-              <div style={{ display: 'grid', gap: 14 }}>
-                <Input
-                  label="User Email"
-                  id="generated-invite-email"
-                  name="generated-invite-email"
-                  value={createdInvite.email}
-                  readOnly
-                  autoComplete="off"
-                />
-                <Textarea
-                  label="Generated Access Link"
-                  value={createdInvite.link}
-                  readOnly
-                  rows={5}
-                  resize="none"
-                  style={{ fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.5 }}
-                />
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  flexWrap: 'wrap',
-                  marginTop: 18,
-                }}
-              >
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  loading={isCopyingLink}
-                  iconLeft={<Copy size={14} />}
-                  onClick={handleCopyGeneratedLink}
-                >
-                  Copy Link
-                </Button>
-                <Button variant="primary" size="sm" onClick={() => setCreatedInvite(null)}>
-                  Done
-                </Button>
-              </div>
-            </Card>
-          </div>
-        </div>
-      )}
+      <BulkStudentImportDialog
+        open={isBulkImportDialogOpen}
+        accessToken={accessToken}
+        onClose={() => setIsBulkImportDialogOpen(false)}
+        onImported={async () => {
+          setActionNotice(null);
+          setEmailFilter('');
+          setStatusFilter('');
+          setRoleTab('STUDENT');
+          await reloadUsers({ email: '', roleTab: 'STUDENT', statusFilter: '' });
+        }}
+      />
     </>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { CalendarDays, Plus, Search } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
@@ -10,29 +10,33 @@ import {
   Button,
   Card,
   Chip,
+  Dialog,
   Input,
   Select,
   Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
+  Tabs,
   Textarea,
-  Dialog,
 } from '@/components/ui';
+import {
+  BookingCard,
+  BookingCardSkeleton,
+  BookingSection,
+} from '@/components/booking/BookingCard';
+import { RecurringBookingForm } from '@/components/booking/RecurringBookingForm';
+import { BookingModificationModal } from '@/components/booking/BookingModificationModal';
+import { BookingCheckInPanel } from '@/components/booking/BookingCheckInPanel';
+import { BookingCalendar } from '@/components/booking/BookingCalendar';
 import {
   cancelMyBooking,
   checkInBooking,
   createBooking,
   createRecurringBooking,
-  getResourceRemainingRanges,
   getErrorMessage,
-  listNotifications,
+  getResourceRemainingRanges,
   listMyBookings,
   listMyRecurringBookings,
-  listResourceOptions,
-  markNotificationAsRead,
+  listNotifications,
+  listResources,
   requestBookingModification,
 } from '@/lib/api-client';
 import type {
@@ -45,22 +49,18 @@ import type {
   ResourceRemainingRangesResponse,
   ResourceOption,
 } from '@/lib/api-types';
+import { getLocationTypeLabel, getWingLabel } from '@/lib/location-display';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
-import { RecurringBookingForm } from '@/components/booking/RecurringBookingForm';
-import { BookingModificationModal } from '@/components/booking/BookingModificationModal';
-import { BookingCheckInPanel } from '@/components/booking/BookingCheckInPanel';
-import { NotificationCenter } from '@/components/notifications/NotificationCenter';
-import { BookingCalendar } from '@/components/booking/BookingCalendar';
-import { BookingScreenSkeleton } from '@/components/booking/BookingScreenSkeleton';
 
-type TabType = 'bookings' | 'recurring' | 'calendar' | 'notifications';
+type TabType = 'bookings' | 'recurring' | 'calendar';
 
 const DURATION_HINTS: Record<string, string> = {
+  SPACES: 'Max 3 hours',
   LECTURE_HALL: 'Max 3 hours',
   LABORATORY: 'Max 3 hours',
   LIBRARY_SPACE: 'Max 3 hours',
-  MEETING_ROOM: 'No limit',
-  EVENT_SPACE: 'No limit',
+  MEETING_ROOM: 'Max 3 hours',
+  EVENT_SPACE: 'Max 3 hours',
 };
 
 const NEW_BOOKING_INITIAL = {
@@ -71,6 +71,16 @@ const NEW_BOOKING_INITIAL = {
   endTime: '',
   purpose: '',
 };
+
+const BOOKING_SECTIONS: Array<{ status: BookingStatus; label: string; color: string }> = [
+  { status: 'APPROVED', label: 'Approved', color: 'var(--green-400)' },
+  { status: 'PENDING', label: 'Pending Review', color: 'var(--yellow-400)' },
+  { status: 'CHECKED_IN', label: 'Checked In', color: 'var(--blue-400)' },
+  { status: 'COMPLETED', label: 'Completed', color: 'var(--blue-500)' },
+  { status: 'REJECTED', label: 'Rejected', color: 'var(--red-400)' },
+  { status: 'CANCELLED', label: 'Cancelled', color: 'var(--neutral-400)' },
+  { status: 'NO_SHOW', label: 'No Show', color: 'var(--red-500)' },
+];
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -87,22 +97,30 @@ function formatDateTime(value: string) {
   }).format(parsed);
 }
 
-function statusChipColor(status: BookingStatus): 'yellow' | 'green' | 'red' | 'neutral' | 'blue' {
-  switch (status) {
-    case 'PENDING':
-      return 'yellow';
-    case 'APPROVED':
-      return 'green';
-    case 'CHECKED_IN':
-    case 'COMPLETED':
-      return 'blue';
-    case 'REJECTED':
-    case 'CANCELLED':
-    case 'NO_SHOW':
-      return 'red';
-    default:
-      return 'neutral';
+function getIsoDate(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
   }
+
+  return parsed.toISOString().slice(0, 10);
+}
+
+function localDateTimeToIso(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
+}
+
+function normalizeSubcategory(value: string | null) {
+  if (!value) {
+    return '';
+  }
+
+  return value.trim().replace(/[\s-]+/g, '_').toUpperCase();
 }
 
 function canCancelByRequester(booking: BookingResponse) {
@@ -118,28 +136,95 @@ function canCancelByRequester(booking: BookingResponse) {
   return Number.isFinite(startTime) && startTime > Date.now();
 }
 
-function localDateTimeToIso(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed.toISOString();
+function isSpaceResource(resource?: ResourceResponse | null) {
+  return resource?.category === 'SPACES';
 }
 
-function getIsoDate(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
+function isCheckInAvailable(booking: BookingResponse, resource?: ResourceResponse | null) {
+  if (!isSpaceResource(resource)) {
+    return false;
   }
-  return parsed.toISOString().slice(0, 10);
+
+  if (booking.status !== 'APPROVED') {
+    return false;
+  }
+
+  const now = Date.now();
+  const startTime = new Date(booking.startTime).getTime();
+  const endTime = new Date(booking.endTime).getTime();
+
+  return startTime <= now && endTime > now;
 }
 
-function normalizeSubcategory(value: string | null) {
-  if (!value) {
-    return '';
-  }
+function RecurringBookingCard({ recurring }: { recurring: RecurringBookingResponse }) {
+  return (
+    <Card
+      style={{
+        minWidth: 320,
+        maxWidth: 340,
+        padding: 18,
+        border: '1px solid var(--border)',
+        boxShadow: 'var(--card-shadow)',
+        display: 'grid',
+        gap: 12,
+        background: 'var(--surface)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '.12em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              marginBottom: 6,
+            }}
+          >
+            {recurring.resource.code}
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-h)' }}>{recurring.resource.name}</div>
+        </div>
+        <Chip color={recurring.active ? 'green' : 'red'} size="sm" dot>
+          {recurring.active ? 'Active' : 'Inactive'}
+        </Chip>
+      </div>
 
-  return value.trim().replace(/[\s-]+/g, '_').toUpperCase();
+      <div style={{ display: 'grid', gap: 7, fontSize: 11.5, color: 'var(--text-body)' }}>
+        <div>{recurring.recurrencePattern}</div>
+        <div>Starts: {new Date(recurring.startDate).toLocaleDateString('en-LK')}</div>
+        <div>
+          Time: {recurring.startTime} to {recurring.endTime}
+        </div>
+        {recurring.endDate && <div>Ends: {new Date(recurring.endDate).toLocaleDateString('en-LK')}</div>}
+        {recurring.occurrenceCount && <div>Occurrences: {recurring.occurrenceCount}</div>}
+        {recurring.purpose && <div>{recurring.purpose}</div>}
+      </div>
+    </Card>
+  );
+}
+
+function RequesterBookingSectionsSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {Array.from({ length: 2 }).map((_, sectionIndex) => (
+        <BookingSection
+          key={sectionIndex}
+          label="Loading"
+          color="var(--border)"
+          count={3}
+        >
+          {Array.from({ length: 3 }).map((__, cardIndex) => (
+            <div key={cardIndex} style={{ flexShrink: 0 }}>
+              <BookingCardSkeleton />
+            </div>
+          ))}
+        </BookingSection>
+      ))}
+    </div>
+  );
 }
 
 export function RequesterBookingsScreenEnhanced({
@@ -151,28 +236,27 @@ export function RequesterBookingsScreenEnhanced({
   const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
-  // State
-  const [resources, setResources] = React.useState<ResourceOption[]>([]);
+  const [resources, setResources] = React.useState<ResourceResponse[]>([]);
   const [bookings, setBookings] = React.useState<BookingResponse[]>([]);
   const [recurringBookings, setRecurringBookings] = React.useState<RecurringBookingResponse[]>([]);
   const [notifications, setNotifications] = React.useState<NotificationResponse[]>([]);
   const [form, setForm] = React.useState(NEW_BOOKING_INITIAL);
+  const [searchText, setSearchText] = React.useState('');
+  const deferredSearch = React.useDeferredValue(searchText);
   const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<TabType>('bookings');
+  const [showBookingComposer, setShowBookingComposer] = React.useState(true);
+  const [showRecurringForm, setShowRecurringForm] = React.useState(false);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [remainingRanges, setRemainingRanges] = React.useState<ResourceRemainingRangesResponse | null>(null);
   const [availabilityLoading, setAvailabilityLoading] = React.useState(false);
   const [availabilityError, setAvailabilityError] = React.useState<string | null>(null);
-
-
-
-  // Modals
-  const [showRecurringForm, setShowRecurringForm] = React.useState(false);
   const [showModificationModal, setShowModificationModal] = React.useState(false);
   const [modificationBooking, setModificationBooking] = React.useState<BookingResponse | null>(null);
   const [checkInBookingId, setCheckInBookingId] = React.useState<string | null>(null);
   const [cancellationBooking, setCancellationBooking] = React.useState<BookingResponse | null>(null);
+  const [locationBooking, setLocationBooking] = React.useState<BookingResponse | null>(null);
   const [cancellationReason, setCancellationReason] = React.useState('');
 
   const reload = React.useCallback(async () => {
@@ -192,6 +276,7 @@ export function RequesterBookingsScreenEnhanced({
         listMyRecurringBookings(accessToken),
         listNotifications(accessToken, { domain: 'BOOKING', limit: 40 }),
       ]);
+
       setResources(resourceList);
       setBookings(myBookings);
       setRecurringBookings(recurring);
@@ -200,6 +285,8 @@ export function RequesterBookingsScreenEnhanced({
       setLoadError(getErrorMessage(error, 'We could not load your bookings.'));
       setResources([]);
       setBookings([]);
+      setRecurringBookings([]);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -235,7 +322,6 @@ export function RequesterBookingsScreenEnhanced({
     void loadRemainingRanges();
   }, [accessToken, form.resourceId, form.startTime]);
 
-  // Handlers
   async function handleCreateBooking(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -253,7 +339,7 @@ export function RequesterBookingsScreenEnhanced({
     const endTimeIso = localDateTimeToIso(form.endTime);
 
     if (!startTimeIso || !endTimeIso) {
-      showToast('warning', 'Invalid time', 'Enter valid times.');
+      showToast('warning', 'Invalid time', 'Enter valid start and end times.');
       return;
     }
 
@@ -272,39 +358,11 @@ export function RequesterBookingsScreenEnhanced({
       });
       showToast('success', 'Booking created', 'Your booking request has been submitted.');
       setForm(NEW_BOOKING_INITIAL);
+      setShowBookingComposer(false);
+      setActiveTab('bookings');
       await reload();
     } catch (error) {
       showToast('error', 'Booking failed', getErrorMessage(error, 'Could not create booking.'));
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function handleCancelBooking(booking: BookingResponse) {
-    if (!accessToken) {
-      showToast('error', 'Session unavailable', 'Please sign in again.');
-      return;
-    }
-
-    setCancellationBooking(booking);
-    setCancellationReason('');
-  }
-
-  async function handleConfirmCancellation() {
-    if (!accessToken || !cancellationBooking) {
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const reason = cancellationReason.trim();
-      await cancelMyBooking(accessToken, cancellationBooking.id, reason ? { reason } : undefined);
-      showToast('success', 'Booking cancelled', 'Your booking has been cancelled.');
-      setCancellationBooking(null);
-      setCancellationReason('');
-      await reload();
-    } catch (error) {
-      showToast('error', 'Cancellation failed', getErrorMessage(error, 'Could not cancel booking.'));
     } finally {
       setSubmitting(false);
     }
@@ -330,13 +388,16 @@ export function RequesterBookingsScreenEnhanced({
   }
 
   async function handleRequestModification(data: RequestModificationRequest) {
-    if (!accessToken || !modificationBooking) return;
+    if (!accessToken || !modificationBooking) {
+      return;
+    }
 
     setSubmitting(true);
     try {
       await requestBookingModification(accessToken, modificationBooking.id, data);
       showToast('success', 'Modification requested', 'Your reschedule request has been submitted.');
       setShowModificationModal(false);
+      setModificationBooking(null);
       await reload();
     } catch (error) {
       showToast('error', 'Request failed', getErrorMessage(error, 'Could not request modification.'));
@@ -345,9 +406,36 @@ export function RequesterBookingsScreenEnhanced({
     }
   }
 
+  async function handleConfirmCancellation() {
+    if (!accessToken || !cancellationBooking) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const reason = cancellationReason.trim();
+      await cancelMyBooking(accessToken, cancellationBooking.id, reason ? { reason } : undefined);
+      showToast('success', 'Booking cancelled', 'Your booking has been cancelled.');
+      setCancellationBooking(null);
+      setCancellationReason('');
+      await reload();
+    } catch (error) {
+      showToast('error', 'Cancellation failed', getErrorMessage(error, 'Could not cancel booking.'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleCheckIn(bookingId: string) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
+      return;
+    }
+
+    const booking = bookings.find((entry) => entry.id === bookingId);
+    const resource = booking ? resourceById.get(booking.resource.id) : null;
+    if (!isSpaceResource(resource)) {
+      showToast('warning', 'Check-in unavailable', 'Check-in is only available for space bookings.');
       return;
     }
 
@@ -364,323 +452,482 @@ export function RequesterBookingsScreenEnhanced({
     }
   }
 
-  async function handleMarkNotificationAsRead(notification: NotificationResponse) {
-    if (!accessToken) {
-      return;
-    }
+  const resourceById = React.useMemo(
+    () => new Map(resources.map((resource) => [resource.id, resource])),
+    [resources],
+  );
 
-    try {
-      await markNotificationAsRead(accessToken, notification.id);
-      await reload();
-    } catch (error) {
-      console.error('Failed to mark notification as read', error);
-    }
-  }
+  const selectedCheckInBooking = bookings.find((booking) => booking.id === checkInBookingId) ?? null;
+  const selectedLocationResource = locationBooking ? resourceById.get(locationBooking.resource.id) ?? null : null;
+  const selectedLocationDetails = selectedLocationResource?.locationDetails ?? null;
+  const selectedLocationBuildingLabel = selectedLocationDetails?.buildingName
+    ? `${selectedLocationDetails.buildingName}${selectedLocationDetails.buildingCode ? ` (${selectedLocationDetails.buildingCode})` : ''}`
+    : 'N/A';
 
-  const selectedCheckInBooking = bookings.find((b) => b.id === checkInBookingId);
-  const bookableResources = resources.filter((resource) => resource.status === 'ACTIVE' && resource.bookable);
-  const categoryOptions = Array.from(new Set(bookableResources.map((resource) => resource.category)))
-    .sort()
-    .map((category) => ({ value: category, label: getResourceCategoryLabel(category) }));
-  const categoryFilteredResources = form.category
-    ? bookableResources.filter((resource) => resource.category === form.category)
-    : [];
-  const subcategoryOptions = (form.category
-    ? Array.from(
-        new Set(
-          categoryFilteredResources
-            .map((resource) => resource.subcategory)
-            .filter((subcategory): subcategory is string => Boolean(subcategory && subcategory.trim())),
-        ),
-      )
-    : [])
-    .sort((left, right) => left.localeCompare(right))
-    .map((subcategory) => ({
-      value: subcategory,
-      label: subcategory,
-    }));
-  const filteredResources = form.subcategory
-    ? categoryFilteredResources.filter(
-      (resource) => normalizeSubcategory(resource.subcategory) === normalizeSubcategory(form.subcategory),
-    )
-    : categoryFilteredResources;
+  const bookableResources = React.useMemo(
+    () => resources.filter((resource) => resource.status === 'ACTIVE' && resource.bookable),
+    [resources],
+  );
+
+  const categoryOptions = React.useMemo(
+    () => Array.from(new Set(bookableResources.map((resource) => resource.category)))
+      .sort()
+      .map((category) => ({ value: category, label: getResourceCategoryLabel(category) })),
+    [bookableResources],
+  );
+
+  const categoryFilteredResources = React.useMemo(
+    () => form.category
+      ? bookableResources.filter((resource) => resource.category === form.category)
+      : [],
+    [bookableResources, form.category],
+  );
+
+  const subcategoryOptions = React.useMemo(
+    () => (form.category
+      ? Array.from(
+          new Set(
+            categoryFilteredResources
+              .map((resource) => resource.subcategory)
+              .filter((subcategory): subcategory is string => Boolean(subcategory && subcategory.trim())),
+          ),
+        )
+      : [])
+        .sort((left, right) => left.localeCompare(right))
+        .map((subcategory) => ({ value: subcategory, label: subcategory })),
+    [categoryFilteredResources, form.category],
+  );
+
+  const filteredResources = React.useMemo(
+    () => form.subcategory
+      ? categoryFilteredResources.filter(
+          (resource) => normalizeSubcategory(resource.subcategory) === normalizeSubcategory(form.subcategory),
+        )
+      : categoryFilteredResources,
+    [categoryFilteredResources, form.subcategory],
+  );
+
   const selectedSubcategoryHint = DURATION_HINTS[normalizeSubcategory(form.subcategory)] ?? null;
-  const elevatedCardStyle: React.CSSProperties = {
-    padding: 20,
-    border: '1px solid color-mix(in srgb, var(--border) 75%, transparent)',
-    boxShadow: '0 16px 40px rgba(8, 20, 56, 0.08)',
-    background:
-      'linear-gradient(140deg, color-mix(in srgb, var(--bg-card) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 96%, #c7d8ff 4%))',
-  };
+
+  const filteredBookings = React.useMemo(() => {
+    const needle = deferredSearch.trim().toLowerCase();
+    if (!needle) {
+      return bookings;
+    }
+
+    return bookings.filter((booking) => {
+      const resource = resourceById.get(booking.resource.id);
+      return (
+        booking.resource.code.toLowerCase().includes(needle)
+        || booking.resource.name.toLowerCase().includes(needle)
+        || (booking.purpose ?? '').toLowerCase().includes(needle)
+        || (resource?.locationDetails?.locationName ?? resource?.location ?? '').toLowerCase().includes(needle)
+      );
+    });
+  }, [bookings, deferredSearch, resourceById]);
+
+  const groupedBookings = React.useMemo(
+    () => BOOKING_SECTIONS.map((section) => ({
+      ...section,
+      items: filteredBookings.filter((booking) => booking.status === section.status),
+    })).filter((section) => section.items.length > 0),
+    [filteredBookings],
+  );
+
+  const pendingCount = bookings.filter((booking) => booking.status === 'PENDING').length;
+  const approvedCount = bookings.filter((booking) => booking.status === 'APPROVED').length;
+  const recurringCount = recurringBookings.filter((booking) => booking.active).length;
+  const unreadNotificationCount = notifications.filter((notification) => !notification.readAt).length;
 
   return (
-    <div style={{ display: 'grid', gap: 28 }}>
-      {/* Header */}
-      <div
-        style={{
-          padding: '22px 24px',
-          borderRadius: 'var(--radius-xl)',
-          border: '1px solid color-mix(in srgb, var(--border) 72%, transparent)',
-          background:
-            'radial-gradient(circle at 84% -30%, rgba(70, 150, 255, 0.18), transparent 58%), linear-gradient(155deg, color-mix(in srgb, var(--bg-card) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 97%, #d9e7ff 3%))',
-          boxShadow: '0 20px 44px rgba(20, 32, 68, 0.1)',
-        }}
-      >
-        <p style={{ margin: '0 0 8px', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 900, letterSpacing: '.35em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-          {workspaceLabel}
-        </p>
-        <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 900, lineHeight: 1.1, color: 'var(--text-h)' }}>
-          Bookings
-        </h1>
-        <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: 14, fontWeight: 500 }}>
-          Manage your resource bookings and recurring schedules.
-        </p>
-      </div>
-
-
-      {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          padding: 8,
-          border: '1px solid color-mix(in srgb, var(--border) 78%, transparent)',
-          borderRadius: 'var(--radius-lg)',
-          background: 'color-mix(in srgb, var(--bg-card) 95%, #f4f7ff 5%)',
-        }}
-      >
-        {(['bookings', 'recurring', 'calendar', 'notifications'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0, width: '100%', overflowX: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <p
             style={{
-              padding: '11px 14px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 13,
-              borderRadius: 10,
-              fontWeight: activeTab === tab ? 700 : 600,
-              color: activeTab === tab ? '#114db8' : 'var(--text-secondary)',
-              background: activeTab === tab
-                ? 'linear-gradient(140deg, rgba(64, 131, 255, 0.2), rgba(180, 215, 255, 0.18))'
-                : 'transparent',
-              boxShadow: activeTab === tab ? 'inset 0 0 0 1px rgba(64, 131, 255, 0.18)' : 'none',
-              transition: 'all 0.2s ease',
+              margin: '0 0 8px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              fontWeight: 900,
+              letterSpacing: '.32em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
             }}
           >
-            {tab === 'bookings' && 'My Bookings'}
-            {tab === 'recurring' && 'Recurring'}
-            {tab === 'calendar' && 'Calendar'}
-            {tab === 'notifications' && (
-              <>
-                Notifications
-                {notifications.filter((n) => !n.readAt).length > 0 && (
-                  <span style={{ marginLeft: 6, backgroundColor: 'var(--primary)', color: 'white', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600 }}>
-                    {notifications.filter((n) => !n.readAt).length}
-                  </span>
-                )}
-              </>
-            )}
-          </button>
-        ))}
+            {workspaceLabel}
+          </p>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: 'var(--font-display)',
+              fontSize: 36,
+              fontWeight: 900,
+              lineHeight: 1.1,
+              color: 'var(--text-h)',
+            }}
+          >
+            Bookings
+          </h1>
+          <p style={{ margin: '8px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
+            Plan bookings, track approvals, and keep an eye on recurring schedules and reminders.
+          </p>
+        </div>
+
+        <Button
+          iconLeft={<Plus size={14} />}
+          onClick={() => {
+            setActiveTab('bookings');
+            setShowBookingComposer((current) => !current);
+          }}
+          style={{ flexShrink: 0, marginTop: 8 }}
+        >
+          {showBookingComposer ? 'Hide Composer' : 'New Booking'}
+        </Button>
       </div>
 
-      {/* Tab Content */}
-      {loading ? (
-        <BookingScreenSkeleton variant="requester" />
-      ) : loadError ? (
-        <Alert variant="error" title="Error">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+        <Card>
+          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+            Pending
+          </p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text-h)' }}>
+            {pendingCount}
+          </p>
+        </Card>
+        <Card>
+          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+            Approved
+          </p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text-h)' }}>
+            {approvedCount}
+          </p>
+        </Card>
+        <Card>
+          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+            Recurring
+          </p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text-h)' }}>
+            {recurringCount}
+          </p>
+        </Card>
+        <Card>
+          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+            Notifications
+          </p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: unreadNotificationCount > 0 ? 'var(--blue-600)' : 'var(--text-h)' }}>
+            {unreadNotificationCount}
+          </p>
+        </Card>
+      </div>
+
+      <Tabs
+        variant="pill"
+        tabs={[
+          { label: 'My Bookings', value: 'bookings', badge: bookings.length },
+          { label: 'Recurring', value: 'recurring', badge: recurringBookings.length },
+          { label: 'Calendar', value: 'calendar' },
+        ]}
+        value={activeTab}
+        onChange={(value) => setActiveTab(value as TabType)}
+      />
+
+      {loadError && (
+        <Alert variant="error" title="Load failed">
           {loadError}
         </Alert>
+      )}
+
+      {loading ? (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+            <Card style={{ padding: 20 }}>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <Skeleton variant="line" height={16} width="34%" />
+                <Skeleton variant="rect" height={44} />
+                <Skeleton variant="rect" height={44} />
+                <Skeleton variant="rect" height={44} />
+              </div>
+            </Card>
+            <Card style={{ padding: 20 }}>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <Skeleton variant="line" height={16} width="48%" />
+                <Skeleton variant="line" height={12} width="80%" />
+                <Skeleton variant="rect" height={32} />
+                <Skeleton variant="rect" height={32} />
+              </div>
+            </Card>
+          </div>
+          <RequesterBookingSectionsSkeleton />
+        </>
       ) : (
         <>
-          {/* Bookings Tab */}
           {activeTab === 'bookings' && (
-            <div style={{ display: 'grid', gap: 16 }}>
-              {/* Create New Booking Form */}
-              <Card style={elevatedCardStyle}>
-                <form onSubmit={handleCreateBooking} style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Category</label>
-                    <Select
-                      value={form.category}
-                      onChange={(e) =>
-                        setForm((current) => ({
-                          ...current,
-                          category: e.target.value,
-                          subcategory: '',
-                          resourceId: '',
-                        }))
-                      }
-                      options={[
-                        { value: '', label: 'Select category' },
-                        ...categoryOptions,
-                      ]}
-                    />
+            <div style={{ display: 'grid', gap: 20, minWidth: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.45fr) minmax(300px, 0.95fr)', gap: 16, minWidth: 0 }}>
+                <Card style={{ padding: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
+                        Booking Composer
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                        Build a booking request with live catalogue options and availability feedback.
+                      </div>
+                    </div>
+                    <Chip color={showBookingComposer ? 'blue' : 'neutral'} size="sm">
+                      {showBookingComposer ? 'Expanded' : 'Collapsed'}
+                    </Chip>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Subcategory</label>
-                    <Select
-                      value={form.subcategory}
-                      onChange={(e) =>
-                        setForm((current) => ({
-                          ...current,
-                          subcategory: e.target.value,
-                          resourceId: '',
-                        }))
-                      }
-                      options={[
-                        { value: '', label: 'Select subcategory' },
-                        ...subcategoryOptions,
-                      ]}
-                    />
-                    {selectedSubcategoryHint && (
-                      <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>{selectedSubcategoryHint}</p>
+
+                  {showBookingComposer ? (
+                    <form onSubmit={handleCreateBooking} style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+                        <Select
+                          id="requester-booking-category"
+                          label="Category"
+                          value={form.category}
+                          onChange={(event) => setForm((current) => ({
+                            ...current,
+                            category: event.target.value,
+                            subcategory: '',
+                            resourceId: '',
+                          }))}
+                          options={[{ value: '', label: 'Select category' }, ...categoryOptions]}
+                        />
+                        <Select
+                          id="requester-booking-subcategory"
+                          label="Subcategory"
+                          value={form.subcategory}
+                          onChange={(event) => setForm((current) => ({
+                            ...current,
+                            subcategory: event.target.value,
+                            resourceId: '',
+                          }))}
+                          options={[{ value: '', label: 'Select subcategory' }, ...subcategoryOptions]}
+                        />
+                        <Select
+                          id="requester-booking-resource"
+                          label="Resource"
+                          value={form.resourceId}
+                          onChange={(event) => setForm((current) => ({ ...current, resourceId: event.target.value }))}
+                          options={[
+                            { value: '', label: 'Select resource' },
+                            ...filteredResources.map((resource) => ({
+                              value: resource.id,
+                              label: resource.name,
+                            })),
+                          ]}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+                        <Input
+                          id="requester-booking-start"
+                          label="Start"
+                          type="datetime-local"
+                          value={form.startTime}
+                          onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))}
+                        />
+                        <Input
+                          id="requester-booking-end"
+                          label="End"
+                          type="datetime-local"
+                          value={form.endTime}
+                          onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))}
+                        />
+                        <Input
+                          id="requester-booking-purpose"
+                          label="Purpose"
+                          placeholder="Optional"
+                          value={form.purpose}
+                          onChange={(event) => setForm((current) => ({ ...current, purpose: event.target.value }))}
+                        />
+                      </div>
+
+                      {selectedSubcategoryHint && (
+                        <Alert variant="info" title="Duration Guidance">
+                          {selectedSubcategoryHint}
+                        </Alert>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            setForm(NEW_BOOKING_INITIAL);
+                            setRemainingRanges(null);
+                            setAvailabilityError(null);
+                          }}
+                          disabled={submitting}
+                        >
+                          Reset
+                        </Button>
+                        <Button type="submit" loading={submitting}>
+                          Submit Booking
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <Alert variant="info" title="Composer hidden">
+                      Use the New Booking button to open the booking request composer.
+                    </Alert>
+                  )}
+                </Card>
+
+                <Card style={{ padding: 20, minWidth: 0 }}>
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
+                        Availability Snapshot
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                        Remaining booking windows for the selected resource and day.
+                      </div>
+                    </div>
+
+                    {!form.resourceId && (
+                      <Alert variant="info" title="Resource required">
+                        Select a resource to load its available time ranges.
+                      </Alert>
+                    )}
+
+                    {availabilityLoading && <Skeleton variant="line" height={12} width="44%" />}
+
+                    {availabilityError && (
+                      <Alert variant="error" title="Availability unavailable">
+                        {availabilityError}
+                      </Alert>
+                    )}
+
+                    {remainingRanges && !availabilityLoading && !availabilityError && (
+                      remainingRanges.remainingRanges.length === 0 ? (
+                        <Alert variant="warning" title="No remaining slots">
+                          No remaining ranges were found for the selected date.
+                        </Alert>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {remainingRanges.remainingRanges.map((range, index) => (
+                            <Chip key={`${range.startTime}-${range.endTime}-${index}`} color="blue">
+                              {formatDateTime(range.startTime)} - {formatDateTime(range.endTime)}
+                            </Chip>
+                          ))}
+                        </div>
+                      )
                     )}
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Resource</label>
-                    <Select
-                      value={form.resourceId}
-                      onChange={(e) => setForm((current) => ({ ...current, resourceId: e.target.value }))}
-                      options={[
-                        { value: '', label: 'Select resource' },
-                        ...filteredResources.map((resource) => ({
-                          value: resource.id,
-                          label: resource.name,
-                        })),
-                      ]}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Start</label>
-                    <Input type="datetime-local" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>End</label>
-                    <Input type="datetime-local" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Purpose</label>
-                    <Input placeholder="Optional" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                    <Button type="submit" disabled={submitting} style={{ flex: 1 }}>
-                      {submitting ? 'Creating...' : 'Book Now'}
-                    </Button>
-                  </div>
-                </form>
-              </Card>
+                </Card>
+              </div>
 
-              <Card style={{ ...elevatedCardStyle, padding: 16 }}>
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-h)' }}>Remaining Time Ranges</p>
-                  {!form.resourceId && (
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-                      Select a resource to see currently available slots.
-                    </p>
-                  )}
-                  {availabilityLoading && (
-                    <Skeleton variant="line" height={12} width="36%" />
-                  )}
-                  {availabilityError && (
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-error)' }}>{availabilityError}</p>
-                  )}
-                  {remainingRanges && !availabilityLoading && !availabilityError && (
-                    remainingRanges.remainingRanges.length === 0 ? (
-                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-                        No remaining ranges for the selected date.
-                      </p>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {remainingRanges.remainingRanges.map((range, index) => (
-                          <Chip key={`${range.startTime}-${range.endTime}-${index}`} color="blue">
-                            {formatDateTime(range.startTime)} - {formatDateTime(range.endTime)}
-                          </Chip>
-                        ))}
-                      </div>
-                    )
-                  )}
+              <Card style={{ padding: 18, minWidth: 0 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'end', minWidth: 0 }}>
+                  <Input
+                    id="requester-booking-search"
+                    label="Search bookings"
+                    placeholder="Search resource, code, purpose, or location"
+                    value={searchText}
+                    iconLeft={<Search size={14} />}
+                    onChange={(event) => setSearchText(event.target.value)}
+                  />
+                  <Button variant="subtle" onClick={() => setSearchText('')}>
+                    Clear Search
+                  </Button>
                 </div>
               </Card>
 
-              {/* Bookings List */}
               {bookings.length === 0 ? (
                 <Alert variant="info" title="No bookings">
                   You have not created any bookings yet.
                 </Alert>
+              ) : groupedBookings.length === 0 ? (
+                <Alert variant="info" title="No matches">
+                  No bookings match the current search text.
+                </Alert>
               ) : (
-                <div
-                  style={{
-                    overflowX: 'auto',
-                    border: '1px solid color-mix(in srgb, var(--border) 72%, transparent)',
-                    borderRadius: 'var(--radius-lg)',
-                    background: 'color-mix(in srgb, var(--bg-card) 96%, #f7f9ff 4%)',
-                    boxShadow: '0 12px 32px rgba(10, 24, 58, 0.08)',
-                  }}
-                >
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Resource</TableCell>
-                        <TableCell>Start Time</TableCell>
-                        <TableCell>End Time</TableCell>
-                        <TableCell>Purpose</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {bookings.map((booking) => (
-                        <TableRow key={booking.id}>
-                          <TableCell>
-                            <strong>{booking.resource.name}</strong>
-                          </TableCell>
-                          <TableCell style={{ fontSize: 12 }}>{formatDateTime(booking.startTime)}</TableCell>
-                          <TableCell style={{ fontSize: 12 }}>{formatDateTime(booking.endTime)}</TableCell>
-                          <TableCell style={{ fontSize: 12 }}>{booking.purpose || '—'}</TableCell>
-                          <TableCell>
-                            <Chip color={statusChipColor(booking.status)}>{booking.status}</Chip>
-                          </TableCell>
-                          <TableCell>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              {booking.status === 'APPROVED' && new Date(booking.startTime).getTime() > Date.now() && (
-                                <Button variant="ghost" onClick={() => { setModificationBooking(booking); setShowModificationModal(true); }} style={{ fontSize: 11 }}>
-                                  Reschedule
-                                </Button>
-                              )}
-                              {canCancelByRequester(booking) && (
-                                <Button variant="ghost-danger" onClick={() => handleCancelBooking(booking)} disabled={submitting} style={{ fontSize: 11 }}>
-                                  Cancel
-                                </Button>
-                              )}
-                              {booking.status === 'APPROVED' && new Date(booking.startTime).getTime() <= Date.now() && new Date(booking.endTime).getTime() > Date.now() && (
-                                <Button variant="primary" onClick={() => setCheckInBookingId(booking.id)} style={{ fontSize: 11 }}>
-                                  Check In
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 32, minWidth: 0 }}>
+                  {groupedBookings.map((section) => (
+                    <BookingSection
+                      key={section.status}
+                      label={section.label}
+                      color={section.color}
+                      count={section.items.length}
+                    >
+                      {section.items.map((booking) => {
+                        const resource = resourceById.get(booking.resource.id);
+
+                        return (
+                          <div key={booking.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
+                            <BookingCard
+                              booking={booking}
+                              resource={resource}
+                              onLocation={() => setLocationBooking(booking)}
+                              actions={
+                                <>
+                                  {booking.status === 'APPROVED' && new Date(booking.startTime).getTime() > Date.now() && (
+                                    <Button
+                                      variant="ghost"
+                                      size="xs"
+                                      onClick={() => {
+                                        setModificationBooking(booking);
+                                        setShowModificationModal(true);
+                                      }}
+                                    >
+                                      Reschedule
+                                    </Button>
+                                  )}
+                                  {canCancelByRequester(booking) && (
+                                    <Button
+                                      variant="ghost-danger"
+                                      size="xs"
+                                      onClick={() => {
+                                        setCancellationBooking(booking);
+                                        setCancellationReason('');
+                                      }}
+                                      disabled={submitting}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  )}
+                                  {isCheckInAvailable(booking, resource) && (
+                                    <Button
+                                      variant="primary"
+                                      size="xs"
+                                      onClick={() => setCheckInBookingId(booking.id)}
+                                    >
+                                      Check In
+                                    </Button>
+                                  )}
+                                </>
+                              }
+                            />
+                          </div>
+                        );
+                      })}
+                    </BookingSection>
+                  ))}
                 </div>
               )}
             </div>
           )}
 
-          {/* Recurring Tab */}
           {activeTab === 'recurring' && (
-            <div style={{ display: 'grid', gap: 16 }}>
-              <Button
-                onClick={() => setShowRecurringForm(!showRecurringForm)}
-                variant="primary"
-                style={{ boxShadow: '0 12px 24px rgba(49, 117, 255, 0.28)' }}
-              >
-                <Plus size={16} style={{ marginRight: 6 }} />
-                Create Recurring Booking
-              </Button>
+            <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
+                    Recurring Bookings
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                    Create repeating booking schedules using the same resource catalogue.
+                  </div>
+                </div>
+                <Button
+                  iconLeft={<CalendarDays size={14} />}
+                  onClick={() => setShowRecurringForm((current) => !current)}
+                >
+                  {showRecurringForm ? 'Hide Form' : 'Create Recurring Booking'}
+                </Button>
+              </div>
 
               {showRecurringForm && (
                 <RecurringBookingForm
@@ -696,65 +943,38 @@ export function RequesterBookingsScreenEnhanced({
                   You have not created any recurring bookings yet.
                 </Alert>
               ) : (
-                <div style={{ display: 'grid', gap: 12 }}>
+                <BookingSection label="Recurring Schedule" color="var(--blue-400)" count={recurringBookings.length}>
                   {recurringBookings.map((recurring) => (
-                    <Card
-                      key={recurring.id}
-                      style={{
-                        ...elevatedCardStyle,
-                        padding: 16,
-                        background:
-                          'linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 94%, #ffffff 6%), color-mix(in srgb, var(--bg-card) 96%, #e7efff 4%))',
-                      }}
-                    >
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                            {recurring.resource.name} - {recurring.recurrencePattern}
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'grid', gap: 4 }}>
-                            <div>📅 Starts: {new Date(recurring.startDate).toLocaleDateString('en-LK')}</div>
-                            <div>⏰ {recurring.startTime} - {recurring.endTime}</div>
-                            {recurring.endDate && <div>Ends: {new Date(recurring.endDate).toLocaleDateString('en-LK')}</div>}
-                            {recurring.occurrenceCount && <div>Occurrences: {recurring.occurrenceCount}</div>}
-                            <Chip color={recurring.active ? 'green' : 'red'}>{recurring.active ? 'Active' : 'Inactive'}</Chip>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
+                    <div key={recurring.id} style={{ flexShrink: 0 }}>
+                      <RecurringBookingCard recurring={recurring} />
+                    </div>
                   ))}
-                </div>
+                </BookingSection>
               )}
             </div>
           )}
 
-          {/* Calendar Tab */}
           {activeTab === 'calendar' && <BookingCalendar bookings={bookings} />}
-
-          {/* Notifications Tab */}
-          {activeTab === 'notifications' && (
-            <NotificationCenter
-              notifications={notifications}
-              onMarkAsRead={handleMarkNotificationAsRead}
-              onRefresh={reload}
-              loading={submitting}
-            />
-          )}
         </>
       )}
 
-      {/* Modification Modal */}
       <BookingModificationModal
         booking={modificationBooking}
         isOpen={showModificationModal}
-        onClose={() => { setShowModificationModal(false); setModificationBooking(null); }}
+        onClose={() => {
+          setShowModificationModal(false);
+          setModificationBooking(null);
+        }}
         onSubmit={handleRequestModification}
         isLoading={submitting}
       />
 
-      {/* Check-in Dialog */}
       {selectedCheckInBooking && (
-        <Dialog open={!!checkInBookingId} onClose={() => setCheckInBookingId(null)} title="Check In to Booking">
+        <Dialog
+          open={!!checkInBookingId}
+          onClose={() => setCheckInBookingId(null)}
+          title="Check In to Booking"
+        >
           <BookingCheckInPanel
             booking={selectedCheckInBooking}
             onCheckIn={() => handleCheckIn(selectedCheckInBooking.id)}
@@ -763,12 +983,116 @@ export function RequesterBookingsScreenEnhanced({
         </Dialog>
       )}
 
-      {/* Cancellation Dialog */}
+      <Dialog
+        open={!!locationBooking}
+        onClose={() => setLocationBooking(null)}
+        title="Location Details"
+        size="sm"
+      >
+        <div style={{ padding: '20px 24px', display: 'grid', gap: 16 }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: 6,
+              padding: 16,
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid color-mix(in srgb, var(--border) 72%, transparent)',
+              background: 'color-mix(in srgb, var(--bg-card) 94%, #eef4ff 6%)',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: '.18em',
+                textTransform: 'uppercase',
+                color: 'var(--text-muted)',
+              }}
+            >
+              Resource
+            </span>
+            <strong style={{ color: 'var(--text-h)', fontSize: 16 }}>
+              {locationBooking?.resource.name ?? 'Selected booking'}
+            </strong>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+              {selectedLocationResource?.code ?? locationBooking?.resource.code ?? 'N/A'}
+            </span>
+          </div>
+
+          {selectedLocationResource ? (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                    Location
+                  </span>
+                  <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                    {selectedLocationDetails?.locationName ?? selectedLocationResource.location ?? 'N/A'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                    Type
+                  </span>
+                  <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                    {selectedLocationDetails ? getLocationTypeLabel(selectedLocationDetails.locationType) : 'N/A'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                    Building
+                  </span>
+                  <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                    {selectedLocationBuildingLabel}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                    Wing
+                  </span>
+                  <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                    {selectedLocationDetails ? getWingLabel(selectedLocationDetails.wing) : 'N/A'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                    Floor
+                  </span>
+                  <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                    {selectedLocationDetails?.floor ?? 'N/A'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                    Room Code
+                  </span>
+                  <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                    {selectedLocationDetails?.roomCode ?? 'N/A'}
+                  </span>
+                </div>
+              </div>
+
+              <Alert variant="info" title="Booking integration">
+                Location details are resolved from the linked resource record for this booking.
+              </Alert>
+            </>
+          ) : (
+            <Alert variant="warning" title="Location unavailable">
+              We could not resolve the linked resource details for this booking right now.
+            </Alert>
+          )}
+        </div>
+      </Dialog>
+
       {cancellationBooking && (
         <Dialog
           open={!!cancellationBooking}
           onClose={() => {
-            if (submitting) return;
+            if (submitting) {
+              return;
+            }
+
             setCancellationBooking(null);
             setCancellationReason('');
           }}
@@ -788,7 +1112,7 @@ export function RequesterBookingsScreenEnhanced({
                 value={cancellationReason}
                 onChange={(event) => setCancellationReason(event.target.value)}
                 rows={3}
-                placeholder="Add context for managers, if needed"
+                placeholder="Add context for managers if needed"
                 disabled={submitting}
               />
             </div>
@@ -801,10 +1125,10 @@ export function RequesterBookingsScreenEnhanced({
                 }}
                 disabled={submitting}
               >
-                Keep booking
+                Keep Booking
               </Button>
               <Button variant="danger" onClick={handleConfirmCancellation} loading={submitting}>
-                Confirm cancel
+                Confirm Cancel
               </Button>
             </div>
           </div>

@@ -70,6 +70,7 @@ public class BookingService {
 
         bookingValidator.validateTimeRange(startTime, endTime);
         bookingValidator.validateDuration(resource, startTime, endTime);
+        bookingValidator.validateBookingWindow(resource, startTime, endTime);
         bookingValidator.requireFutureStart(startTime);
         bookingValidator.ensureNoPendingOrApprovedOverlap(resource.getId(), startTime, endTime);
 
@@ -135,19 +136,22 @@ public class BookingService {
             throw new BadRequestException("This resource is not available for booking.");
         }
 
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = bookingValidator.bookingZoneId();
         Instant dayStart = date.atStartOfDay(zoneId).toInstant();
         Instant dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant();
+        Instant bookingWindowStart = bookingValidator.getBookingWindowStart(resource, date, zoneId);
+        Instant bookingWindowEnd = bookingValidator.getBookingWindowEnd(resource, date, zoneId);
 
         Instant now = bookingValidator.currentInstant();
-        Instant windowStart = dayStart.isBefore(now) ? now : dayStart;
+        Instant windowStart = bookingWindowStart.isBefore(now) ? now : bookingWindowStart;
+        Instant windowEnd = bookingWindowEnd.isBefore(dayEnd) ? bookingWindowEnd : dayEnd;
 
-        if (!windowStart.isBefore(dayEnd)) {
+        if (!windowStart.isBefore(windowEnd)) {
             return new BookingDtos.ResourceRemainingRangesResponse(
                 resourceId,
                 date,
                 windowStart,
-                dayEnd,
+                windowEnd,
                 List.of()
             );
         }
@@ -156,7 +160,7 @@ public class BookingService {
             .findAllByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThanOrderByStartTimeAsc(
                 resourceId,
                 BLOCKING_STATUSES,
-                dayEnd,
+                windowEnd,
                 windowStart
             );
 
@@ -165,7 +169,7 @@ public class BookingService {
 
         for (BookingEntity booking : blockedBookings) {
             Instant blockedStart = booking.getStartTime().isAfter(windowStart) ? booking.getStartTime() : windowStart;
-            Instant blockedEnd = booking.getEndTime().isBefore(dayEnd) ? booking.getEndTime() : dayEnd;
+            Instant blockedEnd = booking.getEndTime().isBefore(windowEnd) ? booking.getEndTime() : windowEnd;
 
             if (!blockedStart.isBefore(blockedEnd)) {
                 continue;
@@ -180,15 +184,15 @@ public class BookingService {
             }
         }
 
-        if (cursor.isBefore(dayEnd)) {
-            remainingRanges.add(new BookingDtos.TimeRange(cursor, dayEnd));
+        if (cursor.isBefore(windowEnd)) {
+            remainingRanges.add(new BookingDtos.TimeRange(cursor, windowEnd));
         }
 
         return new BookingDtos.ResourceRemainingRangesResponse(
             resourceId,
             date,
             windowStart,
-            dayEnd,
+            windowEnd,
             remainingRanges
         );
     }

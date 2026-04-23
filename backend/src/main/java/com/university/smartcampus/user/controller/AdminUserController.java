@@ -23,6 +23,8 @@ import com.university.smartcampus.common.dto.ApiDtos.UserResponse;
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportRequest;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportResponse;
 import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
 import com.university.smartcampus.user.dto.AdminDtos.ManagerRoleUpdateRequest;
 import com.university.smartcampus.user.dto.AdminDtos.UpdateUserRequest;
@@ -48,6 +50,24 @@ public class AdminUserController {
     public UserResponse createUser(@Valid @RequestBody CreateUserRequest request, Authentication authentication) {
         UserEntity admin = currentUserService.requireAdmin(authentication);
         return userManagementService.createUser(request, admin);
+    }
+
+    @PostMapping("/bulk-students/preview")
+    public BulkStudentImportResponse previewBulkStudentImport(
+        @Valid @RequestBody BulkStudentImportRequest request,
+        Authentication authentication
+    ) {
+        currentUserService.requireAdmin(authentication);
+        return userManagementService.previewBulkStudentImport(request);
+    }
+
+    @PostMapping("/bulk-students")
+    public BulkStudentImportResponse importBulkStudents(
+        @Valid @RequestBody BulkStudentImportRequest request,
+        Authentication authentication
+    ) {
+        UserEntity admin = currentUserService.requireAdmin(authentication);
+        return userManagementService.importBulkStudents(request, admin);
     }
 
     @GetMapping

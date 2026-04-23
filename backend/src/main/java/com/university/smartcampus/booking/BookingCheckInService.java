@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.AppEnums.CheckInStatus;
+import com.university.smartcampus.AppEnums.ResourceCategory;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
@@ -48,6 +49,8 @@ public class BookingCheckInService {
             throw new ForbiddenException("You cannot check in this booking.");
         }
 
+        requireSpaceBooking(booking);
+
         if (booking.getStatus() != BookingStatus.APPROVED) {
             throw new BadRequestException("Only approved bookings can be checked in.");
         }
@@ -78,6 +81,8 @@ public class BookingCheckInService {
         BookingEntity booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new NotFoundException("Booking not found."));
 
+        requireSpaceBooking(booking);
+
         if (booking.getStatus() != BookingStatus.APPROVED && booking.getStatus() != BookingStatus.CHECKED_IN) {
             throw new BadRequestException("Only approved or checked-in bookings can be marked as no-show.");
         }
@@ -105,6 +110,8 @@ public class BookingCheckInService {
 
         BookingEntity booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new NotFoundException("Booking not found."));
+
+        requireSpaceBooking(booking);
 
         if (booking.getStatus() != BookingStatus.CHECKED_IN) {
             throw new BadRequestException("Only checked-in bookings can be completed.");
@@ -136,5 +143,11 @@ public class BookingCheckInService {
             booking.getCheckInStatus(),
             booking.getCheckedInAt()
         );
+    }
+
+    private void requireSpaceBooking(BookingEntity booking) {
+        if (booking.getResource() == null || booking.getResource().getCategory() != ResourceCategory.SPACES) {
+            throw new BadRequestException("Check-in is only available for space bookings.");
+        }
     }
 }

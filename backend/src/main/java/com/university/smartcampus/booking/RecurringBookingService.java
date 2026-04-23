@@ -74,6 +74,7 @@ public class RecurringBookingService {
             request.startTime(),
             request.endTime()
         );
+        bookingValidator.validateBookingWindow(resource, firstOccurrenceWindow.startTime(), firstOccurrenceWindow.endTime());
         bookingValidator.validateDuration(resource, firstOccurrenceWindow.startTime(), firstOccurrenceWindow.endTime());
 
         if (request.endDate() != null && request.startDate().isAfter(request.endDate())) {
@@ -108,9 +109,10 @@ public class RecurringBookingService {
     @Transactional
     public void generateBookingsForRecurringPattern(RecurringBookingEntity recurringBooking) {
         List<BookingEntity> bookings = new ArrayList<>();
-        ZonedDateTime current = ZonedDateTime.ofInstant(recurringBooking.getStartDate(), ZoneId.systemDefault());
+        ZoneId bookingZoneId = bookingValidator.bookingZoneId();
+        ZonedDateTime current = ZonedDateTime.ofInstant(recurringBooking.getStartDate(), bookingZoneId);
         ZonedDateTime endDateTime = recurringBooking.getEndDate() != null
-            ? ZonedDateTime.ofInstant(recurringBooking.getEndDate(), ZoneId.systemDefault())
+            ? ZonedDateTime.ofInstant(recurringBooking.getEndDate(), bookingZoneId)
             : null;
 
         int count = 0;
@@ -129,6 +131,7 @@ public class RecurringBookingService {
             Instant bookingEnd = bookingWindow.endTime();
 
             try {
+                bookingValidator.validateBookingWindow(recurringBooking.getResource(), bookingStart, bookingEnd);
                 bookingValidator.validateDuration(recurringBooking.getResource(), bookingStart, bookingEnd);
 
                 // Check for conflicts
@@ -215,7 +218,7 @@ public class RecurringBookingService {
     }
 
     private BookingWindow buildBookingWindow(Instant baseDate, LocalTime startTime, LocalTime endTime) {
-        ZonedDateTime base = ZonedDateTime.ofInstant(baseDate, ZoneId.systemDefault());
+        ZonedDateTime base = ZonedDateTime.ofInstant(baseDate, bookingValidator.bookingZoneId());
 
         Instant bookingStart = base.withHour(startTime.getHour())
             .withMinute(startTime.getMinute())

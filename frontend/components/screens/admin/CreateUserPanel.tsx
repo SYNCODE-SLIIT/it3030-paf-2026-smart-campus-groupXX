@@ -47,7 +47,6 @@ export function CreateUserPanel({
   const [adminForm, setAdminForm] = React.useState(createEmptyAdminForm);
   const [managerForm, setManagerForm] = React.useState(createEmptyManagerForm);
   const [formError, setFormError] = React.useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = React.useState<string | null>(null);
   const [pendingPayload, setPendingPayload] = React.useState<CreateUserRequest | null>(null);
   const [isCreating, startCreateTransition] = React.useTransition();
 
@@ -76,7 +75,6 @@ export function CreateUserPanel({
     }
 
     setFormError(null);
-    setFormSuccess(null);
 
     return {
       email: email.trim(),
@@ -106,10 +104,6 @@ export function CreateUserPanel({
       try {
         const createdUser = await createUser(accessToken, pendingPayload);
 
-        setFormSuccess(createdUser.lastInviteReference
-          ? 'User added, sign-in email sent, and a test link was returned.'
-          : 'User added and sign-in email sent.');
-
         setEmail('');
         setUserType(fixedUserType ?? defaultUserType);
         setManagerRole('');
@@ -122,7 +116,6 @@ export function CreateUserPanel({
       } catch (error) {
         const message = getErrorMessage(error, 'We could not create the user.');
         setFormError(message);
-        setFormSuccess(null);
         setPendingPayload(null);
       }
     });
@@ -158,12 +151,6 @@ export function CreateUserPanel({
       {formError && (
         <Alert variant="error" title="Unable to create user" style={{ marginBottom: 16 }}>
           {formError}
-        </Alert>
-      )}
-
-      {formSuccess && (
-        <Alert variant="success" title="User created" style={{ marginBottom: 16 }}>
-          {formSuccess}
         </Alert>
       )}
 
@@ -220,10 +207,6 @@ export function CreateUserPanel({
             <RoleRadioGroup value={managerRole} onChange={setManagerRole} />
           </div>
         )}
-
-        <Alert variant="info" title="Access link">
-          A login link will be generated for this user immediately after creation so you can copy it and test sign-in.
-        </Alert>
 
         <div style={{ display: 'flex', justifyContent: onCancel ? 'space-between' : 'flex-end', gap: 10, flexWrap: 'wrap' }}>
           {onCancel && (

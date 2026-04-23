@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Copy, Search, UserPlus, X } from 'lucide-react';
+import { Search, UserPlus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -22,7 +22,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Textarea,
 } from '@/components/ui';
 import { getErrorMessage, listUsers } from '@/lib/api-client';
 import type { AccountStatus, UserResponse, UserType } from '@/lib/api-types';
@@ -37,17 +36,6 @@ import {
   getUserTypeChipColor,
   getUserTypeLabel,
 } from '@/lib/user-display';
-
-type CreatedInviteState = {
-  email: string;
-  link: string;
-} | null;
-
-type ActionNotice = {
-  variant: 'error' | 'success' | 'warning' | 'info' | 'neutral';
-  title: string;
-  message: string;
-} | null;
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -168,9 +156,6 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
   const [loadingUsers, setLoadingUsers] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
-  const [createdInvite, setCreatedInvite] = React.useState<CreatedInviteState>(null);
-  const [actionNotice, setActionNotice] = React.useState<ActionNotice>(null);
-  const [isCopyingLink, startCopyLinkTransition] = React.useTransition();
 
   const reloadUsers = React.useCallback(async () => {
     if (!accessToken) {
@@ -200,18 +185,6 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
   React.useEffect(() => {
     void reloadUsers();
   }, [reloadUsers]);
-
-  function handleCopyGeneratedLink() {
-    if (!createdInvite?.link) return;
-    startCopyLinkTransition(async () => {
-      try {
-        await navigator.clipboard.writeText(createdInvite.link);
-        setActionNotice({ variant: 'success', title: 'Copied', message: 'Access link copied to clipboard.' });
-      } catch {
-        setActionNotice({ variant: 'error', title: 'Copy failed', message: 'Could not copy the access link.' });
-      }
-    });
-  }
 
   const now = Date.now();
   const totalUsers = users.length;
@@ -297,12 +270,6 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
           pendingInvites={pendingInvites}
           newThisWeek={newThisWeek}
         />
-
-        {actionNotice && (
-          <Alert variant={actionNotice.variant} title={actionNotice.title}>
-            {actionNotice.message}
-          </Alert>
-        )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ width: 240, maxWidth: '100%' }}>
@@ -454,9 +421,6 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
                   <p id="admin-create-user-title" style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text-h)' }}>
                     Add {getUserTypeLabel(userType)}
                   </p>
-                  <p style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-body)' }}>
-                    Create the account and send its first sign-in email.
-                  </p>
                 </div>
                 <button type="button" className="admin-dialog-close" aria-label="Close" onClick={() => setIsCreateDialogOpen(false)}>
                   <X size={16} />
@@ -467,61 +431,13 @@ export function AdminRoleUsersScreen({ userType }: { userType: UserType }) {
                 embedded
                 accessToken={accessToken}
                 fixedUserType={userType}
-                onCreated={async (createdUser) => {
+                onCreated={async () => {
                   setEmailFilter('');
                   await reloadUsers();
                   setIsCreateDialogOpen(false);
-                  if (createdUser.lastInviteReference) {
-                    setCreatedInvite({ email: createdUser.email, link: createdUser.lastInviteReference });
-                  }
                 }}
                 onCancel={() => setIsCreateDialogOpen(false)}
               />
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {createdInvite && (
-        <div className="admin-dialog-overlay" onClick={() => setCreatedInvite(null)}>
-          <div
-            className="admin-dialog-shell"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="admin-generated-link-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Card>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 18 }}>
-                <div>
-                  <p id="admin-generated-link-title" style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text-h)' }}>
-                    Generated Link
-                  </p>
-                  <p style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-body)' }}>
-                    Share or test this generated access link.
-                  </p>
-                </div>
-                <button type="button" className="admin-dialog-close" aria-label="Close" onClick={() => setCreatedInvite(null)}>
-                  <X size={16} />
-                </button>
-              </div>
-              <Input label="User Email" value={createdInvite.email} readOnly />
-              <Textarea
-                label="Generated Access Link"
-                value={createdInvite.link}
-                readOnly
-                rows={5}
-                resize="none"
-                style={{ marginTop: 14, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.5 }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
-                <Button variant="subtle" size="sm" loading={isCopyingLink} iconLeft={<Copy size={14} />} onClick={handleCopyGeneratedLink}>
-                  Copy Link
-                </Button>
-                <Button variant="primary" size="sm" onClick={() => setCreatedInvite(null)}>
-                  Done
-                </Button>
-              </div>
             </Card>
           </div>
         </div>

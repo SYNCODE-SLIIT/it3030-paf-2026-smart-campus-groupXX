@@ -5,7 +5,22 @@ import { Check, Search, X } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
-import { Alert, Button, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Dialog, Textarea } from '@/components/ui';
+import {
+  Alert,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  Input,
+  Select,
+  Tabs,
+  Textarea,
+} from '@/components/ui';
+import {
+  BookingCard,
+  BookingCardSkeleton,
+  BookingSection,
+} from '@/components/booking/BookingCard';
 import {
   approveBooking,
   approveModification,
@@ -19,17 +34,34 @@ import {
   rejectBooking,
   rejectModification,
 } from '@/lib/api-client';
-import type { BookingResponse, BookingStatus, ResourceOption, BookingModificationResponse } from '@/lib/api-types';
+import type {
+  BookingModificationResponse,
+  BookingResponse,
+  BookingStatus,
+  ResourceResponse,
+} from '@/lib/api-types';
+import { getLocationTypeLabel, getWingLabel } from '@/lib/location-display';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
-import { BookingScreenSkeleton } from '@/components/booking/BookingScreenSkeleton';
 
 type TabType = 'bookings' | 'modifications' | 'checkins';
+type StatusFilter = BookingStatus | 'ALL';
+
+const BOOKING_SECTIONS: Array<{ status: BookingStatus; label: string; color: string }> = [
+  { status: 'PENDING', label: 'Pending Review', color: 'var(--yellow-400)' },
+  { status: 'APPROVED', label: 'Approved', color: 'var(--green-400)' },
+  { status: 'CHECKED_IN', label: 'Checked In', color: 'var(--blue-400)' },
+  { status: 'COMPLETED', label: 'Completed', color: 'var(--blue-500)' },
+  { status: 'REJECTED', label: 'Rejected', color: 'var(--red-400)' },
+  { status: 'CANCELLED', label: 'Cancelled', color: 'var(--neutral-400)' },
+  { status: 'NO_SHOW', label: 'No Show', color: 'var(--red-500)' },
+];
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
+
   return new Intl.DateTimeFormat('en-LK', {
     year: 'numeric',
     month: 'short',
@@ -39,34 +71,48 @@ function formatDateTime(value: string) {
   }).format(parsed);
 }
 
-function statusChipColor(status: BookingStatus): 'yellow' | 'green' | 'red' | 'neutral' | 'blue' {
-  switch (status) {
-    case 'PENDING':
-      return 'yellow';
-    case 'APPROVED':
-      return 'green';
-    case 'CHECKED_IN':
-    case 'COMPLETED':
-      return 'blue';
-    case 'REJECTED':
-    case 'CANCELLED':
-    case 'NO_SHOW':
-      return 'red';
-    default:
-      return 'neutral';
-  }
-}
-
-function shortId(value: string) {
-  return value.length > 10 ? `${value.slice(0, 8)}...` : value;
-}
-
 function normalizeSubcategory(value: string | null | undefined) {
   if (!value) {
     return '';
   }
 
   return value.trim().replace(/[\s-]+/g, '_').toUpperCase();
+}
+
+function shortId(value: string) {
+  return value.length > 10 ? `${value.slice(0, 8)}...` : value;
+}
+
+function isCheckInWindow(booking: BookingResponse) {
+  const now = Date.now();
+  const startTime = new Date(booking.startTime).getTime();
+  const endTime = new Date(booking.endTime).getTime();
+  return startTime <= now && endTime > now;
+}
+
+function isSpaceResource(resource?: ResourceResponse | null) {
+  return resource?.category === 'SPACES';
+}
+
+function ManagerBookingSectionsSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {Array.from({ length: 2 }).map((_, sectionIndex) => (
+        <BookingSection
+          key={sectionIndex}
+          label="Loading"
+          color="var(--border)"
+          count={3}
+        >
+          {Array.from({ length: 3 }).map((__, cardIndex) => (
+            <div key={cardIndex} style={{ flexShrink: 0 }}>
+              <BookingCardSkeleton />
+            </div>
+          ))}
+        </BookingSection>
+      ))}
+    </div>
+  );
 }
 
 export function ManagerBookingsScreenEnhanced() {
@@ -81,18 +127,20 @@ export function ManagerBookingsScreenEnhanced() {
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [activeBookingId, setActiveBookingId] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState<TabType>('bookings');
-
-  const [statusFilter, setStatusFilter] = React.useState<BookingStatus | ''>('');
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('ALL');
   const [categoryFilter, setCategoryFilter] = React.useState('');
   const [subcategoryFilter, setSubcategoryFilter] = React.useState('');
   const [resourceFilter, setResourceFilter] = React.useState('');
   const [searchText, setSearchText] = React.useState('');
   const deferredSearch = React.useDeferredValue(searchText);
-
-  // Modification approval modals
-  const [showModificationDetail, setShowModificationDetail] = React.useState(false);
   const [selectedModification, setSelectedModification] = React.useState<BookingModificationResponse | null>(null);
-  const [decisionReason, setDecisionReason] = React.useState('');
+  const [modificationDecisionReason, setModificationDecisionReason] = React.useState('');
+  const [bookingDecision, setBookingDecision] = React.useState<{
+    booking: BookingResponse;
+    action: 'reject' | 'cancelApproved';
+  } | null>(null);
+  const [bookingDecisionReason, setBookingDecisionReason] = React.useState('');
+  const [locationBooking, setLocationBooking] = React.useState<BookingResponse | null>(null);
 
   const reload = React.useCallback(async () => {
     if (!accessToken) {
@@ -110,6 +158,7 @@ export function ManagerBookingsScreenEnhanced() {
         listPendingModifications(accessToken),
         listResourceOptions(accessToken, { status: 'ACTIVE' }),
       ]);
+
       setBookings(allBookings);
       setModifications(pendingMods);
       setResources(availableResources);
@@ -117,6 +166,7 @@ export function ManagerBookingsScreenEnhanced() {
       setLoadError(getErrorMessage(error, 'We could not load bookings.'));
       setBookings([]);
       setModifications([]);
+      setResources([]);
     } finally {
       setLoading(false);
     }
@@ -127,60 +177,57 @@ export function ManagerBookingsScreenEnhanced() {
   }, [reload]);
 
   const resourceById = React.useMemo(
-    () =>
-      new Map(resources.map((resource) => [resource.id, resource])),
+    () => new Map(resources.map((resource) => [resource.id, resource])),
     [resources],
   );
 
   const categoryOptions = React.useMemo(
-    () =>
-      Array.from(new Set(resources.map((resource) => resource.category)))
-        .sort()
-        .map((category) => ({
-          value: category,
-          label: getResourceCategoryLabel(category),
-        })),
+    () => Array.from(new Set(resources.map((resource) => resource.category)))
+      .sort()
+      .map((category) => ({ value: category, label: getResourceCategoryLabel(category) })),
     [resources],
   );
 
   const categoryFilteredResources = React.useMemo(
-    () =>
-      categoryFilter
-        ? resources.filter((resource) => resource.category === categoryFilter)
-        : resources,
+    () => categoryFilter
+      ? resources.filter((resource) => resource.category === categoryFilter)
+      : resources,
     [categoryFilter, resources],
   );
 
   const subcategoryOptions = React.useMemo(
-    () =>
-      Array.from(
-        new Set(
-          categoryFilteredResources
-            .map((resource) => resource.subcategory)
-            .filter((subcategory): subcategory is string => Boolean(subcategory && subcategory.trim())),
-        ),
-      )
-        .sort((left, right) => left.localeCompare(right))
-        .map((subcategory) => ({
-          value: subcategory,
-          label: subcategory,
-        })),
+    () => Array.from(
+      new Set(
+        categoryFilteredResources
+          .map((resource) => resource.subcategory)
+          .filter((subcategory): subcategory is string => Boolean(subcategory && subcategory.trim())),
+      ),
+    )
+      .sort((left, right) => left.localeCompare(right))
+      .map((subcategory) => ({ value: subcategory, label: subcategory })),
     [categoryFilteredResources],
   );
 
   const resourceOptions = React.useMemo(
-    () =>
-      categoryFilteredResources
-        .filter(
-          (resource) => !subcategoryFilter
-            || normalizeSubcategory(resource.subcategory) === normalizeSubcategory(subcategoryFilter),
-        )
-        .map((resource) => ({
-          value: resource.id,
-          label: resource.name,
-        })),
+    () => categoryFilteredResources
+      .filter(
+        (resource) => !subcategoryFilter
+          || normalizeSubcategory(resource.subcategory) === normalizeSubcategory(subcategoryFilter),
+      )
+      .map((resource) => ({ value: resource.id, label: resource.name })),
     [categoryFilteredResources, subcategoryFilter],
   );
+
+  const tabCounts = React.useMemo(() => ({
+    ALL: bookings.length,
+    PENDING: bookings.filter((booking) => booking.status === 'PENDING').length,
+    APPROVED: bookings.filter((booking) => booking.status === 'APPROVED').length,
+    CHECKED_IN: bookings.filter((booking) => booking.status === 'CHECKED_IN').length,
+    COMPLETED: bookings.filter((booking) => booking.status === 'COMPLETED').length,
+    REJECTED: bookings.filter((booking) => booking.status === 'REJECTED').length,
+    CANCELLED: bookings.filter((booking) => booking.status === 'CANCELLED').length,
+    NO_SHOW: bookings.filter((booking) => booking.status === 'NO_SHOW').length,
+  }), [bookings]);
 
   const filteredBookings = React.useMemo(() => {
     const needle = deferredSearch.trim().toLowerCase();
@@ -188,7 +235,7 @@ export function ManagerBookingsScreenEnhanced() {
     return bookings.filter((booking) => {
       const resource = resourceById.get(booking.resource.id);
 
-      if (statusFilter && booking.status !== statusFilter) {
+      if (statusFilter !== 'ALL' && booking.status !== statusFilter) {
         return false;
       }
 
@@ -217,16 +264,38 @@ export function ManagerBookingsScreenEnhanced() {
         || (booking.purpose ?? '').toLowerCase().includes(needle)
         || (booking.requesterRegistrationNumber ?? '').toLowerCase().includes(needle)
         || booking.requesterId.toLowerCase().includes(needle)
+        || (resource?.locationDetails?.locationName ?? resource?.location ?? '').toLowerCase().includes(needle)
       );
     });
   }, [bookings, categoryFilter, deferredSearch, resourceById, resourceFilter, statusFilter, subcategoryFilter]);
 
-  const pendingBookings = bookings.filter((b) => b.status === 'PENDING').length;
-  const approvedBookings = bookings.filter((b) => b.status === 'APPROVED').length;
-  const pendingModifications = modifications.filter((m) => m.status === 'PENDING').length;
-  const rejectedBookings = bookings.filter((b) => b.status === 'REJECTED').length;
+  const groupedBookings = React.useMemo(
+    () => BOOKING_SECTIONS.map((section) => ({
+      ...section,
+      items: filteredBookings.filter((booking) => booking.status === section.status),
+    })).filter((section) => section.items.length > 0),
+    [filteredBookings],
+  );
 
-  // Booking approval handlers
+  const checkInBookings = React.useMemo(
+    () => bookings.filter((booking) => {
+      const resource = resourceById.get(booking.resource.id);
+      return isSpaceResource(resource) && (booking.status === 'APPROVED' || booking.checkInStatus);
+    }),
+    [bookings, resourceById],
+  );
+
+  const selectedLocationResource = locationBooking ? resourceById.get(locationBooking.resource.id) ?? null : null;
+  const selectedLocationDetails = selectedLocationResource?.locationDetails ?? null;
+  const selectedLocationBuildingLabel = selectedLocationDetails?.buildingName
+    ? `${selectedLocationDetails.buildingName}${selectedLocationDetails.buildingCode ? ` (${selectedLocationDetails.buildingCode})` : ''}`
+    : 'N/A';
+
+  const pendingBookings = bookings.filter((booking) => booking.status === 'PENDING').length;
+  const approvedBookings = bookings.filter((booking) => booking.status === 'APPROVED').length;
+  const pendingModifications = modifications.filter((modification) => modification.status === 'PENDING').length;
+  const checkInCount = checkInBookings.length;
+
   async function handleApproveBooking(booking: BookingResponse) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
@@ -245,56 +314,41 @@ export function ManagerBookingsScreenEnhanced() {
     }
   }
 
-  async function handleRejectBooking(booking: BookingResponse) {
-    if (!accessToken) {
-      showToast('error', 'Session unavailable', 'Please sign in again.');
+  async function handleBookingDecisionSubmit() {
+    if (!accessToken || !bookingDecision) {
       return;
     }
 
-    const reason = window.prompt('Provide a rejection reason:');
-    if (!reason?.trim()) {
+    if (bookingDecision.action === 'reject' && !bookingDecisionReason.trim()) {
       showToast('warning', 'Reason required', 'A rejection reason is required.');
       return;
     }
 
-    setActiveBookingId(booking.id);
+    setActiveBookingId(bookingDecision.booking.id);
     try {
-      await rejectBooking(accessToken, booking.id, { reason: reason.trim() });
+      if (bookingDecision.action === 'reject') {
+        await rejectBooking(accessToken, bookingDecision.booking.id, { reason: bookingDecisionReason.trim() });
+        showToast('success', 'Booking rejected', `${bookingDecision.booking.resource.name} was rejected.`);
+      } else {
+        const trimmedReason = bookingDecisionReason.trim();
+        await cancelApprovedBookingAsManager(
+          accessToken,
+          bookingDecision.booking.id,
+          trimmedReason ? { reason: trimmedReason } : undefined,
+        );
+        showToast('success', 'Booking cancelled', `${bookingDecision.booking.resource.name} was cancelled.`);
+      }
+
+      setBookingDecision(null);
+      setBookingDecisionReason('');
       await reload();
-      showToast('success', 'Booking rejected', `${booking.resource.name} was rejected.`);
     } catch (error) {
-      showToast('error', 'Rejection failed', getErrorMessage(error, 'Could not reject this booking.'));
+      showToast('error', 'Action failed', getErrorMessage(error, 'Could not update this booking.'));
     } finally {
       setActiveBookingId(null);
     }
   }
 
-  async function handleCancelApprovedBooking(booking: BookingResponse) {
-    if (!accessToken) {
-      showToast('error', 'Session unavailable', 'Please sign in again.');
-      return;
-    }
-
-    const confirmed = window.confirm(`Cancel approved booking ${booking.resource.name}?`);
-    if (!confirmed) {
-      return;
-    }
-
-    const reason = window.prompt('Optional cancellation reason:')?.trim();
-
-    setActiveBookingId(booking.id);
-    try {
-      await cancelApprovedBookingAsManager(accessToken, booking.id, reason ? { reason } : undefined);
-      await reload();
-      showToast('success', 'Booking cancelled', `${booking.resource.name} was cancelled.`);
-    } catch (error) {
-      showToast('error', 'Cancellation failed', getErrorMessage(error, 'Could not cancel this booking.'));
-    } finally {
-      setActiveBookingId(null);
-    }
-  }
-
-  // Modification handlers
   async function handleApproveModification(modification: BookingModificationResponse) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
@@ -305,8 +359,6 @@ export function ManagerBookingsScreenEnhanced() {
     try {
       await approveModification(accessToken, modification.id);
       await reload();
-      setShowModificationDetail(false);
-      setSelectedModification(null);
       showToast('success', 'Modification approved', 'The reschedule request has been approved.');
     } catch (error) {
       showToast('error', 'Approval failed', getErrorMessage(error, 'Could not approve this modification.'));
@@ -321,18 +373,17 @@ export function ManagerBookingsScreenEnhanced() {
       return;
     }
 
-    if (!decisionReason.trim()) {
+    if (!modificationDecisionReason.trim()) {
       showToast('warning', 'Reason required', 'A rejection reason is required.');
       return;
     }
 
     setActiveBookingId(modification.id);
     try {
-      await rejectModification(accessToken, modification.id, { decisionReason: decisionReason.trim() });
+      await rejectModification(accessToken, modification.id, { decisionReason: modificationDecisionReason.trim() });
       await reload();
-      setShowModificationDetail(false);
       setSelectedModification(null);
-      setDecisionReason('');
+      setModificationDecisionReason('');
       showToast('success', 'Modification rejected', 'The reschedule request has been rejected.');
     } catch (error) {
       showToast('error', 'Rejection failed', getErrorMessage(error, 'Could not reject this modification.'));
@@ -346,9 +397,6 @@ export function ManagerBookingsScreenEnhanced() {
       showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
-
-    const confirmed = window.confirm(`Mark booking as no-show? ${booking.resource.name}`);
-    if (!confirmed) return;
 
     setActiveBookingId(booking.id);
     try {
@@ -382,32 +430,15 @@ export function ManagerBookingsScreenEnhanced() {
 
   function resetBookingFilters() {
     setSearchText('');
-    setStatusFilter('');
+    setStatusFilter('ALL');
     setCategoryFilter('');
     setSubcategoryFilter('');
     setResourceFilter('');
   }
 
-  const elevatedCardStyle: React.CSSProperties = {
-    border: '1px solid color-mix(in srgb, var(--border) 74%, transparent)',
-    boxShadow: '0 16px 40px rgba(10, 24, 58, 0.08)',
-    background:
-      'linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 97%, #dce8ff 3%))',
-  };
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div
-        style={{
-          padding: '22px 24px',
-          borderRadius: 'var(--radius-xl)',
-          border: '1px solid color-mix(in srgb, var(--border) 72%, transparent)',
-          background:
-            'radial-gradient(circle at 88% -25%, rgba(52, 132, 255, 0.2), transparent 60%), linear-gradient(150deg, color-mix(in srgb, var(--bg-card) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 97%, #e5eeff 3%))',
-          boxShadow: '0 22px 44px rgba(14, 32, 70, 0.1)',
-        }}
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0, width: '100%', overflowX: 'hidden' }}>
+      <div>
         <p
           style={{
             margin: '0 0 8px',
@@ -434,512 +465,450 @@ export function ManagerBookingsScreenEnhanced() {
           Booking Management
         </h1>
         <p style={{ margin: '8px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
-          Review booking requests, manage approvals, modifications, and keep resource schedules conflict-free.
+          Review booking requests, approve changes, and manage active check-ins using the same card workflow as ticketing.
         </p>
       </div>
 
-
-
-      {/* Stats Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-          gap: 12,
-        }}
-      >
-        {[
-          { label: 'Pending Bookings', value: pendingBookings.toString() },
-          { label: 'Approved', value: approvedBookings.toString() },
-          { label: 'Pending Mods', value: pendingModifications.toString(), highlight: pendingModifications > 0 },
-          { label: 'Rejected', value: rejectedBookings.toString() },
-        ].map((item) => (
-          <Card key={item.label} style={{ backgroundColor: item.highlight ? 'rgba(255, 193, 7, 0.1)' : undefined }}>
-            <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
-              {item.label}
-            </p>
-            <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: item.highlight ? '#FFC107' : 'var(--text-h)' }}>
-              {item.value}
-            </p>
-          </Card>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+        <Card>
+          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+            Pending
+          </p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text-h)' }}>
+            {pendingBookings}
+          </p>
+        </Card>
+        <Card>
+          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+            Approved
+          </p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text-h)' }}>
+            {approvedBookings}
+          </p>
+        </Card>
+        <Card>
+          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+            Pending Mods
+          </p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: pendingModifications > 0 ? 'var(--yellow-700)' : 'var(--text-h)' }}>
+            {pendingModifications}
+          </p>
+        </Card>
+        <Card>
+          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+            Check-In Queue
+          </p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text-h)' }}>
+            {checkInCount}
+          </p>
+        </Card>
       </div>
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          padding: 8,
-          border: '1px solid color-mix(in srgb, var(--border) 78%, transparent)',
-          borderRadius: 'var(--radius-lg)',
-          background: 'color-mix(in srgb, var(--bg-card) 95%, #f4f7ff 5%)',
-        }}
-      >
-        {(['bookings', 'modifications', 'checkins'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '11px 14px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 13,
-              borderRadius: 10,
-              fontWeight: activeTab === tab ? 700 : 600,
-              color: activeTab === tab ? '#114db8' : 'var(--text-secondary)',
-              background: activeTab === tab
-                ? 'linear-gradient(140deg, rgba(64, 131, 255, 0.2), rgba(180, 215, 255, 0.18))'
-                : 'transparent',
-              boxShadow: activeTab === tab ? 'inset 0 0 0 1px rgba(64, 131, 255, 0.18)' : 'none',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {tab === 'bookings' && 'Booking Requests'}
-            {tab === 'modifications' && `Modification Requests${pendingModifications > 0 ? ` (${pendingModifications})` : ''}`}
-            {tab === 'checkins' && 'Check-in Management'}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        variant="pill"
+        tabs={[
+          { label: 'Bookings', value: 'bookings', badge: bookings.length },
+          { label: 'Modifications', value: 'modifications', badge: modifications.length },
+          { label: 'Check-Ins', value: 'checkins', badge: checkInCount },
+        ]}
+        value={activeTab}
+        onChange={(value) => setActiveTab(value as TabType)}
+      />
 
-      {/* Tab Content */}
-      {loading ? (
-        <BookingScreenSkeleton variant="manager" />
-      ) : loadError ? (
-        <Alert variant="error" title="Error">
+      {loadError && (
+        <Alert variant="error" title="Load failed">
           {loadError}
         </Alert>
+      )}
+
+      {loading ? (
+        <>
+          <Card style={{ padding: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+              <div style={{ height: 44, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)' }} />
+              <div style={{ height: 44, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)' }} />
+              <div style={{ height: 44, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)' }} />
+            </div>
+          </Card>
+          <ManagerBookingSectionsSkeleton />
+        </>
       ) : (
         <>
-          {/* Bookings Tab */}
           {activeTab === 'bookings' && (
-            <Card style={{ ...elevatedCardStyle, padding: 20 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
-                <Input
-                  id="manager-booking-search"
-                  name="manager-booking-search"
-                  label="Search"
-                  placeholder="Search by resource, purpose, registration number"
-                  value={searchText}
-                  onChange={(event) => setSearchText(event.target.value)}
-                  iconLeft={<Search size={14} />}
-                  autoComplete="off"
-                />
-                <Select
-                  id="manager-booking-status"
-                  name="manager-booking-status"
-                  label="Status"
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value as BookingStatus | '')}
-                  placeholder="All statuses"
-                  options={[
-                    { value: 'PENDING', label: 'Pending' },
-                    { value: 'APPROVED', label: 'Approved' },
-                    { value: 'REJECTED', label: 'Rejected' },
-                    { value: 'CANCELLED', label: 'Cancelled' },
+            <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+              <Card style={{ padding: 18, display: 'grid', gap: 14, minWidth: 0 }}>
+                <Tabs
+                  variant="pill"
+                  tabs={[
+                    { label: 'All', value: 'ALL', badge: tabCounts.ALL },
+                    { label: 'Pending', value: 'PENDING', badge: tabCounts.PENDING },
+                    { label: 'Approved', value: 'APPROVED', badge: tabCounts.APPROVED },
+                    { label: 'Checked In', value: 'CHECKED_IN', badge: tabCounts.CHECKED_IN },
+                    { label: 'Completed', value: 'COMPLETED', badge: tabCounts.COMPLETED },
+                    { label: 'Rejected', value: 'REJECTED', badge: tabCounts.REJECTED },
+                    { label: 'Cancelled', value: 'CANCELLED', badge: tabCounts.CANCELLED },
+                    { label: 'No Show', value: 'NO_SHOW', badge: tabCounts.NO_SHOW },
                   ]}
+                  value={statusFilter}
+                  onChange={(value) => setStatusFilter(value as StatusFilter)}
                 />
-                <Select
-                  id="manager-booking-category"
-                  name="manager-booking-category"
-                  label="Category"
-                  value={categoryFilter}
-                  onChange={(event) => {
-                    const nextCategory = event.target.value;
-                    setCategoryFilter(nextCategory);
-                    setSubcategoryFilter('');
-                    setResourceFilter('');
-                  }}
-                  placeholder="All categories"
-                  options={categoryOptions}
-                />
-                <Select
-                  id="manager-booking-subcategory"
-                  name="manager-booking-subcategory"
-                  label="Subcategory"
-                  value={subcategoryFilter}
-                  onChange={(event) => {
-                    setSubcategoryFilter(event.target.value);
-                    setResourceFilter('');
-                  }}
-                  placeholder="All subcategories"
-                  options={subcategoryOptions}
-                />
-                <Select
-                  id="manager-booking-resource"
-                  name="manager-booking-resource"
-                  label="Resource"
-                  value={resourceFilter}
-                  onChange={(event) => setResourceFilter(event.target.value)}
-                  placeholder="All resources"
-                  options={resourceOptions}
-                />
-                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                  <Button variant="subtle" onClick={resetBookingFilters} fullWidth>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, minWidth: 0 }}>
+                  <Input
+                    id="manager-booking-search"
+                    label="Search"
+                    placeholder="Search by resource, purpose, requester, or location"
+                    value={searchText}
+                    onChange={(event) => setSearchText(event.target.value)}
+                    iconLeft={<Search size={14} />}
+                    autoComplete="off"
+                  />
+                  <Select
+                    id="manager-booking-category"
+                    label="Category"
+                    value={categoryFilter}
+                    onChange={(event) => {
+                      setCategoryFilter(event.target.value);
+                      setSubcategoryFilter('');
+                      setResourceFilter('');
+                    }}
+                    options={[{ value: '', label: 'All categories' }, ...categoryOptions]}
+                  />
+                  <Select
+                    id="manager-booking-subcategory"
+                    label="Subcategory"
+                    value={subcategoryFilter}
+                    onChange={(event) => {
+                      setSubcategoryFilter(event.target.value);
+                      setResourceFilter('');
+                    }}
+                    options={[{ value: '', label: 'All subcategories' }, ...subcategoryOptions]}
+                  />
+                  <Select
+                    id="manager-booking-resource"
+                    label="Resource"
+                    value={resourceFilter}
+                    onChange={(event) => setResourceFilter(event.target.value)}
+                    options={[{ value: '', label: 'All resources' }, ...resourceOptions]}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button variant="subtle" onClick={resetBookingFilters}>
                     Clear Filters
                   </Button>
                 </div>
-              </div>
+              </Card>
 
-              <div
-                style={{
-                  overflowX: 'auto',
-                  border: '1px solid color-mix(in srgb, var(--border) 70%, transparent)',
-                  borderRadius: 'var(--radius-lg)',
-                  background: 'color-mix(in srgb, var(--bg-card) 96%, #f6f9ff 4%)',
-                  boxShadow: '0 12px 30px rgba(10, 24, 58, 0.08)',
-                }}
-              >
-                <Table>
-                  <TableHead>
-                    <TableRow hoverable={false}>
-                      <TableHeader>Resource</TableHeader>
-                      <TableHeader>Requester</TableHeader>
-                      <TableHeader>Window</TableHeader>
-                      <TableHeader>Purpose</TableHeader>
-                      <TableHeader>Status</TableHeader>
-                      <TableHeader style={{ width: 260 }}>Actions</TableHeader>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {!loading && filteredBookings.length === 0 && (
-                      <TableRow hoverable={false}>
-                        <TableCell colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 28 }}>
-                          No bookings found for the current filters.
-                        </TableCell>
-                      </TableRow>
-                    )}
-
-                    {filteredBookings.map((booking) => {
-                      const actionBusy = activeBookingId === booking.id;
-                      const isCheckedInWindow = new Date(booking.startTime).getTime() <= Date.now() && new Date(booking.endTime).getTime() > Date.now();
-
-                      return (
-                        <TableRow key={booking.id}>
-                          <TableCell>
-                            <div style={{ display: 'grid', gap: 4 }}>
-                              <strong style={{ color: 'var(--text-h)' }}>{booking.resource.name}</strong>
-                            </div>
-                          </TableCell>
-                          <TableCell>{booking.requesterRegistrationNumber ?? shortId(booking.requesterId)}</TableCell>
-                          <TableCell>
-                            <div style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-                              <span>{formatDateTime(booking.startTime)}</span>
-                              <span style={{ color: 'var(--text-muted)' }}>{formatDateTime(booking.endTime)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span style={{ color: booking.purpose ? 'var(--text-body)' : 'var(--text-muted)' }}>
-                              {booking.purpose ?? 'No purpose provided'}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Chip color={statusChipColor(booking.status)} dot>
-                              {booking.status}
-                            </Chip>
-                            {booking.rejectionReason && (
-                              <p style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 11 }}>Reason: {booking.rejectionReason}</p>
-                            )}
-                            {booking.cancellationReason && (
-                              <p style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 11 }}>Cancelled: {booking.cancellationReason}</p>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              {booking.status === 'PENDING' && (
-                                <>
-                                  <Button
-                                    size="xs"
-                                    variant="success"
-                                    iconLeft={<Check size={13} />}
-                                    loading={actionBusy}
-                                    onClick={() => {
-                                      void handleApproveBooking(booking);
-                                    }}
-                                  >
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="xs"
-                                    variant="ghost-danger"
-                                    iconLeft={<X size={13} />}
-                                    loading={actionBusy}
-                                    onClick={() => {
-                                      void handleRejectBooking(booking);
-                                    }}
-                                  >
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
-                              {booking.status === 'APPROVED' && isCheckedInWindow && (
-                                <>
-                                  <Button
-                                    size="xs"
-                                    variant="ghost"
-                                    loading={actionBusy}
-                                    onClick={() => {
-                                      void handleCompleteBooking(booking);
-                                    }}
-                                  >
-                                    Complete
-                                  </Button>
-                                  <Button
-                                    size="xs"
-                                    variant="ghost-danger"
-                                    loading={actionBusy}
-                                    onClick={() => {
-                                      void handleMarkNoShow(booking);
-                                    }}
-                                  >
-                                    No-Show
-                                  </Button>
-                                </>
-                              )}
-                              {booking.status === 'APPROVED' && new Date(booking.startTime).getTime() > Date.now() && (
-                                <Button
-                                  size="xs"
-                                  variant="ghost-danger"
-                                  loading={actionBusy}
-                                  onClick={() => {
-                                    void handleCancelApprovedBooking(booking);
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                              )}
-                              {booking.status !== 'PENDING' && booking.status !== 'APPROVED' && (
-                                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>No actions</span>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          )}
-
-          {/* Modifications Tab */}
-          {activeTab === 'modifications' && (
-            <>
-              {modifications.length === 0 ? (
-                <Alert variant="info" title="No modifications">
-                  There are no pending modification requests.
+              {bookings.length === 0 ? (
+                <Alert variant="info" title="No bookings">
+                  No bookings are available yet.
+                </Alert>
+              ) : groupedBookings.length === 0 ? (
+                <Alert variant="info" title="No matches">
+                  No bookings match the current filters.
                 </Alert>
               ) : (
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {modifications.map((mod) => {
-                    const booking = bookings.find((b) => b.id === mod.bookingId);
-                    const actionBusy = activeBookingId === mod.id;
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 32, minWidth: 0 }}>
+                  {groupedBookings.map((section) => (
+                    <BookingSection
+                      key={section.status}
+                      label={section.label}
+                      color={section.color}
+                      count={section.items.length}
+                    >
+                      {section.items.map((booking) => {
+                        const actionBusy = activeBookingId === booking.id;
 
-                    return (
-                      <Card key={mod.id} style={{ ...elevatedCardStyle, padding: 16 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start' }}>
-                          <div style={{ display: 'grid', gap: 12 }}>
-                            {booking && (
-                              <>
-                                <div>
-                                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Resource</p>
-                                  <p style={{ margin: '4px 0 0', fontWeight: 600 }}>
-                                    {booking.resource.name}
-                                  </p>
-                                </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                                  <div>
-                                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Current Time</p>
-                                    <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 500 }}>
-                                      {formatDateTime(booking.startTime)} to {formatDateTime(booking.endTime)}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Requested Time</p>
-                                    <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 500, color: 'var(--primary)' }}>
-                                      {formatDateTime(mod.requestedStartTime)} to {formatDateTime(mod.requestedEndTime)}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {mod.reason && (
-                                  <div>
-                                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Reason</p>
-                                    <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>{mod.reason}</p>
-                                  </div>
-                                )}
-                              </>
-                            )}
+                        return (
+                          <div key={booking.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
+                            <BookingCard
+                              booking={booking}
+                              resource={resourceById.get(booking.resource.id)}
+                              showRequester
+                              onLocation={() => setLocationBooking(booking)}
+                              actions={
+                                <>
+                                  {booking.status === 'PENDING' && (
+                                    <>
+                                      <Button
+                                        size="xs"
+                                        variant="success"
+                                        iconLeft={<Check size={13} />}
+                                        loading={actionBusy}
+                                        onClick={() => {
+                                          void handleApproveBooking(booking);
+                                        }}
+                                      >
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        size="xs"
+                                        variant="ghost-danger"
+                                        iconLeft={<X size={13} />}
+                                        loading={actionBusy}
+                                        onClick={() => {
+                                          setBookingDecision({ booking, action: 'reject' });
+                                          setBookingDecisionReason('');
+                                        }}
+                                      >
+                                        Reject
+                                      </Button>
+                                    </>
+                                  )}
+                                  {booking.status === 'APPROVED' && !isCheckInWindow(booking) && new Date(booking.startTime).getTime() > Date.now() && (
+                                    <Button
+                                      size="xs"
+                                      variant="ghost-danger"
+                                      loading={actionBusy}
+                                      onClick={() => {
+                                        setBookingDecision({ booking, action: 'cancelApproved' });
+                                        setBookingDecisionReason('');
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  )}
+                                </>
+                              }
+                            />
                           </div>
-
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            {mod.status === 'PENDING' && (
-                              <>
-                                <Button
-                                  size="xs"
-                                  variant="success"
-                                  loading={actionBusy}
-                                  onClick={() => {
-                                    void handleApproveModification(mod);
-                                  }}
-                                >
-                                  Approve
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  variant="ghost-danger"
-                                  loading={actionBusy}
-                                  onClick={() => {
-                                    setSelectedModification(mod);
-                                    setShowModificationDetail(true);
-                                    setDecisionReason('');
-                                  }}
-                                >
-                                  Reject
-                                </Button>
-                              </>
-                            )}
-                            {mod.status === 'APPROVED' && (
-                              <Chip color="green">Approved</Chip>
-                            )}
-                            {mod.status === 'REJECTED' && (
-                              <div>
-                                <Chip color="red">Rejected</Chip>
-                                {mod.decisionReason && (
-                                  <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>Reason: {mod.decisionReason}</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                        );
+                      })}
+                    </BookingSection>
+                  ))}
                 </div>
               )}
-            </>
+            </div>
           )}
 
-          {/* Check-in Tab */}
-          {activeTab === 'checkins' && (
-            <>
-              {bookings.filter((b) => b.status === 'APPROVED' || b.checkInStatus).length === 0 ? (
-                <Alert variant="info" title="No active bookings">
-                  There are no bookings to manage check-ins for.
-                </Alert>
-              ) : (
-                <Card style={{ ...elevatedCardStyle, padding: 20 }}>
-                  <div
-                    style={{
-                      overflowX: 'auto',
-                      border: '1px solid color-mix(in srgb, var(--border) 70%, transparent)',
-                      borderRadius: 'var(--radius-lg)',
-                      background: 'color-mix(in srgb, var(--bg-card) 96%, #f6f9ff 4%)',
-                    }}
-                  >
-                    <Table>
-                      <TableHead>
-                        <TableRow hoverable={false}>
-                          <TableHeader>Resource</TableHeader>
-                          <TableHeader>Booking Time</TableHeader>
-                          <TableHeader>Check-in Status</TableHeader>
-                          <TableHeader>Actions</TableHeader>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {bookings
-                          .filter((b) => b.status === 'APPROVED' || b.checkInStatus)
-                          .map((booking) => {
-                            const actionBusy = activeBookingId === booking.id;
-                            const isCheckedInWindow = new Date(booking.startTime).getTime() <= Date.now() && new Date(booking.endTime).getTime() > Date.now();
+          {activeTab === 'modifications' && (
+            modifications.length === 0 ? (
+              <Alert variant="info" title="No modifications">
+                There are no pending modification requests.
+              </Alert>
+            ) : (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {modifications.map((modification) => {
+                  const booking = bookings.find((entry) => entry.id === modification.bookingId);
+                  const actionBusy = activeBookingId === modification.id;
+                  const resource = booking ? resourceById.get(booking.resource.id) : null;
 
-                            return (
-                              <TableRow key={booking.id}>
-                                <TableCell>
-                                  <div>
-                                    <strong>{booking.resource.name}</strong>
-                                  </div>
-                                </TableCell>
-                                <TableCell style={{ fontSize: 12 }}>
-                                  <div>{formatDateTime(booking.startTime)}</div>
-                                  <div style={{ color: 'var(--text-muted)' }}>{formatDateTime(booking.endTime)}</div>
-                                </TableCell>
-                                <TableCell>
-                                  {booking.checkInStatus ? (
-                                    <Chip color={booking.checkInStatus === 'CHECKED_IN' ? 'blue' : booking.checkInStatus === 'NO_SHOW' ? 'red' : 'green'}>
-                                      {booking.checkInStatus}
-                                    </Chip>
-                                  ) : (
-                                    <Chip color={isCheckedInWindow ? 'yellow' : 'neutral'}>
-                                      {isCheckedInWindow ? 'Ready for Check-in' : 'Not Started'}
-                                    </Chip>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div style={{ display: 'flex', gap: 8 }}>
-                                    {isCheckedInWindow && !booking.checkInStatus && (
-                                      <>
-                                        <Button
-                                          size="xs"
-                                          variant="success"
-                                          loading={actionBusy}
-                                          onClick={() => {
-                                            void handleCompleteBooking(booking);
-                                          }}
-                                        >
-                                          Complete
-                                        </Button>
-                                        <Button
-                                          size="xs"
-                                          variant="ghost-danger"
-                                          loading={actionBusy}
-                                          onClick={() => {
-                                            void handleMarkNoShow(booking);
-                                          }}
-                                        >
-                                          No-Show
-                                        </Button>
-                                      </>
-                                    )}
-                                    {!isCheckedInWindow && !booking.checkInStatus && (
-                                      <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Pending</span>
-                                    )}
-                                    {booking.checkInStatus && (
-                                      <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Completed</span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </Card>
-              )}
-            </>
+                  return (
+                    <Card
+                      key={modification.id}
+                      style={{
+                        padding: 18,
+                        border: '1px solid var(--border)',
+                        boxShadow: 'var(--card-shadow)',
+                        display: 'grid',
+                        gap: 14,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'grid', gap: 6 }}>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
+                            {booking?.resource.name ?? 'Booking modification'}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            {booking?.resource.code ?? shortId(modification.bookingId)}
+                            {resource?.locationDetails?.locationName ? ` · ${resource.locationDetails.locationName}` : ''}
+                          </div>
+                        </div>
+                        <Chip color="yellow" size="sm" dot>
+                          Pending
+                        </Chip>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                        <div style={{ padding: 14, borderRadius: 'var(--radius-md)', background: 'var(--surface-2)', display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--text-muted)' }}>
+                            Current Window
+                          </span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-body)' }}>
+                            {booking ? `${formatDateTime(booking.startTime)} to ${formatDateTime(booking.endTime)}` : 'Unavailable'}
+                          </span>
+                        </div>
+                        <div style={{ padding: 14, borderRadius: 'var(--radius-md)', background: 'rgba(59,130,246,0.08)', display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--text-muted)' }}>
+                            Requested Window
+                          </span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-body)' }}>
+                            {formatDateTime(modification.requestedStartTime)} to {formatDateTime(modification.requestedEndTime)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {modification.reason && (
+                        <Alert variant="info" title="Requester note">
+                          {modification.reason}
+                        </Alert>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+                        <Button
+                          size="sm"
+                          variant="ghost-danger"
+                          loading={actionBusy}
+                          onClick={() => {
+                            setSelectedModification(modification);
+                            setModificationDecisionReason('');
+                          }}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="success"
+                          loading={actionBusy}
+                          onClick={() => {
+                            void handleApproveModification(modification);
+                          }}
+                        >
+                          Approve
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {activeTab === 'checkins' && (
+            checkInBookings.length === 0 ? (
+              <Alert variant="info" title="No active bookings">
+                There are no bookings to manage check-ins for.
+              </Alert>
+            ) : (
+              <BookingSection label="Check-In Queue" color="var(--blue-400)" count={checkInBookings.length}>
+                {checkInBookings.map((booking) => {
+                  const actionBusy = activeBookingId === booking.id;
+                  const inWindow = isCheckInWindow(booking);
+
+                  return (
+                    <div key={booking.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
+                      <BookingCard
+                        booking={booking}
+                        resource={resourceById.get(booking.resource.id)}
+                        showRequester
+                        onLocation={() => setLocationBooking(booking)}
+                        actions={
+                          <>
+                            {inWindow && !booking.checkInStatus && (
+                              <>
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  loading={actionBusy}
+                                  onClick={() => {
+                                    void handleCompleteBooking(booking);
+                                  }}
+                                >
+                                  Complete
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  variant="ghost-danger"
+                                  loading={actionBusy}
+                                  onClick={() => {
+                                    void handleMarkNoShow(booking);
+                                  }}
+                                >
+                                  No-Show
+                                </Button>
+                              </>
+                            )}
+                          </>
+                        }
+                      />
+                    </div>
+                  );
+                })}
+              </BookingSection>
+            )
           )}
         </>
       )}
 
-      {/* Modification Rejection Dialog */}
-        <Dialog open={showModificationDetail && !!selectedModification} onClose={() => { setShowModificationDetail(false); setSelectedModification(null); }} title="Reject Modification Request">
+      <Dialog
+        open={!!bookingDecision}
+        onClose={() => {
+          setBookingDecision(null);
+          setBookingDecisionReason('');
+        }}
+        title={bookingDecision?.action === 'reject' ? 'Reject Booking' : 'Cancel Approved Booking'}
+        size="sm"
+      >
+        {bookingDecision && (
+          <div style={{ padding: '20px 24px', display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--text-body)' }}>
+              {bookingDecision.action === 'reject'
+                ? `Provide a reason for rejecting ${bookingDecision.booking.resource.name}.`
+                : `Cancel the approved booking for ${bookingDecision.booking.resource.name}. You can include an optional reason.`}
+            </p>
+            <Textarea
+              label={bookingDecision.action === 'reject' ? 'Rejection Reason' : 'Cancellation Reason'}
+              placeholder={bookingDecision.action === 'reject' ? 'Enter rejection reason' : 'Optional manager note'}
+              value={bookingDecisionReason}
+              onChange={(event) => setBookingDecisionReason(event.target.value)}
+              rows={4}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setBookingDecision(null);
+                  setBookingDecisionReason('');
+                }}
+                disabled={activeBookingId === bookingDecision.booking.id}
+              >
+                Close
+              </Button>
+              <Button
+                variant={bookingDecision.action === 'reject' ? 'danger' : 'ghost-danger'}
+                loading={activeBookingId === bookingDecision.booking.id}
+                onClick={() => {
+                  void handleBookingDecisionSubmit();
+                }}
+              >
+                {bookingDecision.action === 'reject' ? 'Reject Booking' : 'Cancel Booking'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      <Dialog
+        open={!!selectedModification}
+        onClose={() => {
+          setSelectedModification(null);
+          setModificationDecisionReason('');
+        }}
+        title="Reject Modification Request"
+        size="sm"
+      >
         {selectedModification && (
-          <div style={{ display: 'grid', gap: 12 }}>
-            <Alert variant="info" title="Enter rejection reason">
+          <div style={{ padding: '20px 24px', display: 'grid', gap: 12 }}>
+            <Alert variant="info" title="Rejection reason">
               Provide a reason for rejecting this modification request.
             </Alert>
             <Textarea
               label="Rejection Reason"
-              placeholder="Enter reason..."
-              value={decisionReason}
-              onChange={(e) => setDecisionReason(e.target.value)}
+              placeholder="Enter rejection reason"
+              value={modificationDecisionReason}
+              onChange={(event) => setModificationDecisionReason(event.target.value)}
               rows={4}
             />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="ghost-danger" onClick={() => { setShowModificationDetail(false); setSelectedModification(null); }}>
-                Cancel
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSelectedModification(null);
+                  setModificationDecisionReason('');
+                }}
+              >
+                Close
               </Button>
               <Button
                 variant="danger"
@@ -953,6 +922,102 @@ export function ManagerBookingsScreenEnhanced() {
             </div>
           </div>
         )}
+      </Dialog>
+
+      <Dialog
+        open={!!locationBooking}
+        onClose={() => setLocationBooking(null)}
+        title="Location Details"
+        size="sm"
+      >
+        <div style={{ padding: '20px 24px', display: 'grid', gap: 16 }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: 6,
+              padding: 16,
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid color-mix(in srgb, var(--border) 72%, transparent)',
+              background: 'color-mix(in srgb, var(--bg-card) 94%, #eef4ff 6%)',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: '.18em',
+                textTransform: 'uppercase',
+                color: 'var(--text-muted)',
+              }}
+            >
+              Resource
+            </span>
+            <strong style={{ color: 'var(--text-h)', fontSize: 16 }}>
+              {locationBooking?.resource.name ?? 'Selected booking'}
+            </strong>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+              {selectedLocationResource?.code ?? locationBooking?.resource.code ?? 'N/A'}
+            </span>
+          </div>
+
+          {selectedLocationResource ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                  Location
+                </span>
+                <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                  {selectedLocationDetails?.locationName ?? selectedLocationResource.location ?? 'N/A'}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                  Type
+                </span>
+                <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                  {selectedLocationDetails ? getLocationTypeLabel(selectedLocationDetails.locationType) : 'N/A'}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                  Building
+                </span>
+                <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                  {selectedLocationBuildingLabel}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                  Wing
+                </span>
+                <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                  {selectedLocationDetails ? getWingLabel(selectedLocationDetails.wing) : 'N/A'}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                  Floor
+                </span>
+                <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                  {selectedLocationDetails?.floor ?? 'N/A'}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+                  Room Code
+                </span>
+                <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
+                  {selectedLocationDetails?.roomCode ?? 'N/A'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <Alert variant="warning" title="Location unavailable">
+              We could not resolve the linked resource details for this booking right now.
+            </Alert>
+          )}
+        </div>
       </Dialog>
     </div>
   );
