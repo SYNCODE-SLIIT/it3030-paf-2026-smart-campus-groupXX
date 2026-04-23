@@ -2,6 +2,8 @@ package com.university.smartcampus.user.service;
 
 import java.time.Instant;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.List;
@@ -10,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +20,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -42,6 +48,12 @@ import com.university.smartcampus.config.SmartCampusProperties;
 import com.university.smartcampus.ticket.entity.TicketEntity;
 import com.university.smartcampus.ticket.repository.TicketRepository;
 import com.university.smartcampus.user.dto.AdminDtos.AdminProfileInput;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportEntry;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportRequest;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportResponse;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportRowResult;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportStatus;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportSummary;
 import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
 import com.university.smartcampus.user.dto.AdminDtos.FacultyProfileInput;
 import com.university.smartcampus.user.dto.AdminDtos.ManagerProfileInput;
@@ -68,6 +80,8 @@ public class UserManagementService {
 
     private static final String NEXT_STEP_DASHBOARD = "DASHBOARD";
     private static final String NEXT_STEP_ONBOARDING = "ONBOARDING";
+    private static final int MAX_BULK_STUDENT_IMPORT_ROWS = 500;
+    private static final Pattern SIMPLE_EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private static final Set<String> ALLOWED_PROFILE_IMAGE_TYPES = Set.of("image/jpeg", "image/jpg", "image/png", "image/webp");
 
     private final UserRepository userRepository;
@@ -82,6 +96,7 @@ public class UserManagementService {
     private final UserIdentifierService userIdentifierService;
     private final AuditLogService auditLogService;
     private final TicketRepository ticketRepository;
+    private final PlatformTransactionManager transactionManager;
 
     public UserManagementService(
             UserRepository userRepository,
@@ -95,7 +110,8 @@ public class UserManagementService {
             SmartCampusProperties properties,
             UserIdentifierService userIdentifierService,
             AuditLogService auditLogService,
-            TicketRepository ticketRepository) {
+            TicketRepository ticketRepository,
+            PlatformTransactionManager transactionManager) {
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
         this.managerRepository = managerRepository;
@@ -108,6 +124,7 @@ public class UserManagementService {
         this.userIdentifierService = userIdentifierService;
         this.auditLogService = auditLogService;
         this.ticketRepository = ticketRepository;
+        this.transactionManager = transactionManager;
     }
 
     @Transactional
@@ -150,6 +167,53 @@ public class UserManagementService {
         }
 
         return userMapper.toUserResponse(user);
+    }
+
+    @Transactional(readOnly = true)
+    public BulkStudentImportResponse previewBulkStudentImport(BulkStudentImportRequest request) {
+        return buildBulkStudentResponse(validateBulkStudentRows(request));
+    }
+
+    public BulkStudentImportResponse importBulkStudents(BulkStudentImportRequest request, UserEntity performedByAdmin) {
+        List<BulkStudentImportRowResult> validatedRows = validateBulkStudentRows(request);
+        List<BulkStudentImportRowResult> results = new ArrayList<>(validatedRows.size());
+
+        for (BulkStudentImportRowResult row : validatedRows) {
+            if (row.status() != BulkStudentImportStatus.VALID || !StringUtils.hasText(row.normalizedEmail())) {
+                results.add(row);
+                continue;
+            }
+
+            try {
+                UserResponse createdUser = createBulkStudentInNewTransaction(row.normalizedEmail(), performedByAdmin);
+                results.add(new BulkStudentImportRowResult(
+                    row.rowNumber(),
+                    row.email(),
+                    createdUser.email(),
+                    BulkStudentImportStatus.CREATED,
+                    "Student account created and invite email queued.",
+                    createdUser.id()
+                ));
+            } catch (BadRequestException exception) {
+                if (isAlreadyExistsMessage(exception.getMessage())) {
+                    results.add(new BulkStudentImportRowResult(
+                        row.rowNumber(),
+                        row.email(),
+                        row.normalizedEmail(),
+                        BulkStudentImportStatus.ALREADY_EXISTS,
+                        "A user with this email already exists.",
+                        null
+                    ));
+                } else {
+                    results.add(failedBulkRow(row, exception.getMessage()));
+                }
+            } catch (Exception exception) {
+                LOGGER.warn("Bulk student import failed for row {} ({})", row.rowNumber(), row.normalizedEmail(), exception);
+                results.add(failedBulkRow(row, "Could not create or invite this student."));
+            }
+        }
+
+        return buildBulkStudentResponse(results);
     }
 
     @Transactional(readOnly = true)
@@ -483,6 +547,153 @@ public class UserManagementService {
 
         studentRepository.save(student);
         return userMapper.toUserResponse(managedUser);
+    }
+
+    private List<BulkStudentImportRowResult> validateBulkStudentRows(BulkStudentImportRequest request) {
+        validateBulkStudentRequest(request);
+
+        List<BulkStudentImportRowResult> results = new ArrayList<>(request.students().size());
+        Set<String> seenEmails = new HashSet<>();
+
+        for (int index = 0; index < request.students().size(); index += 1) {
+            BulkStudentImportEntry row = request.students().get(index);
+            int rowNumber = resolveBulkRowNumber(row, index);
+            String rawEmail = row != null ? row.email() : null;
+            String displayEmail = rawEmail == null ? "" : rawEmail.trim();
+            String normalizedEmail = currentUserService.normalizeEmail(rawEmail);
+
+            if (!StringUtils.hasText(normalizedEmail) || !SIMPLE_EMAIL_PATTERN.matcher(normalizedEmail).matches()) {
+                results.add(new BulkStudentImportRowResult(
+                    rowNumber,
+                    displayEmail,
+                    normalizedEmail,
+                    BulkStudentImportStatus.INVALID_EMAIL,
+                    "Enter a valid email address.",
+                    null
+                ));
+                continue;
+            }
+
+            if (!seenEmails.add(normalizedEmail)) {
+                results.add(new BulkStudentImportRowResult(
+                    rowNumber,
+                    displayEmail,
+                    normalizedEmail,
+                    BulkStudentImportStatus.DUPLICATE_IN_FILE,
+                    "Duplicate email in this import.",
+                    null
+                ));
+                continue;
+            }
+
+            if (userRepository.findByEmailIgnoreCase(normalizedEmail).isPresent()) {
+                results.add(new BulkStudentImportRowResult(
+                    rowNumber,
+                    displayEmail,
+                    normalizedEmail,
+                    BulkStudentImportStatus.ALREADY_EXISTS,
+                    "A user with this email already exists.",
+                    null
+                ));
+                continue;
+            }
+
+            results.add(new BulkStudentImportRowResult(
+                rowNumber,
+                displayEmail,
+                normalizedEmail,
+                BulkStudentImportStatus.VALID,
+                "Ready to import.",
+                null
+            ));
+        }
+
+        return results;
+    }
+
+    private void validateBulkStudentRequest(BulkStudentImportRequest request) {
+        if (request == null || request.students() == null || request.students().isEmpty()) {
+            throw new BadRequestException("Student import requires at least one row.");
+        }
+
+        if (request.students().size() > MAX_BULK_STUDENT_IMPORT_ROWS) {
+            throw new BadRequestException("Student imports are limited to 500 rows per request.");
+        }
+    }
+
+    private int resolveBulkRowNumber(BulkStudentImportEntry row, int index) {
+        if (row != null && row.rowNumber() != null && row.rowNumber() > 0) {
+            return row.rowNumber();
+        }
+
+        return index + 1;
+    }
+
+    private UserResponse createBulkStudentInNewTransaction(String normalizedEmail, UserEntity performedByAdmin) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        return template.execute(status -> createUser(new CreateUserRequest(
+            normalizedEmail,
+            UserType.STUDENT,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+        ), performedByAdmin));
+    }
+
+    private BulkStudentImportRowResult failedBulkRow(BulkStudentImportRowResult row, String message) {
+        String resolvedMessage = StringUtils.hasText(message) ? message : "Could not create or invite this student.";
+        return new BulkStudentImportRowResult(
+            row.rowNumber(),
+            row.email(),
+            row.normalizedEmail(),
+            BulkStudentImportStatus.FAILED,
+            resolvedMessage,
+            null
+        );
+    }
+
+    private boolean isAlreadyExistsMessage(String message) {
+        return message != null && message.toLowerCase(Locale.ROOT).contains("already exists");
+    }
+
+    private BulkStudentImportResponse buildBulkStudentResponse(List<BulkStudentImportRowResult> results) {
+        int validRows = 0;
+        int createdRows = 0;
+        int failedRows = 0;
+        int invalidRows = 0;
+        int duplicateRows = 0;
+        int existingRows = 0;
+
+        for (BulkStudentImportRowResult result : results) {
+            switch (result.status()) {
+                case VALID -> validRows += 1;
+                case CREATED -> createdRows += 1;
+                case FAILED -> failedRows += 1;
+                case INVALID_EMAIL -> invalidRows += 1;
+                case DUPLICATE_IN_FILE -> duplicateRows += 1;
+                case ALREADY_EXISTS -> existingRows += 1;
+            }
+        }
+
+        int skippedRows = invalidRows + duplicateRows + existingRows;
+        return new BulkStudentImportResponse(
+            new BulkStudentImportSummary(
+                results.size(),
+                validRows,
+                createdRows,
+                skippedRows,
+                failedRows,
+                invalidRows,
+                duplicateRows,
+                existingRows
+            ),
+            results
+        );
     }
 
     private void attachProfileForCreate(UserEntity user, CreateUserRequest request) {

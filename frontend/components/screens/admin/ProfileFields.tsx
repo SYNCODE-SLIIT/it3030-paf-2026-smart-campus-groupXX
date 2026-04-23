@@ -114,14 +114,7 @@ export function ProfileFields({
       );
     }
 
-    return (
-      <GlassPill style={{ padding: '16px 18px' }}>
-        <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-body)' }}>
-          Student users are provisioned with shared identity data only. Their student-specific profile details are
-          completed later during onboarding.
-        </p>
-      </GlassPill>
-    );
+    return null;
   }
 
   if (userType === 'FACULTY') {

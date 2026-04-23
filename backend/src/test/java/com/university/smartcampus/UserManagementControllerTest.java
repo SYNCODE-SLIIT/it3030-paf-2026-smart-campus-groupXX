@@ -14,7 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.time.Year;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,8 @@ import com.university.smartcampus.booking.BookingRepository;
 import com.university.smartcampus.resource.ResourceEntity;
 import com.university.smartcampus.resource.ResourceRepository;
 import com.university.smartcampus.user.dto.AdminDtos;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportEntry;
+import com.university.smartcampus.user.dto.AdminDtos.BulkStudentImportRequest;
 import com.university.smartcampus.user.dto.AdminDtos.CreateUserRequest;
 import com.university.smartcampus.user.dto.AdminDtos.ManagerRoleUpdateRequest;
 import com.university.smartcampus.user.entity.AdminEntity;
@@ -114,6 +118,107 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
             .andExpect(jsonPath("$.lastInviteReference").isNotEmpty());
 
         assertThat(recordingAuthProviderClient.deliveries()).hasSize(1);
+    }
+
+    @Test
+    void adminCanPreviewBulkStudentImportWithMixedRows() throws Exception {
+        seedStudent("existing.bulk@campus.test", AccountStatus.INVITED, false);
+        BulkStudentImportRequest request = new BulkStudentImportRequest(List.of(
+            new BulkStudentImportEntry(2, "New.Student@Campus.Test "),
+            new BulkStudentImportEntry(3, "not-an-email"),
+            new BulkStudentImportEntry(4, "new.student@campus.test"),
+            new BulkStudentImportEntry(5, "existing.bulk@campus.test")
+        ));
+
+        mockMvc.perform(post("/api/admin/users/bulk-students/preview")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.summary.totalRows").value(4))
+            .andExpect(jsonPath("$.summary.validRows").value(1))
+            .andExpect(jsonPath("$.summary.invalidRows").value(1))
+            .andExpect(jsonPath("$.summary.duplicateRows").value(1))
+            .andExpect(jsonPath("$.summary.existingRows").value(1))
+            .andExpect(jsonPath("$.summary.skippedRows").value(3))
+            .andExpect(jsonPath("$.results[0].normalizedEmail").value("new.student@campus.test"))
+            .andExpect(jsonPath("$.results[0].status").value("VALID"))
+            .andExpect(jsonPath("$.results[1].status").value("INVALID_EMAIL"))
+            .andExpect(jsonPath("$.results[2].status").value("DUPLICATE_IN_FILE"))
+            .andExpect(jsonPath("$.results[3].status").value("ALREADY_EXISTS"));
+
+        assertThat(recordingAuthProviderClient.deliveries()).isEmpty();
+    }
+
+    @Test
+    void adminCanImportBulkStudentUsersAndSkipsInvalidRows() throws Exception {
+        seedStudent("existing.import@campus.test", AccountStatus.INVITED, false);
+        BulkStudentImportRequest request = new BulkStudentImportRequest(List.of(
+            new BulkStudentImportEntry(2, "bulk-one@campus.test"),
+            new BulkStudentImportEntry(3, "bulk-two@campus.test"),
+            new BulkStudentImportEntry(4, "bulk-one@campus.test"),
+            new BulkStudentImportEntry(5, "bad-address"),
+            new BulkStudentImportEntry(6, "existing.import@campus.test")
+        ));
+
+        mockMvc.perform(post("/api/admin/users/bulk-students")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.summary.createdRows").value(2))
+            .andExpect(jsonPath("$.summary.invalidRows").value(1))
+            .andExpect(jsonPath("$.summary.duplicateRows").value(1))
+            .andExpect(jsonPath("$.summary.existingRows").value(1))
+            .andExpect(jsonPath("$.summary.skippedRows").value(3))
+            .andExpect(jsonPath("$.results[0].status").value("CREATED"))
+            .andExpect(jsonPath("$.results[1].status").value("CREATED"))
+            .andExpect(jsonPath("$.results[2].status").value("DUPLICATE_IN_FILE"))
+            .andExpect(jsonPath("$.results[3].status").value("INVALID_EMAIL"))
+            .andExpect(jsonPath("$.results[4].status").value("ALREADY_EXISTS"));
+
+        UserEntity imported = userRepository.findByEmailIgnoreCase("bulk-one@campus.test").orElseThrow();
+        assertThat(imported.getUserType()).isEqualTo(UserType.STUDENT);
+        assertThat(imported.getAccountStatus()).isEqualTo(AccountStatus.INVITED);
+        assertThat(imported.getStudentProfile()).isNotNull();
+        assertThat(imported.getStudentProfile().isOnboardingCompleted()).isFalse();
+        assertThat(imported.getStudentProfile().getFirstName()).isNull();
+        assertThat(recordingAuthProviderClient.deliveries()).hasSize(2);
+    }
+
+    @Test
+    void bulkStudentImportRequiresAdminAccess() throws Exception {
+        seedStudent("student.no.bulk@campus.test", AccountStatus.ACTIVE, true);
+        BulkStudentImportRequest request = new BulkStudentImportRequest(List.of(
+            new BulkStudentImportEntry(1, "bulk-auth@campus.test")
+        ));
+
+        mockMvc.perform(post("/api/admin/users/bulk-students/preview")
+                .with(jwtFor("student.no.bulk@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/admin/users/bulk-students")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void bulkStudentImportRejectsMoreThanFiveHundredRows() throws Exception {
+        BulkStudentImportRequest request = new BulkStudentImportRequest(
+            IntStream.rangeClosed(1, 501)
+                .mapToObj(row -> new BulkStudentImportEntry(row, "student" + row + "@campus.test"))
+                .toList()
+        );
+
+        mockMvc.perform(post("/api/admin/users/bulk-students/preview")
+                .with(jwtFor("admin@campus.test"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Student imports are limited to 500 rows per request."));
     }
 
     @Test

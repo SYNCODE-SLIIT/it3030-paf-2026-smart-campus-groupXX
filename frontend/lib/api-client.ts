@@ -6,6 +6,8 @@ import {
   type UpdateCommentRequest,
   type AssignTicketRequest,
   type BuildingResponse,
+  type BulkStudentImportRequest,
+  type BulkStudentImportResponse,
   type BookingDecisionRequest,
   type BookingModificationResponse,
   type BookingResponse,
@@ -346,6 +348,22 @@ export async function getUser(accessToken: string, userId: string) {
 
 export async function createUser(accessToken: string, payload: CreateUserRequest) {
   return request<UserResponse>('/api/admin/users', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function previewBulkStudentImport(accessToken: string, payload: BulkStudentImportRequest) {
+  return request<BulkStudentImportResponse>('/api/admin/users/bulk-students/preview', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
+export async function importBulkStudents(accessToken: string, payload: BulkStudentImportRequest) {
+  return request<BulkStudentImportResponse>('/api/admin/users/bulk-students', {
     method: 'POST',
     accessToken,
     body: payload,

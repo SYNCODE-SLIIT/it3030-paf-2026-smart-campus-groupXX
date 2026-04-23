@@ -679,6 +679,48 @@ export interface CreateUserRequest {
   managerRole?: ManagerRole | null;
 }
 
+export interface BulkStudentImportEntry {
+  rowNumber: number;
+  email: string;
+}
+
+export interface BulkStudentImportRequest {
+  students: BulkStudentImportEntry[];
+}
+
+export type BulkStudentImportStatus =
+  | 'VALID'
+  | 'CREATED'
+  | 'INVALID_EMAIL'
+  | 'DUPLICATE_IN_FILE'
+  | 'ALREADY_EXISTS'
+  | 'FAILED';
+
+export interface BulkStudentImportSummary {
+  totalRows: number;
+  validRows: number;
+  createdRows: number;
+  skippedRows: number;
+  failedRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+  existingRows: number;
+}
+
+export interface BulkStudentImportRowResult {
+  rowNumber: number;
+  email: string;
+  normalizedEmail: string | null;
+  status: BulkStudentImportStatus;
+  message: string;
+  userId: string | null;
+}
+
+export interface BulkStudentImportResponse {
+  summary: BulkStudentImportSummary;
+  results: BulkStudentImportRowResult[];
+}
+
 export interface UpdateUserRequest {
   accountStatus?: AccountStatus;
   studentProfile?: StudentProfileInput | null;

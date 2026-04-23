@@ -1,5 +1,8 @@
 package com.university.smartcampus.user.dto;
 
+import java.util.List;
+import java.util.UUID;
+
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
 import com.university.smartcampus.common.enums.AppEnums.AcademicYear;
 import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
@@ -82,5 +85,53 @@ public final class AdminDtos {
     }
 
     public record ManagerRoleUpdateRequest(@NotNull ManagerRole managerRole) {
+    }
+
+    public record BulkStudentImportRequest(
+        @Valid List<BulkStudentImportEntry> students
+    ) {
+    }
+
+    public record BulkStudentImportEntry(
+        Integer rowNumber,
+        String email
+    ) {
+    }
+
+    public enum BulkStudentImportStatus {
+        VALID,
+        CREATED,
+        INVALID_EMAIL,
+        DUPLICATE_IN_FILE,
+        ALREADY_EXISTS,
+        FAILED
+    }
+
+    public record BulkStudentImportSummary(
+        int totalRows,
+        int validRows,
+        int createdRows,
+        int skippedRows,
+        int failedRows,
+        int invalidRows,
+        int duplicateRows,
+        int existingRows
+    ) {
+    }
+
+    public record BulkStudentImportRowResult(
+        int rowNumber,
+        String email,
+        String normalizedEmail,
+        BulkStudentImportStatus status,
+        String message,
+        UUID userId
+    ) {
+    }
+
+    public record BulkStudentImportResponse(
+        BulkStudentImportSummary summary,
+        List<BulkStudentImportRowResult> results
+    ) {
     }
 }
