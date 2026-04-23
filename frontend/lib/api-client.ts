@@ -811,6 +811,25 @@ export async function cancelApprovedBookingAsManager(
   });
 }
 
+export async function approvePendingRecurringBooking(accessToken: string, recurringBookingId: string) {
+  return request<RecurringBookingResponse>(`/api/admin/recurring-bookings/${recurringBookingId}/approve-pending`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function cancelFutureRecurringBooking(
+  accessToken: string,
+  recurringBookingId: string,
+  payload?: CancelBookingRequest,
+) {
+  return request<RecurringBookingResponse>(`/api/admin/recurring-bookings/${recurringBookingId}/cancel-future`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
 // Recurring Bookings
 export async function createRecurringBooking(accessToken: string, payload: CreateRecurringBookingRequest) {
   return request<RecurringBookingResponse>('/api/recurring-bookings', {
