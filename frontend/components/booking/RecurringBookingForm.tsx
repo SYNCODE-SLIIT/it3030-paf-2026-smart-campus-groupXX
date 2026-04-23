@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Clock, RotateCw } from 'lucide-react';
-import { Button, Card, Input, Select, Textarea } from '@/components/ui';
+import { CalendarRange, RotateCw } from 'lucide-react';
+
+import { Alert, Button, Card, Chip, Input, Select, Textarea } from '@/components/ui';
 import type { CreateRecurringBookingRequest, RecurrencePattern, ResourceResponse } from '@/lib/api-types';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
 
@@ -14,11 +15,12 @@ interface RecurringBookingFormProps {
 }
 
 const DURATION_HINTS: Record<string, string> = {
+  SPACES: 'Max 3 hours',
   LECTURE_HALL: 'Max 3 hours',
   LABORATORY: 'Max 3 hours',
   LIBRARY_SPACE: 'Max 3 hours',
-  MEETING_ROOM: 'No limit',
-  EVENT_SPACE: 'No limit',
+  MEETING_ROOM: 'Max 3 hours',
+  EVENT_SPACE: 'Max 3 hours',
 };
 
 function normalizeSubcategory(value: string | null) {
@@ -42,7 +44,6 @@ export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading 
     endTime: '',
     purpose: '',
   });
-
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
   const recurrencePatterns: { value: RecurrencePattern; label: string }[] = [
@@ -51,6 +52,7 @@ export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading 
     { value: 'BIWEEKLY', label: 'Biweekly' },
     { value: 'MONTHLY', label: 'Monthly' },
   ];
+
   const bookableResources = resources.filter((resource) => resource.status === 'ACTIVE' && resource.bookable);
   const categoryOptions = Array.from(new Set(bookableResources.map((resource) => resource.category)))
     .sort()
@@ -71,232 +73,223 @@ export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading 
     .map((subcategory) => ({ value: subcategory, label: subcategory }));
   const filteredResources = formData.subcategory
     ? categoryFilteredResources.filter(
-      (resource) => normalizeSubcategory(resource.subcategory) === normalizeSubcategory(formData.subcategory),
-    )
+        (resource) => normalizeSubcategory(resource.subcategory) === normalizeSubcategory(formData.subcategory),
+      )
     : categoryFilteredResources;
   const selectedSubcategoryHint = DURATION_HINTS[normalizeSubcategory(formData.subcategory)] ?? null;
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+  function validateForm() {
+    const nextErrors: Record<string, string> = {};
 
-    if (!formData.category) newErrors.category = 'Category is required';
-    if (!formData.subcategory) newErrors.subcategory = 'Subcategory is required';
-    if (!formData.resourceId) newErrors.resourceId = 'Resource is required';
-    if (!formData.startDate) newErrors.startDate = 'Start date is required';
-    if (!formData.startTime) newErrors.startTime = 'Start time is required';
-    if (!formData.endTime) newErrors.endTime = 'End time is required';
+    if (!formData.category) nextErrors.category = 'Category is required.';
+    if (!formData.subcategory) nextErrors.subcategory = 'Subcategory is required.';
+    if (!formData.resourceId) nextErrors.resourceId = 'Resource is required.';
+    if (!formData.startDate) nextErrors.startDate = 'Start date is required.';
+    if (!formData.startTime) nextErrors.startTime = 'Start time is required.';
+    if (!formData.endTime) nextErrors.endTime = 'End time is required.';
 
     if (formData.startTime && formData.endTime && formData.startTime >= formData.endTime) {
-      newErrors.endTime = 'End time must be after start time';
+      nextErrors.endTime = 'End time must be after start time.';
     }
 
     if (formData.endDate && formData.startDate > formData.endDate) {
-      newErrors.endDate = 'End date must be after start date';
+      nextErrors.endDate = 'End date must be after start date.';
     }
 
     if (!formData.endDate && !formData.occurrenceCount) {
-      newErrors.endDate = 'Either end date or occurrence count is required';
+      nextErrors.endDate = 'Provide an end date or an occurrence count.';
     }
 
-    if (formData.occurrenceCount && parseInt(formData.occurrenceCount) < 1) {
-      newErrors.occurrenceCount = 'Occurrence count must be at least 1';
+    if (formData.occurrenceCount && parseInt(formData.occurrenceCount, 10) < 1) {
+      nextErrors.occurrenceCount = 'Occurrence count must be at least 1.';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!validateForm()) {
+      return;
+    }
 
     const payload: CreateRecurringBookingRequest = {
       resourceId: formData.resourceId,
       recurrencePattern: formData.recurrencePattern,
       startDate: new Date(`${formData.startDate}T00:00:00Z`).toISOString(),
       endDate: formData.endDate ? new Date(`${formData.endDate}T23:59:59Z`).toISOString() : null,
-      occurrenceCount: formData.occurrenceCount ? parseInt(formData.occurrenceCount) : null,
+      occurrenceCount: formData.occurrenceCount ? parseInt(formData.occurrenceCount, 10) : null,
       startTime: formData.startTime,
       endTime: formData.endTime,
-      purpose: formData.purpose || null,
+      purpose: formData.purpose.trim() || null,
     };
 
     try {
       await onSubmit(payload);
     } catch (error) {
-      setErrors({ submit: error instanceof Error ? error.message : 'Failed to create recurring booking' });
+      setErrors({ submit: error instanceof Error ? error.message : 'Failed to create recurring booking.' });
     }
-  };
+  }
 
   return (
-    <Card style={{ padding: 24, maxWidth: 600 }}>
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>
+    <Card style={{ padding: 22, display: 'grid', gap: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            Category *
-          </label>
-          <Select
-            value={formData.category}
-            onChange={(e) =>
-              setFormData((current) => ({
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 800, color: 'var(--text-h)' }}>
+            Recurring Booking Builder
+          </div>
+          <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+            Configure a repeating booking pattern using the same booking catalogue.
+          </div>
+        </div>
+        <Chip color="blue" size="sm" dot>
+          Repeating
+        </Chip>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gap: 6 }}>
+            <Select
+              id="recurring-category"
+              label="Category"
+              value={formData.category}
+              onChange={(event) => setFormData((current) => ({
                 ...current,
-                category: e.target.value,
+                category: event.target.value,
                 subcategory: '',
                 resourceId: '',
-              }))
-            }
-            style={{ width: '100%' }}
-            options={[
-              { value: '', label: 'Select a category' },
-              ...categoryOptions,
-            ]}
-          />
-          {errors.category && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.category}</p>}
-        </div>
+              }))}
+              options={[{ value: '', label: 'Select category' }, ...categoryOptions]}
+            />
+            {errors.category && <span style={{ fontSize: 12, color: 'var(--text-error)' }}>{errors.category}</span>}
+          </div>
 
-        <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            Subcategory *
-          </label>
-          <Select
-            value={formData.subcategory}
-            onChange={(e) =>
-              setFormData((current) => ({
+          <div style={{ display: 'grid', gap: 6 }}>
+            <Select
+              id="recurring-subcategory"
+              label="Subcategory"
+              value={formData.subcategory}
+              onChange={(event) => setFormData((current) => ({
                 ...current,
-                subcategory: e.target.value,
+                subcategory: event.target.value,
                 resourceId: '',
-              }))
-            }
-            style={{ width: '100%' }}
-            options={[
-              { value: '', label: 'Select a subcategory' },
-              ...subcategoryOptions,
-            ]}
-          />
-          {selectedSubcategoryHint && (
-            <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>{selectedSubcategoryHint}</p>
-          )}
-          {errors.subcategory && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.subcategory}</p>}
+              }))}
+              options={[{ value: '', label: 'Select subcategory' }, ...subcategoryOptions]}
+            />
+            {selectedSubcategoryHint && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedSubcategoryHint}</span>
+            )}
+            {errors.subcategory && <span style={{ fontSize: 12, color: 'var(--text-error)' }}>{errors.subcategory}</span>}
+          </div>
+
+          <div style={{ display: 'grid', gap: 6 }}>
+            <Select
+              id="recurring-resource"
+              label="Resource"
+              value={formData.resourceId}
+              onChange={(event) => setFormData((current) => ({ ...current, resourceId: event.target.value }))}
+              options={[
+                { value: '', label: 'Select resource' },
+                ...filteredResources.map((resource) => ({ value: resource.id, label: resource.name })),
+              ]}
+            />
+            {errors.resourceId && <span style={{ fontSize: 12, color: 'var(--text-error)' }}>{errors.resourceId}</span>}
+          </div>
         </div>
 
-        <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            Resource *
-          </label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <Select
-            value={formData.resourceId}
-            onChange={(e) => setFormData((current) => ({ ...current, resourceId: e.target.value }))}
-            style={{ width: '100%' }}
-            options={[
-              { value: '', label: 'Select a resource' },
-              ...filteredResources.map((resource) => ({ value: resource.id, label: resource.name })),
-            ]}
-          />
-          {errors.resourceId && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.resourceId}</p>}
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            Recurrence Pattern *
-          </label>
-          <Select
+            id="recurring-pattern"
+            label="Recurrence Pattern"
             value={formData.recurrencePattern}
-            onChange={(e) => setFormData({ ...formData, recurrencePattern: e.target.value as RecurrencePattern })}
-            style={{ width: '100%' }}
-            options={recurrencePatterns.map((pattern) => ({ value: pattern.value, label: pattern.label }))}
+            onChange={(event) => setFormData((current) => ({ ...current, recurrencePattern: event.target.value as RecurrencePattern }))}
+            options={recurrencePatterns}
           />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-              Start Date *
-            </label>
-            <Input
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-            />
-            {errors.startDate && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.startDate}</p>}
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-              End Date (optional)
-            </label>
-            <Input
-              type="date"
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-            />
-            {errors.endDate && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.endDate}</p>}
-          </div>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            Occurrence Count (if no end date)
-          </label>
           <Input
+            id="recurring-start-date"
+            label="Start Date"
+            type="date"
+            value={formData.startDate}
+            onChange={(event) => setFormData((current) => ({ ...current, startDate: event.target.value }))}
+          />
+          <Input
+            id="recurring-end-date"
+            label="End Date"
+            type="date"
+            value={formData.endDate}
+            onChange={(event) => setFormData((current) => ({ ...current, endDate: event.target.value }))}
+          />
+          <Input
+            id="recurring-occurrence-count"
+            label="Occurrence Count"
             type="number"
             min="1"
             value={formData.occurrenceCount}
-            onChange={(e) => setFormData({ ...formData, occurrenceCount: e.target.value })}
-            placeholder="e.g., 10"
-          />
-          {errors.occurrenceCount && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.occurrenceCount}</p>}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-              Start Time *
-            </label>
-            <Input
-              type="time"
-              value={formData.startTime}
-              onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-            />
-            {errors.startTime && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.startTime}</p>}
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-              End Time *
-            </label>
-            <Input
-              type="time"
-              value={formData.endTime}
-              onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-            />
-            {errors.endTime && <p style={{ color: 'var(--text-error)', fontSize: 12, marginTop: 4 }}>{errors.endTime}</p>}
-          </div>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            Purpose (optional)
-          </label>
-          <Textarea
-            value={formData.purpose}
-            onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-            placeholder="Why are you booking this resource?"
-            style={{ minHeight: 80 }}
+            onChange={(event) => setFormData((current) => ({ ...current, occurrenceCount: event.target.value }))}
+            placeholder="Optional"
           />
         </div>
 
-        {errors.submit && (
-          <div style={{ color: 'var(--text-error)', fontSize: 13, padding: 8, backgroundColor: 'var(--bg-error)', borderRadius: 4 }}>
-            {errors.submit}
-          </div>
+        {(errors.startDate || errors.endDate || errors.occurrenceCount) && (
+          <Alert variant="warning" title="Schedule details">
+            {errors.startDate ?? errors.endDate ?? errors.occurrenceCount}
+          </Alert>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Button variant="ghost" onClick={onCancel} disabled={isLoading}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <Input
+            id="recurring-start-time"
+            label="Start Time"
+            type="time"
+            value={formData.startTime}
+            onChange={(event) => setFormData((current) => ({ ...current, startTime: event.target.value }))}
+          />
+          <Input
+            id="recurring-end-time"
+            label="End Time"
+            type="time"
+            value={formData.endTime}
+            onChange={(event) => setFormData((current) => ({ ...current, endTime: event.target.value }))}
+          />
+        </div>
+
+        {(errors.startTime || errors.endTime) && (
+          <Alert variant="warning" title="Time details">
+            {errors.startTime ?? errors.endTime}
+          </Alert>
+        )}
+
+        <Textarea
+          label="Purpose"
+          value={formData.purpose}
+          onChange={(event) => setFormData((current) => ({ ...current, purpose: event.target.value }))}
+          placeholder="Why are you booking this resource on a recurring basis?"
+          rows={4}
+        />
+
+        <Alert variant="info" title="Recurring rule">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <CalendarRange size={14} />
+            <span>
+              The schedule will repeat <strong>{formData.recurrencePattern.toLowerCase()}</strong> from the start date using the selected time window.
+            </span>
+          </div>
+        </Alert>
+
+        {errors.submit && (
+          <Alert variant="error" title="Recurring booking failed">
+            {errors.submit}
+          </Alert>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <Button variant="ghost" type="button" onClick={onCancel} disabled={isLoading}>
             Cancel
           </Button>
-          <Button variant="primary" type="submit" disabled={isLoading}>
-            {isLoading ? 'Creating...' : 'Create Recurring Booking'}
+          <Button variant="primary" type="submit" loading={isLoading} iconLeft={<RotateCw size={14} />}>
+            Create Recurring Booking
           </Button>
         </div>
       </form>
