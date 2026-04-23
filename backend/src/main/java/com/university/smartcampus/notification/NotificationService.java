@@ -2,9 +2,13 @@ package com.university.smartcampus.notification;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -26,14 +30,17 @@ import com.university.smartcampus.common.enums.AppEnums.ManagerRole;
 import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
 import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
+import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ForbiddenException;
 import com.university.smartcampus.common.exception.NotFoundException;
 import com.university.smartcampus.config.SmartCampusProperties;
 import com.university.smartcampus.notification.NotificationDtos.NotificationDeliveryResponse;
 import com.university.smartcampus.notification.NotificationDtos.NotificationLinkResponse;
+import com.university.smartcampus.notification.NotificationDtos.NotificationPreferenceCategoryResponse;
 import com.university.smartcampus.notification.NotificationDtos.NotificationPreferencesResponse;
 import com.university.smartcampus.notification.NotificationDtos.NotificationResponse;
 import com.university.smartcampus.notification.NotificationDtos.NotificationUnreadCountResponse;
+import com.university.smartcampus.notification.NotificationDtos.UpdateNotificationPreferenceCategoryRequest;
 import com.university.smartcampus.notification.NotificationDtos.UpdateNotificationPreferencesRequest;
 import com.university.smartcampus.notification.NotificationEnums.NotificationDeliveryChannel;
 import com.university.smartcampus.notification.NotificationEnums.NotificationDeliveryStatus;
@@ -53,6 +60,8 @@ public class NotificationService {
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
     private static final List<BookingStatus> FUTURE_BOOKING_STATUSES = List.of(BookingStatus.APPROVED);
+    private static final NotificationDeliveryChannel IN_APP_CHANNEL = NotificationDeliveryChannel.IN_APP;
+    private static final NotificationDeliveryStatus IN_APP_VISIBLE_STATUS = NotificationDeliveryStatus.SENT;
 
     private final NotificationEventRepository eventRepository;
     private final NotificationRecipientRepository recipientRepository;
@@ -92,7 +101,14 @@ public class NotificationService {
         boolean unreadOnly = "unread".equalsIgnoreCase(status);
         int resolvedLimit = normalizeLimit(limit);
         List<NotificationRecipientEntity> recipients = recipientRepository
-            .findForUser(user.getId(), unreadOnly, domain, PageRequest.of(0, resolvedLimit));
+            .findForUser(
+                user.getId(),
+                unreadOnly,
+                domain,
+                IN_APP_CHANNEL,
+                IN_APP_VISIBLE_STATUS,
+                PageRequest.of(0, resolvedLimit)
+            );
         return toNotificationResponses(recipients);
     }
 
@@ -100,7 +116,7 @@ public class NotificationService {
     public NotificationUnreadCountResponse unreadCount(UserEntity user) {
         Objects.requireNonNull(user, "User is required.");
         return new NotificationUnreadCountResponse(
-            recipientRepository.countByRecipientUserIdAndReadAtIsNullAndArchivedAtIsNull(user.getId())
+            recipientRepository.countVisibleUnreadForUser(user.getId(), IN_APP_CHANNEL, IN_APP_VISIBLE_STATUS)
         );
     }
 
@@ -121,13 +137,13 @@ public class NotificationService {
     @Transactional
     public NotificationUnreadCountResponse markAllAsRead(UserEntity user) {
         Objects.requireNonNull(user, "User is required.");
-        recipientRepository.markAllUnreadAsRead(user.getId(), Instant.now());
+        recipientRepository.markAllUnreadAsRead(user.getId(), IN_APP_CHANNEL, IN_APP_VISIBLE_STATUS, Instant.now());
         return unreadCount(user);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public NotificationPreferencesResponse getPreferences(UserEntity user) {
-        return toPreferencesResponse(requirePreference(user));
+        return toPreferencesResponse(ensurePreferences(user));
     }
 
     @Transactional
@@ -135,15 +151,19 @@ public class NotificationService {
         Objects.requireNonNull(user, "User is required.");
         Objects.requireNonNull(request, "Request is required.");
 
-        NotificationPreferenceEntity preference = requirePreference(user);
-        if (request.inAppEnabled() != null) {
-            preference.setInAppEnabled(request.inAppEnabled());
-        }
-        if (request.emailEnabled() != null) {
-            preference.setEmailEnabled(request.emailEnabled());
+        Map<NotificationDomain, NotificationPreferenceEntity> preferences = ensurePreferences(user);
+        Map<NotificationDomain, UpdateNotificationPreferenceCategoryRequest> categoriesByDomain =
+            validatePreferenceUpdateRequest(request);
+
+        for (NotificationDomain domain : NotificationDomain.values()) {
+            UpdateNotificationPreferenceCategoryRequest categoryRequest = categoriesByDomain.get(domain);
+            NotificationPreferenceEntity preference = preferences.get(domain);
+            preference.setInAppEnabled(Boolean.TRUE.equals(categoryRequest.inAppEnabled()));
+            preference.setEmailEnabled(Boolean.TRUE.equals(categoryRequest.emailEnabled()));
         }
 
-        return toPreferencesResponse(preference);
+        preferenceRepository.saveAll(preferences.values());
+        return toPreferencesResponse(preferences);
     }
 
     @Transactional(readOnly = true)
@@ -782,16 +802,23 @@ public class NotificationService {
     }
 
     private void createDeliveryAttempts(NotificationRecipientEntity recipient, UserEntity user) {
+        NotificationPreferenceEntity preference = ensurePreferences(user).get(recipient.getEvent().getDomain());
+        String domainLabel = recipient.getEvent().getDomain().name().toLowerCase(Locale.ROOT).replace('_', ' ');
+
         NotificationDeliveryAttemptEntity inAppAttempt = new NotificationDeliveryAttemptEntity();
         inAppAttempt.setId(UUID.randomUUID());
         inAppAttempt.setRecipient(recipient);
         inAppAttempt.setChannel(NotificationDeliveryChannel.IN_APP);
-        inAppAttempt.setStatus(NotificationDeliveryStatus.SENT);
-        inAppAttempt.setAttemptCount(1);
-        inAppAttempt.setSentAt(Instant.now());
+        if (preference.isInAppEnabled()) {
+            inAppAttempt.setStatus(NotificationDeliveryStatus.SENT);
+            inAppAttempt.setAttemptCount(1);
+            inAppAttempt.setSentAt(Instant.now());
+        } else {
+            inAppAttempt.setStatus(NotificationDeliveryStatus.SKIPPED);
+            inAppAttempt.setFailureReason("User disabled in-app notifications for " + domainLabel + ".");
+        }
         deliveryAttemptRepository.save(inAppAttempt);
 
-        NotificationPreferenceEntity preference = requirePreference(user);
         NotificationDeliveryAttemptEntity emailAttempt = new NotificationDeliveryAttemptEntity();
         emailAttempt.setId(UUID.randomUUID());
         emailAttempt.setRecipient(recipient);
@@ -802,7 +829,7 @@ public class NotificationService {
             emailAttempt.setFailureReason("Email notifications are disabled.");
         } else if (!preference.isEmailEnabled()) {
             emailAttempt.setStatus(NotificationDeliveryStatus.SKIPPED);
-            emailAttempt.setFailureReason("User disabled email notifications.");
+            emailAttempt.setFailureReason("User disabled email notifications for " + domainLabel + ".");
         } else if (!StringUtils.hasText(user.getEmail())) {
             emailAttempt.setStatus(NotificationDeliveryStatus.SKIPPED);
             emailAttempt.setFailureReason("Recipient does not have an email address.");
@@ -814,19 +841,83 @@ public class NotificationService {
         deliveryAttemptRepository.save(emailAttempt);
     }
 
-    private NotificationPreferenceEntity requirePreference(UserEntity user) {
-        Objects.requireNonNull(user, "User is required.");
-        return preferenceRepository.findByUserId(user.getId()).orElseGet(() -> {
-            NotificationPreferenceEntity preference = new NotificationPreferenceEntity();
-            preference.setUser(user);
-            preference.setInAppEnabled(true);
-            preference.setEmailEnabled(defaultEmailEnabled(user));
-            return preferenceRepository.save(preference);
-        });
+    private Map<NotificationDomain, UpdateNotificationPreferenceCategoryRequest> validatePreferenceUpdateRequest(
+        UpdateNotificationPreferencesRequest request
+    ) {
+        if (request.categories() == null || request.categories().isEmpty()) {
+            throw new BadRequestException("Notification preference categories are required.");
+        }
+
+        Map<NotificationDomain, UpdateNotificationPreferenceCategoryRequest> categoriesByDomain =
+            new EnumMap<>(NotificationDomain.class);
+
+        for (UpdateNotificationPreferenceCategoryRequest category : request.categories()) {
+            if (category == null || category.domain() == null) {
+                throw new BadRequestException("Each notification preference category must include a domain.");
+            }
+            if (category.inAppEnabled() == null || category.emailEnabled() == null) {
+                throw new BadRequestException("Each notification preference category must include both channel values.");
+            }
+            if (categoriesByDomain.putIfAbsent(category.domain(), category) != null) {
+                throw new BadRequestException("Notification preference categories must be unique per domain.");
+            }
+        }
+
+        Set<NotificationDomain> missingDomains = EnumSet.allOf(NotificationDomain.class);
+        missingDomains.removeAll(categoriesByDomain.keySet());
+        if (!missingDomains.isEmpty()) {
+            throw new BadRequestException("Notification preference categories must include every notification domain.");
+        }
+
+        return categoriesByDomain;
     }
 
-    private boolean defaultEmailEnabled(UserEntity user) {
+    private Map<NotificationDomain, NotificationPreferenceEntity> ensurePreferences(UserEntity user) {
+        Objects.requireNonNull(user, "User is required.");
+        Map<NotificationDomain, NotificationPreferenceEntity> preferences = new EnumMap<>(NotificationDomain.class);
+        preferenceRepository.findByUserId(user.getId()).forEach(preference -> preferences.put(preference.getDomain(), preference));
+
+        List<NotificationPreferenceEntity> created = new ArrayList<>();
+        for (NotificationDomain domain : NotificationDomain.values()) {
+            if (preferences.containsKey(domain)) {
+                continue;
+            }
+
+            NotificationPreferenceEntity preference = new NotificationPreferenceEntity();
+            preference.setUser(user);
+            preference.setDomain(domain);
+            preference.setInAppEnabled(defaultInAppEnabled(preferences));
+            preference.setEmailEnabled(defaultEmailEnabled(user, preferences));
+            preferences.put(domain, preference);
+            created.add(preference);
+        }
+
+        if (!created.isEmpty()) {
+            preferenceRepository.saveAll(created);
+        }
+
+        return preferences;
+    }
+
+    private boolean defaultInAppEnabled(Map<NotificationDomain, NotificationPreferenceEntity> preferences) {
+        NotificationPreferenceEntity baseline = preferenceBaseline(preferences);
+        return baseline == null || baseline.isInAppEnabled();
+    }
+
+    private boolean defaultEmailEnabled(UserEntity user, Map<NotificationDomain, NotificationPreferenceEntity> preferences) {
+        NotificationPreferenceEntity baseline = preferenceBaseline(preferences);
+        if (baseline != null) {
+            return baseline.isEmailEnabled();
+        }
         return user.getAccountStatus() == AccountStatus.ACTIVE;
+    }
+
+    private NotificationPreferenceEntity preferenceBaseline(Map<NotificationDomain, NotificationPreferenceEntity> preferences) {
+        NotificationPreferenceEntity baseline = preferences.get(NotificationDomain.SYSTEM);
+        if (baseline != null) {
+            return baseline;
+        }
+        return preferences.values().stream().findFirst().orElse(null);
     }
 
     private NotificationResponse toNotificationResponse(NotificationRecipientEntity recipient) {
@@ -917,8 +1008,19 @@ public class NotificationService {
         );
     }
 
-    private NotificationPreferencesResponse toPreferencesResponse(NotificationPreferenceEntity preference) {
-        return new NotificationPreferencesResponse(preference.isInAppEnabled(), preference.isEmailEnabled());
+    private NotificationPreferencesResponse toPreferencesResponse(Map<NotificationDomain, NotificationPreferenceEntity> preferences) {
+        return new NotificationPreferencesResponse(
+            Arrays.stream(NotificationDomain.values())
+                .map(domain -> {
+                    NotificationPreferenceEntity preference = preferences.get(domain);
+                    return new NotificationPreferenceCategoryResponse(
+                        domain,
+                        preference != null && preference.isInAppEnabled(),
+                        preference != null && preference.isEmailEnabled()
+                    );
+                })
+                .toList()
+        );
     }
 
     private NotificationDeliveryResponse toDeliveryResponse(NotificationDeliveryAttemptEntity attempt) {

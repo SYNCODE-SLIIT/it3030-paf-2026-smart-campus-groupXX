@@ -12,6 +12,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.university.smartcampus.notification.NotificationEnums.NotificationDeliveryChannel;
+import com.university.smartcampus.notification.NotificationEnums.NotificationDeliveryStatus;
 import com.university.smartcampus.notification.NotificationEnums.NotificationDomain;
 
 public interface NotificationRecipientRepository extends JpaRepository<NotificationRecipientEntity, UUID> {
@@ -25,19 +27,46 @@ public interface NotificationRecipientRepository extends JpaRepository<Notificat
               and recipient.archivedAt is null
               and (:unreadOnly = false or recipient.readAt is null)
               and (:domain is null or event.domain = :domain)
+              and exists (
+                select 1
+                from NotificationDeliveryAttemptEntity attempt
+                where attempt.recipient = recipient
+                  and attempt.channel = :channel
+                  and attempt.status = :status
+              )
             order by recipient.createdAt desc
             """)
     List<NotificationRecipientEntity> findForUser(
         @Param("userId") UUID userId,
         @Param("unreadOnly") boolean unreadOnly,
         @Param("domain") NotificationDomain domain,
+        @Param("channel") NotificationDeliveryChannel channel,
+        @Param("status") NotificationDeliveryStatus status,
         Pageable pageable
     );
 
     @EntityGraph(attributePaths = { "event", "event.actorUser", "recipientUser" })
     Optional<NotificationRecipientEntity> findByIdAndRecipientUserId(UUID id, UUID recipientUserId);
 
-    long countByRecipientUserIdAndReadAtIsNullAndArchivedAtIsNull(UUID recipientUserId);
+    @Query("""
+            select count(recipient)
+            from NotificationRecipientEntity recipient
+            where recipient.recipientUser.id = :userId
+              and recipient.readAt is null
+              and recipient.archivedAt is null
+              and exists (
+                select 1
+                from NotificationDeliveryAttemptEntity attempt
+                where attempt.recipient = recipient
+                  and attempt.channel = :channel
+                  and attempt.status = :status
+              )
+            """)
+    long countVisibleUnreadForUser(
+        @Param("userId") UUID userId,
+        @Param("channel") NotificationDeliveryChannel channel,
+        @Param("status") NotificationDeliveryStatus status
+    );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -46,6 +75,18 @@ public interface NotificationRecipientRepository extends JpaRepository<Notificat
             where recipient.recipientUser.id = :userId
               and recipient.readAt is null
               and recipient.archivedAt is null
+              and exists (
+                select 1
+                from NotificationDeliveryAttemptEntity attempt
+                where attempt.recipient = recipient
+                  and attempt.channel = :channel
+                  and attempt.status = :status
+              )
             """)
-    int markAllUnreadAsRead(@Param("userId") UUID userId, @Param("readAt") Instant readAt);
+    int markAllUnreadAsRead(
+        @Param("userId") UUID userId,
+        @Param("channel") NotificationDeliveryChannel channel,
+        @Param("status") NotificationDeliveryStatus status,
+        @Param("readAt") Instant readAt
+    );
 }

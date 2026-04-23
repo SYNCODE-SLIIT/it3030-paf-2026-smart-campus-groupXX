@@ -598,14 +598,24 @@ export interface NotificationUnreadCountResponse {
   unreadCount: number;
 }
 
+export interface NotificationPreferenceCategoryResponse {
+  domain: NotificationDomain;
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+}
+
 export interface NotificationPreferencesResponse {
+  categories: NotificationPreferenceCategoryResponse[];
+}
+
+export interface UpdateNotificationPreferenceCategoryRequest {
+  domain: NotificationDomain;
   inAppEnabled: boolean;
   emailEnabled: boolean;
 }
 
 export interface UpdateNotificationPreferencesRequest {
-  inAppEnabled?: boolean;
-  emailEnabled?: boolean;
+  categories: UpdateNotificationPreferenceCategoryRequest[];
 }
 
 export interface NotificationDeliveryResponse {

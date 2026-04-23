@@ -50,15 +50,27 @@ public final class NotificationDtos {
     ) {
     }
 
-    public record NotificationPreferencesResponse(
+    public record NotificationPreferenceCategoryResponse(
+        NotificationDomain domain,
         boolean inAppEnabled,
         boolean emailEnabled
     ) {
     }
 
-    public record UpdateNotificationPreferencesRequest(
+    public record NotificationPreferencesResponse(
+        List<NotificationPreferenceCategoryResponse> categories
+    ) {
+    }
+
+    public record UpdateNotificationPreferenceCategoryRequest(
+        NotificationDomain domain,
         Boolean inAppEnabled,
         Boolean emailEnabled
+    ) {
+    }
+
+    public record UpdateNotificationPreferencesRequest(
+        List<UpdateNotificationPreferenceCategoryRequest> categories
     ) {
     }
 

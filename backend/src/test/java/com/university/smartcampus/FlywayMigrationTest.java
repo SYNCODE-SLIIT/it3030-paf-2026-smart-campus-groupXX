@@ -130,6 +130,39 @@ class FlywayMigrationTest extends AbstractPostgresIntegrationTest {
         assertThat(constraintCount).isEqualTo(2);
     }
 
+    @Test
+    void notificationPreferencesAreScopedPerDomain() {
+        assertThat(columnType("notification_preferences", "domain")).isEqualTo("varchar");
+
+        Integer primaryKeyColumnCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from information_schema.key_column_usage usage
+                        join information_schema.table_constraints constraints
+                          on constraints.constraint_name = usage.constraint_name
+                         and constraints.table_schema = usage.table_schema
+                         and constraints.table_name = usage.table_name
+                        where usage.table_schema = 'public'
+                          and usage.table_name = 'notification_preferences'
+                          and constraints.constraint_type = 'PRIMARY KEY'
+                          and usage.column_name in ('user_id', 'domain')
+                        """,
+                Integer.class);
+
+        Integer domainConstraintCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from pg_constraint
+                        where connamespace = 'public'::regnamespace
+                          and conrelid = 'public.notification_preferences'::regclass
+                          and conname = 'chk_notification_preferences_domain'
+                        """,
+                Integer.class);
+
+        assertThat(primaryKeyColumnCount).isEqualTo(2);
+        assertThat(domainConstraintCount).isEqualTo(1);
+    }
+
     private String columnType(String tableName, String columnName) {
         return jdbcTemplate.queryForObject(
                 """

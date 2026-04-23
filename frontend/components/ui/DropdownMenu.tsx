@@ -14,9 +14,12 @@ interface DropdownMenuProps {
   items: DropdownMenuItem[];
   open: boolean;
   direction?: 'up' | 'down';
+  align?: 'stretch' | 'left' | 'right';
+  minWidth?: number;
+  onItemClick?: () => void;
 }
 
-function MenuItem({ item }: { item: DropdownMenuItem }) {
+function MenuItem({ item, onItemClick }: { item: DropdownMenuItem; onItemClick?: () => void }) {
   const [hovered, setHovered] = useState(false);
   const IconComp = item.icon;
 
@@ -24,7 +27,10 @@ function MenuItem({ item }: { item: DropdownMenuItem }) {
     <button
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={item.onClick}
+      onClick={() => {
+        item.onClick?.();
+        onItemClick?.();
+      }}
       style={{
         width: '100%',
         display: 'flex',
@@ -55,13 +61,26 @@ function MenuItem({ item }: { item: DropdownMenuItem }) {
   );
 }
 
-export function DropdownMenu({ items, open, direction = 'down' }: DropdownMenuProps) {
+export function DropdownMenu({
+  items,
+  open,
+  direction = 'down',
+  align = 'stretch',
+  minWidth = 220,
+  onItemClick,
+}: DropdownMenuProps) {
   if (!open) return null;
 
   const positionStyle: React.CSSProperties =
     direction === 'up'
       ? { bottom: 'calc(100% + 8px)', top: 'auto' }
       : { top: 'calc(100% + 8px)', bottom: 'auto' };
+  const horizontalStyle: React.CSSProperties =
+    align === 'stretch'
+      ? { left: 0, right: 0 }
+      : align === 'left'
+      ? { left: 0, minWidth, width: 'max-content', maxWidth: 'min(320px, calc(100vw - 32px))' }
+      : { right: 0, minWidth, width: 'max-content', maxWidth: 'min(320px, calc(100vw - 32px))' };
 
   const animationName = direction === 'up' ? 'dropdown-up' : 'dropdown-down';
 
@@ -69,9 +88,8 @@ export function DropdownMenu({ items, open, direction = 'down' }: DropdownMenuPr
     <div
       style={{
         position: 'absolute',
-        left: 0,
-        right: 0,
         ...positionStyle,
+        ...horizontalStyle,
         borderRadius: 14,
         background: 'var(--surface)',
         border: '1px solid var(--border)',
@@ -101,7 +119,7 @@ export function DropdownMenu({ items, open, direction = 'down' }: DropdownMenuPr
           {item.dividerBefore && (
             <div style={{ height: 1, background: 'var(--border)', margin: '0 12px' }} />
           )}
-          <MenuItem item={item} />
+          <MenuItem item={item} onItemClick={onItemClick} />
         </React.Fragment>
       ))}
     </div>

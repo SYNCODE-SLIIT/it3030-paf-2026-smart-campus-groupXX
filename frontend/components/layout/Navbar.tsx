@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Avatar, Button, GlassPill, IconButton } from '@/components/ui';
-import { LogOut, Menu, X } from 'lucide-react';
+import { Avatar, Button, DropdownMenu, type DropdownMenuItem, GlassPill } from '@/components/ui';
+import { ChevronUp, LogOut, Menu, X } from 'lucide-react';
 import type { UserType } from '@/lib/api-types';
 
 export interface NavItem {
@@ -28,11 +28,44 @@ interface NavbarProps {
   onNavigate?: (href: string) => void;
   hideAuthActions?: boolean;
   rightAccessory?: React.ReactNode;
+  profileDropdownItems?: DropdownMenuItem[];
 }
 
 
-export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate, hideAuthActions, rightAccessory }: NavbarProps) {
+export function Navbar({
+  items,
+  currentPath,
+  user,
+  onLogin,
+  onLogout,
+  onNavigate,
+  hideAuthActions,
+  rightAccessory,
+  profileDropdownItems,
+}: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+    }
+
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [dropdownOpen]);
+
+  const resolvedProfileDropdownItems = profileDropdownItems ?? (
+    onLogout
+      ? [{ label: 'Sign out', icon: LogOut, danger: true, onClick: onLogout }]
+      : []
+  );
 
   return (
     <>
@@ -122,33 +155,65 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
             {user ? (
               <>
                 {rightAccessory}
-                <Avatar
-                  initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
-                  src={user.src}
-                  size="sm"
-                />
-                <span
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 600,
-                    fontSize: 12,
-                    color: 'var(--text-h)',
-                    maxWidth: 120,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {user.name}
-                </span>
-                <IconButton
-                  icon={<LogOut size={17} strokeWidth={2.4} />}
-                  variant="danger"
-                  size="md"
-                  title="Sign out"
-                  aria-label="Sign out"
-                  onClick={onLogout}
-                />
+                <div ref={profileRef} style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setDropdownOpen((value) => !value)}
+                    style={{
+                      minWidth: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '6px 10px 6px 6px',
+                      borderRadius: 14,
+                      border: '1px solid var(--border)',
+                      background: dropdownOpen ? 'rgba(238,202,68,.08)' : 'var(--surface)',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+                    }}
+                  >
+                    <Avatar
+                      initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
+                      src={user.src}
+                      size="sm"
+                    />
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-display)',
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: 'var(--text-h)',
+                        maxWidth: 120,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {user.name}
+                    </span>
+                    <span
+                      style={{
+                        color: 'var(--text-muted)',
+                        display: 'flex',
+                        transform: dropdownOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+                        transition: 'transform .2s ease',
+                      }}
+                    >
+                      <ChevronUp size={13} strokeWidth={2.5} />
+                    </span>
+                  </button>
+
+                  {resolvedProfileDropdownItems.length > 0 && (
+                    <DropdownMenu
+                      items={resolvedProfileDropdownItems}
+                      open={dropdownOpen}
+                      direction="down"
+                      align="right"
+                      minWidth={220}
+                      onItemClick={() => setDropdownOpen(false)}
+                    />
+                  )}
+                </div>
               </>
             ) : (
               <Button variant="glass" size="sm" onClick={onLogin} style={{ borderRadius: 100 }}>
@@ -223,30 +288,48 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
           {!hideAuthActions && (
             <div style={{ marginTop: 'auto' }}>
               {user ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Avatar
-                    initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
-                    src={user.src}
-                    size="md"
-                  />
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontWeight: 700,
-                      fontSize: 15,
-                      color: 'var(--text-h)',
-                      flex: 1,
-                    }}
-                  >
-                    {user.name}
-                  </span>
-                  <Button
-                    variant="ghost-danger"
-                    size="sm"
-                    onClick={() => { onLogout?.(); setMobileOpen(false); }}
-                  >
-                    Sign out
-                  </Button>
+                <div style={{ display: 'grid', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <Avatar
+                      initials={user.initials ?? user.name.slice(0, 2).toUpperCase()}
+                      src={user.src}
+                      size="md"
+                    />
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-display)',
+                        fontWeight: 700,
+                        fontSize: 15,
+                        color: 'var(--text-h)',
+                        flex: 1,
+                      }}
+                    >
+                      {user.name}
+                    </span>
+                  </div>
+
+                  {resolvedProfileDropdownItems.length > 0 && (
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {resolvedProfileDropdownItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <Button
+                            key={item.label}
+                            variant={item.danger ? 'ghost-danger' : 'subtle'}
+                            size="sm"
+                            fullWidth
+                            iconLeft={<Icon size={15} strokeWidth={2.2} />}
+                            onClick={() => {
+                              item.onClick?.();
+                              setMobileOpen(false);
+                            }}
+                          >
+                            {item.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <Button variant="glass" size="lg" fullWidth onClick={() => { onLogin?.(); setMobileOpen(false); }}>

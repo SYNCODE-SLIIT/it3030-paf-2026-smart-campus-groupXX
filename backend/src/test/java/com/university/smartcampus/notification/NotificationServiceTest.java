@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -91,18 +92,13 @@ class NotificationServiceTest {
         ticket.setPriority(TicketPriority.HIGH);
         ticket.setReportedBy(reporter);
 
-        NotificationPreferenceEntity preference = new NotificationPreferenceEntity();
-        preference.setUser(admin);
-        preference.setInAppEnabled(true);
-        preference.setEmailEnabled(true);
-
         when(userRepository.findByUserTypeAndAccountStatus(UserType.ADMIN, AccountStatus.ACTIVE))
             .thenReturn(List.of(admin));
         when(eventRepository.findByDedupeKey("ticket-created:" + ticket.getId())).thenReturn(Optional.empty());
         when(eventRepository.save(any(NotificationEventEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(linkRepository.save(any(NotificationEventLinkEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(recipientRepository.save(any(NotificationRecipientEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(preferenceRepository.findByUserId(admin.getId())).thenReturn(Optional.of(preference));
+        when(preferenceRepository.findByUserId(admin.getId())).thenReturn(preferencesForUser(admin, true, true));
         when(deliveryAttemptRepository.save(any(NotificationDeliveryAttemptEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         notificationService.notifyTicketCreated(ticket);
@@ -170,5 +166,18 @@ class NotificationServiceTest {
         user.setEmail(email);
         user.setAccountStatus(AccountStatus.ACTIVE);
         return user;
+    }
+
+    private List<NotificationPreferenceEntity> preferencesForUser(UserEntity user, boolean inAppEnabled, boolean emailEnabled) {
+        return Arrays.stream(NotificationDomain.values())
+            .map(domain -> {
+                NotificationPreferenceEntity preference = new NotificationPreferenceEntity();
+                preference.setUser(user);
+                preference.setDomain(domain);
+                preference.setInAppEnabled(inAppEnabled);
+                preference.setEmailEnabled(emailEnabled);
+                return preference;
+            })
+            .toList();
     }
 }

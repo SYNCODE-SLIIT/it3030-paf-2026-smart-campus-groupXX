@@ -382,7 +382,12 @@ export function Sidebar({
               </button>
             </div>
 
-            <DropdownMenu items={resolvedProfileDropdownItems} open={dropdownOpen} direction="up" />
+            <DropdownMenu
+              items={resolvedProfileDropdownItems}
+              open={dropdownOpen}
+              direction="up"
+              onItemClick={() => setDropdownOpen(false)}
+            />
           </div>
         </div>
 

@@ -15,13 +15,16 @@ import {
   LogOut,
   MessageSquare,
   ShieldCheck,
+  SlidersHorizontal,
   Ticket,
   Users,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
+import { type DropdownMenuItem } from '@/components/ui';
 import { Navbar, type NavItem } from '@/components/layout/Navbar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { NotificationPreferencesDialog } from '@/components/notifications/NotificationPreferencesDialog';
 import { useNotifications } from '@/components/notifications/useNotifications';
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -317,6 +320,7 @@ export function ProtectedShell({
   const resolvedWorkspace = workspace === 'auto' ? getWorkspaceForUser(user) : workspace;
   const notificationState = useNotifications(session?.access_token ?? null);
   const refreshNotifications = notificationState.refreshNotifications;
+  const [preferencesOpen, setPreferencesOpen] = React.useState(false);
 
   const navigateTo = React.useCallback((href: string) => {
     triggerRouteProgress();
@@ -409,6 +413,21 @@ export function ProtectedShell({
     />
   );
 
+  const accountMenuItems = React.useMemo<DropdownMenuItem[]>(() => ([
+    {
+      label: 'Notification preferences',
+      icon: SlidersHorizontal,
+      onClick: () => setPreferencesOpen(true),
+    },
+    {
+      label: 'Sign out',
+      icon: LogOut,
+      danger: true,
+      dividerBefore: true,
+      onClick: handleSignOut,
+    },
+  ]), [handleSignOut]);
+
   if (resolvedWorkspace === 'students') {
     const navItems: NavItem[] = resolvedSections.flatMap((s) =>
       s.items.map((item) => ({
@@ -436,8 +455,14 @@ export function ProtectedShell({
           onLogout={handleSignOut}
           onNavigate={navigateTo}
           rightAccessory={notificationBell('below')}
+          profileDropdownItems={accountMenuItems}
         />
         <main style={{ padding: '96px 24px 40px' }}>{children}</main>
+        <NotificationPreferencesDialog
+          open={preferencesOpen}
+          onClose={() => setPreferencesOpen(false)}
+          accessToken={session?.access_token ?? null}
+        />
       </div>
     );
   }
@@ -459,14 +484,7 @@ export function ProtectedShell({
           role: userDisplay?.role ?? getUserTypeLabel(user.userType),
           src: userDisplay?.src,
         }}
-        profileDropdownItems={[
-          {
-            label: 'Sign out',
-            icon: LogOut,
-            danger: true,
-            onClick: handleSignOut,
-          },
-        ]}
+        profileDropdownItems={accountMenuItems}
         notificationCount={notificationState.unreadCount}
         notificationAccessory={notificationBell('above', 'left', true)}
         onNavigate={(item) => {
@@ -485,6 +503,11 @@ export function ProtectedShell({
       >
         {children}
       </main>
+      <NotificationPreferencesDialog
+        open={preferencesOpen}
+        onClose={() => setPreferencesOpen(false)}
+        accessToken={session?.access_token ?? null}
+      />
     </div>
   );
 }
