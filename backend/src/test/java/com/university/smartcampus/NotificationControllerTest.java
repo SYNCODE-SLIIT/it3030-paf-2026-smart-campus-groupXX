@@ -96,6 +96,7 @@ class NotificationControllerTest extends AbstractPostgresIntegrationTest {
     private UserEntity seedActiveStudent(String email) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
+        user.setAuthUserId(authUserIdFor(email));
         user.setEmail(email);
         user.setUserType(UserType.STUDENT);
         user.setAccountStatus(AccountStatus.ACTIVE);

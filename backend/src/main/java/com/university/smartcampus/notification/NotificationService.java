@@ -162,7 +162,6 @@ public class NotificationService {
             preference.setEmailEnabled(Boolean.TRUE.equals(categoryRequest.emailEnabled()));
         }
 
-        preferenceRepository.saveAll(preferences.values());
         return toPreferencesResponse(preferences);
     }
 

@@ -16,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.university.smartcampus.AbstractPostgresIntegrationTest;
 import com.university.smartcampus.common.enums.AppEnums.AccountStatus;
+import com.university.smartcampus.common.enums.AppEnums.TicketCategory;
+import com.university.smartcampus.common.enums.AppEnums.TicketPriority;
+import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
 import com.university.smartcampus.common.enums.AppEnums.UserType;
 import com.university.smartcampus.notification.NotificationDtos.NotificationPreferenceCategoryResponse;
 import com.university.smartcampus.notification.NotificationDtos.NotificationPreferencesResponse;
@@ -25,6 +28,7 @@ import com.university.smartcampus.notification.NotificationEnums.NotificationDel
 import com.university.smartcampus.notification.NotificationEnums.NotificationDeliveryStatus;
 import com.university.smartcampus.notification.NotificationEnums.NotificationDomain;
 import com.university.smartcampus.ticket.entity.TicketEntity;
+import com.university.smartcampus.ticket.repository.TicketRepository;
 import com.university.smartcampus.user.entity.AdminEntity;
 import com.university.smartcampus.user.entity.StudentEntity;
 import com.university.smartcampus.user.entity.UserEntity;
@@ -48,6 +52,9 @@ class NotificationServiceIntegrationTest extends AbstractPostgresIntegrationTest
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TicketRepository ticketRepository;
 
     @Test
     void getPreferencesReturnsAllDomainsAndCreatesMissingRows() {
@@ -180,9 +187,13 @@ class NotificationServiceIntegrationTest extends AbstractPostgresIntegrationTest
         ticket.setId(UUID.randomUUID());
         ticket.setTicketCode("TCK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         ticket.setTitle("Notification preference test");
+        ticket.setDescription("Notification preference test description");
+        ticket.setCategory(TicketCategory.OTHER);
+        ticket.setPriority(TicketPriority.LOW);
+        ticket.setStatus(TicketStatus.OPEN);
         ticket.setAssignedTo(assignee);
         ticket.setReportedBy(assignee);
-        return ticket;
+        return ticketRepository.saveAndFlush(ticket);
     }
 
     private UserEntity seedAdmin(String email) {
