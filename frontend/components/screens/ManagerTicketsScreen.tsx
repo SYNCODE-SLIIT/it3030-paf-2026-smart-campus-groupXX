@@ -180,7 +180,7 @@ function ManagerTicketsScreenInner() {
           Manager Workspace
         </p>
         <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 900, lineHeight: 1.1, color: 'var(--text-h)' }}>
-          My Tickets
+          Assigned Tickets
         </h1>
         <p style={{ margin: '8px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
           Tickets assigned to you. Accept, work through, and resolve them.

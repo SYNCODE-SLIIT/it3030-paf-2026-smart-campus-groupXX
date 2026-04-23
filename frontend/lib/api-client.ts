@@ -56,6 +56,7 @@ import {
   type TicketCategory,
   type TicketCommentResponse,
   type TicketPriority,
+  type TicketQueryScope,
   type TicketResponse,
   type TicketStatus,
   type TicketStatusHistoryResponse,
@@ -1031,12 +1032,13 @@ export async function uploadStudentProfileImage(accessToken: string, file: File)
 
 export async function listMyTickets(
   accessToken: string,
-  params?: { status?: TicketStatus; category?: TicketCategory; priority?: TicketPriority },
+  params?: { status?: TicketStatus; category?: TicketCategory; priority?: TicketPriority; scope?: TicketQueryScope },
 ): Promise<TicketSummaryResponse[]> {
   const qs = new URLSearchParams();
   if (params?.status) qs.set('status', params.status);
   if (params?.category) qs.set('category', params.category);
   if (params?.priority) qs.set('priority', params.priority);
+  if (params?.scope) qs.set('scope', params.scope);
   const query = qs.toString();
   const data = await request<unknown>(`/api/tickets${query ? `?${query}` : ''}`, { accessToken });
   return extractHalCollection<TicketSummaryResponse>(data);

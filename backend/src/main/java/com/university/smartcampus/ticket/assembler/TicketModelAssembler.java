@@ -20,6 +20,7 @@ import com.university.smartcampus.common.enums.AppEnums.UserType;
 import com.university.smartcampus.ticket.controller.TicketController;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAttachmentResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketCommentResponse;
+import com.university.smartcampus.ticket.dto.TicketDtos.TicketListScope;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketStatusHistoryResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketSummaryResponse;
@@ -33,13 +34,14 @@ public class TicketModelAssembler {
             List<TicketSummaryResponse> tickets,
             TicketStatus status,
             TicketCategory category,
-            TicketPriority priority) {
+            TicketPriority priority,
+            TicketListScope scope) {
         List<EntityModel<TicketSummaryResponse>> models = tickets.stream()
                 .map(ticket -> toTicketSummaryModel(actor, ticket))
                 .toList();
 
         return CollectionModel.of(models,
-                        linkTo(methodOn(TicketController.class).listTickets(status, category, priority, null))
+                        linkTo(methodOn(TicketController.class).listTickets(status, category, priority, scope, null))
                                 .withSelfRel())
                 .withFallbackType(new ParameterizedTypeReference<EntityModel<TicketSummaryResponse>>() {});
     }
@@ -180,7 +182,7 @@ public class TicketModelAssembler {
         String ticketRef = ticket.ticketCode();
         model.add(
                 ticketSelfLink(ticketRef),
-                linkTo(methodOn(TicketController.class).listTickets(null, null, null, null)).withRel("tickets"),
+                linkTo(methodOn(TicketController.class).listTickets(null, null, null, null, null)).withRel("tickets"),
                 linkTo(methodOn(TicketController.class).listComments(ticketRef, null)).withRel("comments"),
                 linkTo(methodOn(TicketController.class).listAttachments(ticketRef, null)).withRel("attachments"),
                 linkTo(methodOn(TicketController.class).getStatusHistory(ticketRef, null)).withRel("history"));
@@ -266,10 +268,13 @@ public class TicketModelAssembler {
         if (isAdmin(actor)) {
             return ticket.status() == TicketStatus.IN_PROGRESS;
         }
+        if (isReporter(actor, ticket)) {
+            return true;
+        }
         if (isTicketManager(actor)) {
             return isAssignedTo(actor, ticket) && ticket.status() != TicketStatus.OPEN;
         }
-        return isReporter(actor, ticket);
+        return false;
     }
 
     private boolean canManageAttachments(UserEntity actor, TicketContext ticket) {

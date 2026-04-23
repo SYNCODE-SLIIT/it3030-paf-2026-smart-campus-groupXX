@@ -1,33 +1,48 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { TicketPlus } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
-import { Alert, Button, Card, Dialog, Skeleton } from '@/components/ui';
+import { Alert, Button, Dialog, Skeleton, Tabs } from '@/components/ui';
 import { SubmitTicketModal, TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
 import { deleteTicket, getErrorMessage, listMyTickets } from '@/lib/api-client';
-import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
+import type { TicketPriority, TicketQueryScope, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
+
+type StatusFilter = TicketStatus | 'ALL';
 
 const PRIORITY_ORDER: TicketPriority[] = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
 
-const STATUS_SECTIONS: { status: TicketStatus; label: string; color: string }[] = [
-  { status: 'OPEN',        label: 'Open',        color: 'var(--blue-400)' },
-  { status: 'IN_PROGRESS', label: 'In Progress',  color: 'var(--yellow-400)' },
-  { status: 'RESOLVED',    label: 'Resolved',     color: 'var(--green-400)' },
-  { status: 'CLOSED',      label: 'Closed',       color: 'var(--neutral-400)' },
-  { status: 'REJECTED',    label: 'Rejected',     color: 'var(--red-400)' },
+const STATUS_TABS: { label: string; value: StatusFilter }[] = [
+  { label: 'All', value: 'ALL' },
+  { label: 'Open', value: 'OPEN' },
+  { label: 'In Progress', value: 'IN_PROGRESS' },
+  { label: 'Resolved', value: 'RESOLVED' },
+  { label: 'Closed', value: 'CLOSED' },
+  { label: 'Rejected', value: 'REJECTED' },
 ];
 
-function sortByPriority(tickets: TicketSummaryResponse[]): TicketSummaryResponse[] {
-  return [...tickets].sort(
-    (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority),
-  );
+const PRIORITY_LABELS: Record<TicketPriority, string> = {
+  URGENT: 'Urgent',
+  HIGH: 'High',
+  MEDIUM: 'Medium',
+  LOW: 'Low',
+};
+
+const PRIORITY_COLOR: Record<TicketPriority, string> = {
+  URGENT: 'var(--red-400)',
+  HIGH: 'var(--orange-400)',
+  MEDIUM: 'var(--blue-400)',
+  LOW: 'var(--neutral-400)',
+};
+
+function resolveStatusFilter(value: string | null): StatusFilter {
+  return STATUS_TABS.some((tab) => tab.value === value) ? (value as StatusFilter) : 'ALL';
 }
 
-interface StatusSectionProps {
+interface TicketSectionProps {
   label: string;
   color: string;
   tickets: TicketSummaryResponse[];
@@ -35,14 +50,13 @@ interface StatusSectionProps {
   onDelete: (code: string) => void;
 }
 
-function StatusSection({ label, color, tickets, onView, onDelete }: StatusSectionProps) {
+function TicketSection({ label, color, tickets, onView, onDelete }: TicketSectionProps) {
   if (tickets.length === 0) return null;
-  const sorted = sortByPriority(tickets);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+        <div style={{ width: 3, height: 16, borderRadius: 2, background: color, flexShrink: 0 }} />
         <span
           style={{
             fontFamily: 'var(--font-mono)',
@@ -66,7 +80,6 @@ function StatusSection({ label, color, tickets, onView, onDelete }: StatusSectio
           {tickets.length}
         </span>
       </div>
-
       <div
         style={{
           display: 'flex',
@@ -78,11 +91,10 @@ function StatusSection({ label, color, tickets, onView, onDelete }: StatusSectio
           scrollbarWidth: 'thin',
         }}
       >
-        {sorted.map((ticket) => (
+        {tickets.map((ticket) => (
           <div key={ticket.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
             <TicketCard
               ticket={ticket}
-              showReporter
               onView={() => onView(ticket.ticketCode)}
               onDelete={ticket.status === 'OPEN' && ticket.assignedToId === null ? () => onDelete(ticket.ticketCode) : undefined}
             />
@@ -95,11 +107,13 @@ function StatusSection({ label, color, tickets, onView, onDelete }: StatusSectio
 
 export function StudentTicketsScreen() {
   return (
-    <RequesterTicketsScreen
-      workspaceLabel="Student Workspace"
-      description="Report campus issues and track their resolution."
-      ticketsBasePath="/students/tickets"
-    />
+    <React.Suspense fallback={<Skeleton variant="rect" height={60} />}>
+      <RequesterTicketsScreen
+        workspaceLabel="Student Workspace"
+        description="Report campus issues and track their resolution."
+        ticketsBasePath="/students/tickets"
+      />
+    </React.Suspense>
   );
 }
 
@@ -107,17 +121,22 @@ export function RequesterTicketsScreen({
   workspaceLabel,
   description,
   ticketsBasePath,
+  ticketScope = 'REPORTED',
 }: {
   workspaceLabel: string;
   description: string;
   ticketsBasePath: string;
+  ticketScope?: TicketQueryScope;
 }) {
   const { session } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const accessToken = session?.access_token ?? null;
+  const initialStatus = resolveStatusFilter(searchParams.get('status'));
 
   const [tickets, setTickets] = React.useState<TicketSummaryResponse[]>([]);
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(initialStatus);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
@@ -133,7 +152,7 @@ export function RequesterTicketsScreen({
     setLoading(true);
     setLoadError(null);
     try {
-      const list = await listMyTickets(accessToken);
+      const list = await listMyTickets(accessToken, { scope: ticketScope });
       setTickets(list);
     } catch (error) {
       setLoadError(getErrorMessage(error, 'We could not load your tickets.'));
@@ -141,14 +160,40 @@ export function RequesterTicketsScreen({
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, ticketScope]);
 
   React.useEffect(() => {
     void reload();
   }, [reload]);
 
-  const openCount = tickets.filter((t) => t.status === 'OPEN').length;
-  const inProgressCount = tickets.filter((t) => t.status === 'IN_PROGRESS').length;
+  React.useEffect(() => {
+    setStatusFilter(resolveStatusFilter(searchParams.get('status')));
+  }, [searchParams]);
+
+  const tabCounts = React.useMemo(() => ({
+    ALL: tickets.length,
+    OPEN: tickets.filter((t) => t.status === 'OPEN').length,
+    IN_PROGRESS: tickets.filter((t) => t.status === 'IN_PROGRESS').length,
+    RESOLVED: tickets.filter((t) => t.status === 'RESOLVED').length,
+    CLOSED: tickets.filter((t) => t.status === 'CLOSED').length,
+    REJECTED: tickets.filter((t) => t.status === 'REJECTED').length,
+  } satisfies Record<StatusFilter, number>), [tickets]);
+
+  const filteredTickets = React.useMemo(() => {
+    if (statusFilter === 'ALL') return tickets;
+    return tickets.filter((ticket) => ticket.status === statusFilter);
+  }, [tickets, statusFilter]);
+
+  const priorityGroups = React.useMemo(
+    () =>
+      PRIORITY_ORDER
+        .map((priority) => ({
+          priority,
+          tickets: filteredTickets.filter((ticket) => ticket.priority === priority),
+        }))
+        .filter((group) => group.tickets.length > 0),
+    [filteredTickets],
+  );
 
   const handleDeleteRequest = React.useCallback((ticketCode: string) => {
     setDeleteConfirmCode(ticketCode);
@@ -217,25 +262,12 @@ export function RequesterTicketsScreen({
         </Button>
       </div>
 
-      {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-        <Card>
-          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
-            Open
-          </p>
-          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text-h)' }}>
-            {openCount}
-          </p>
-        </Card>
-        <Card>
-          <p style={{ margin: '0 0 8px', color: 'var(--text-muted)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
-            In Progress
-          </p>
-          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text-h)' }}>
-            {inProgressCount}
-          </p>
-        </Card>
-      </div>
+      <Tabs
+        variant="pill"
+        tabs={STATUS_TABS.map((tab) => ({ ...tab, badge: tabCounts[tab.value] }))}
+        value={statusFilter}
+        onChange={(value) => setStatusFilter(value as StatusFilter)}
+      />
 
       {loadError && (
         <Alert variant="error" title="Load failed">
@@ -256,14 +288,20 @@ export function RequesterTicketsScreen({
         </p>
       )}
 
-      {!loading && tickets.length > 0 && (
+      {!loading && tickets.length > 0 && priorityGroups.length === 0 && (
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 28 }}>
+          No tickets match the selected status.
+        </p>
+      )}
+
+      {!loading && priorityGroups.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          {STATUS_SECTIONS.map(({ status, label, color }) => (
-            <StatusSection
-              key={status}
-              label={label}
-              color={color}
-              tickets={tickets.filter((t) => t.status === status)}
+          {priorityGroups.map(({ priority, tickets: groupedTickets }) => (
+            <TicketSection
+              key={priority}
+              label={PRIORITY_LABELS[priority]}
+              color={PRIORITY_COLOR[priority]}
+              tickets={groupedTickets}
               onView={handleView}
               onDelete={handleDeleteRequest}
             />

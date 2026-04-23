@@ -9,6 +9,7 @@ export default async function CatalogManagerTicketsPage() {
       workspaceLabel="Manager Workspace"
       description="Submit and track catalogue-related support tickets without leaving the catalogue workspace."
       ticketsBasePath="/managers/catalog/tickets"
+      ticketScope="REPORTED"
     />
   );
 }

@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, BarChart2, CheckCircle2, Clock, Inbox } from 'lucide-react';
+import { AlertTriangle, BarChart2, CheckCircle2, Clock, Inbox, SquarePen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
-import { Alert, Card, Chip, Skeleton } from '@/components/ui';
+import { Alert, Button, Card, Chip, Skeleton } from '@/components/ui';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
 import type { TicketCategory, TicketPriority, TicketSummaryResponse } from '@/lib/api-types';
 
@@ -287,6 +287,23 @@ export function ManagerDashboardScreen() {
                   ))}
                 </div>
               )}
+            </Card>
+
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+                <SquarePen size={18} color="var(--yellow-600)" />
+                <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
+                  Reported Tickets
+                </p>
+              </div>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7 }}>
+                Submit your own operational issues and follow them separately from the assigned work queue.
+              </p>
+              <div style={{ marginTop: 18 }}>
+                <Button variant="subtle" size="sm" onClick={() => router.push('/ticket-managers/reported')}>
+                  Open Reported Tickets
+                </Button>
+              </div>
             </Card>
           </div>
         </>

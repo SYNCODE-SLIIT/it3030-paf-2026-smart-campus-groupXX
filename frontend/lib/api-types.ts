@@ -855,6 +855,7 @@ export interface StudentOnboardingRequest {
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
 export type TicketCategory = 'ELECTRICAL' | 'NETWORK' | 'EQUIPMENT' | 'FURNITURE' | 'CLEANLINESS' | 'FACILITY_DAMAGE' | 'ACCESS_SECURITY' | 'OTHER';
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type TicketQueryScope = 'ASSIGNED' | 'REPORTED';
 export type TicketAnalyticsBucket = 'DAY' | 'WEEK' | 'MONTH';
 
 export interface TicketAnalyticsQuery {

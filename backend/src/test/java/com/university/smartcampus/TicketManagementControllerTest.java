@@ -257,6 +257,21 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void ticketManagerCanListReportedTicketsWhenScopeRequested() throws Exception {
+        TicketEntity reported = seedTicket("ticketmgr@campus.test", TicketStatus.OPEN);
+        assignTicketTo("ticketmgr@campus.test", seedTicket("student@campus.test", TicketStatus.OPEN));
+
+        mockMvc.perform(get("/api/tickets")
+                        .param("scope", "REPORTED")
+                        .with(jwtFor("ticketmgr@campus.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._embedded.tickets.length()").value(1))
+                .andExpect(jsonPath("$._embedded.tickets[0].id").value(reported.getId().toString()))
+                .andExpect(jsonPath("$._links.self.href",
+                        org.hamcrest.Matchers.containsString("scope=REPORTED")));
+    }
+
+    @Test
     void adminTicketAnalyticsIncludesCampusWideOperationalMetrics() throws Exception {
         Instant now = Instant.now();
         Instant from = now.minus(Duration.ofDays(10));
@@ -421,6 +436,17 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(ticket.getId().toString()))
                 .andExpect(jsonPath("$._links.self.href").exists());
+    }
+
+    @Test
+    void ticketManagerCanGetOwnReportedTicket() throws Exception {
+        TicketEntity ticket = seedTicket("ticketmgr@campus.test", TicketStatus.OPEN);
+
+        mockMvc.perform(get("/api/tickets/{id}", ticket.getId())
+                        .with(jwtFor("ticketmgr@campus.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ticket.getId().toString()))
+                .andExpect(jsonPath("$.reportedByEmail").value("ticketmgr@campus.test"));
     }
 
     @Test
@@ -1069,6 +1095,20 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void ticketManagerCanAddCommentToOwnReportedOpenTicket() throws Exception {
+        TicketEntity ticket = seedTicket("ticketmgr@campus.test", TicketStatus.OPEN);
+        AddCommentRequest request = new AddCommentRequest("Additional details from the reporter.");
+
+        mockMvc.perform(post("/api/tickets/{id}/comments", ticket.getId())
+                        .with(jwtFor("ticketmgr@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userEmail").value("ticketmgr@campus.test"))
+                .andExpect(jsonPath("$.commentText").value("Additional details from the reporter."));
+    }
+
+    @Test
     void adminCanAddCommentToAnyInProgressTicket() throws Exception {
         TicketEntity ticket = assignTicketTo("ticketmgr@campus.test",
                 seedTicket("student@campus.test", TicketStatus.IN_PROGRESS));
@@ -1487,6 +1527,26 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$._embedded.attachments.length()").value(1))
                 .andExpect(jsonPath("$._embedded.attachments[0].fileType").value("text/plain"));
+    }
+
+    @Test
+    void ticketManagerCanManageAttachmentsForOwnReportedTicket() throws Exception {
+        TicketEntity ticket = seedTicket("ticketmgr@campus.test", TicketStatus.OPEN);
+        AddTicketAttachmentRequest request = new AddTicketAttachmentRequest(
+                "reporter-log.txt", "https://files.campus.test/reporter-log.txt", "text/plain");
+
+        mockMvc.perform(post("/api/tickets/{id}/attachments", ticket.getId())
+                        .with(jwtFor("ticketmgr@campus.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fileName").value("reporter-log.txt"));
+
+        mockMvc.perform(get("/api/tickets/{id}/attachments", ticket.getId())
+                        .with(jwtFor("ticketmgr@campus.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._embedded.attachments.length()").value(1))
+                .andExpect(jsonPath("$._embedded.attachments[0].fileName").value("reporter-log.txt"));
     }
 
     @Test

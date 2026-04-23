@@ -80,6 +80,11 @@ public final class TicketDtos {
         MONTH
     }
 
+    public enum TicketListScope {
+        ASSIGNED,
+        REPORTED
+    }
+
     public record TicketAnalyticsSlaRow(
         TicketPriority priority,
         long total,

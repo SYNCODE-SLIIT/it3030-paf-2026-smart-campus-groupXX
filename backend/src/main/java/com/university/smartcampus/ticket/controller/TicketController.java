@@ -38,6 +38,7 @@ import com.university.smartcampus.ticket.dto.TicketDtos.TicketAnalyticsResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAttachmentResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketCommentResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketResponse;
+import com.university.smartcampus.ticket.dto.TicketDtos.TicketListScope;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketStatusHistoryResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketStatusUpdateRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketSummaryResponse;
@@ -83,10 +84,11 @@ public class TicketController {
             @RequestParam(required = false) TicketStatus status,
             @RequestParam(required = false) TicketCategory category,
             @RequestParam(required = false) TicketPriority priority,
+            @RequestParam(required = false) TicketListScope scope,
             Authentication authentication) {
         UserEntity user = currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
-        List<TicketSummaryResponse> tickets = ticketService.listTickets(user, status, category, priority);
-        return ticketModelAssembler.toTicketSummaryCollection(user, tickets, status, category, priority);
+        List<TicketSummaryResponse> tickets = ticketService.listTickets(user, status, category, priority, scope);
+        return ticketModelAssembler.toTicketSummaryCollection(user, tickets, status, category, priority, scope);
     }
 
     @GetMapping("/analytics")

@@ -222,7 +222,7 @@ export function RequesterTicketDetailScreen({
     setDeleting(true);
     try {
       await deleteTicket(accessToken, ticketRef);
-      router.push('/students/tickets');
+      router.push(ticketsHref);
     } catch (error) {
       showToast('error', 'Delete failed', getErrorMessage(error, 'Could not delete the ticket.'));
       setDeleting(false);

@@ -29,6 +29,7 @@ import com.university.smartcampus.ticket.dto.TicketDtos.AddTicketAttachmentReque
 import com.university.smartcampus.ticket.dto.TicketDtos.CreateTicketRequest;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketAttachmentResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketCommentResponse;
+import com.university.smartcampus.ticket.dto.TicketDtos.TicketListScope;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketStatusHistoryResponse;
 import com.university.smartcampus.ticket.dto.TicketDtos.TicketStatusUpdateRequest;
@@ -131,14 +132,19 @@ public class TicketService {
             UserEntity user,
             TicketStatus status,
             TicketCategory category,
-            TicketPriority priority) {
+            TicketPriority priority,
+            TicketListScope scope) {
         Specification<TicketEntity> spec = (root, query, cb) -> cb.conjunction();
 
         if (isAdmin(user)) {
             // admin sees all tickets
         } else if (isTicketManager(user)) {
             UUID userId = user.getId();
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("assignedTo").get("id"), userId));
+            if (scope == TicketListScope.REPORTED) {
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("reportedBy").get("id"), userId));
+            } else {
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("assignedTo").get("id"), userId));
+            }
         } else {
             UUID userId = user.getId();
             spec = spec.and((root, query, cb) -> cb.equal(root.get("reportedBy").get("id"), userId));
@@ -284,7 +290,7 @@ public class TicketService {
         if (isAdmin(user) && ticket.getStatus() != TicketStatus.IN_PROGRESS) {
             throw new BadRequestException("Admins can only comment on in-progress tickets.");
         }
-        if (isTicketManager(user) && ticket.getStatus() == TicketStatus.OPEN) {
+        if (isTicketManager(user) && !isReporter(ticket, user) && ticket.getStatus() == TicketStatus.OPEN) {
             throw new BadRequestException("Cannot comment on an open ticket before accepting it.");
         }
 
@@ -489,12 +495,12 @@ public class TicketService {
             return ticket;
         }
         if (isTicketManager(user)) {
-            if (isAssignedTo(ticket, user)) {
+            if (isAssignedTo(ticket, user) || isReporter(ticket, user)) {
                 return ticket;
             }
             throw new ForbiddenException("You do not have access to this ticket.");
         }
-        if (ticket.getReportedBy().getId().equals(user.getId())) {
+        if (isReporter(ticket, user)) {
             return ticket;
         }
         throw new ForbiddenException("You do not have access to this ticket.");
@@ -554,6 +560,11 @@ public class TicketService {
     private boolean isAssignedTo(TicketEntity ticket, UserEntity user) {
         return ticket.getAssignedTo() != null
                 && ticket.getAssignedTo().getId().equals(user.getId());
+    }
+
+    private boolean isReporter(TicketEntity ticket, UserEntity user) {
+        return ticket.getReportedBy() != null
+                && ticket.getReportedBy().getId().equals(user.getId());
     }
 
     private void validateStatusTransition(TicketStatus currentStatus, TicketStatus nextStatus) {
