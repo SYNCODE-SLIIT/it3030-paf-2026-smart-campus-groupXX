@@ -6,8 +6,6 @@ import {
   AlertCircle,
   Bell,
   BookOpen,
-  Database,
-  Gauge,
   GraduationCap,
   ShieldCheck,
   TicketPlus,
@@ -37,8 +35,6 @@ import { SubmitTicketModal } from '@/components/tickets';
 import { getErrorMessage, listAuditLogs, listUsers } from '@/lib/api-client';
 import type { AuditLogResponse, UserResponse } from '@/lib/api-types';
 import {
-  getAccountStatusChipColor,
-  getAccountStatusLabel,
   getUserAvatarInitials,
   getUserDisplayName,
   getUserTypeChipColor,
@@ -131,128 +127,6 @@ function getUserDetailPath(user: UserResponse) {
   return `${getRoleDirectoryPath(user.userType)}/${user.id}`;
 }
 
-function DashboardMetric({
-  label,
-  value,
-  caption,
-  badge,
-  onClick,
-  actionLabel,
-  icon: Icon,
-}: {
-  label: string;
-  value: React.ReactNode;
-  caption: string;
-  badge?: string;
-  onClick?: () => void;
-  actionLabel?: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
-}) {
-  const metricContent = (
-    <Card hoverable>
-      <div style={{ display: 'grid', gap: 12, position: 'relative', overflow: 'hidden' }}>
-        <span
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            top: -42,
-            right: -34,
-            width: 110,
-            height: 110,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(238,202,68,.22) 0%, rgba(238,202,68,0) 72%)',
-            pointerEvents: 'none',
-          }}
-        />
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
-          <div>
-            <p
-              style={{
-                margin: 0,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                fontWeight: 900,
-                letterSpacing: '.18em',
-                textTransform: 'uppercase',
-                color: 'var(--text-muted)',
-              }}
-            >
-              {label}
-            </p>
-            <p style={{ margin: '10px 0 0', fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 900, color: 'var(--text-h)' }}>
-              {value}
-            </p>
-          </div>
-          <span
-            style={{
-              width: 38,
-              height: 38,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 10,
-              background: 'var(--surface-2)',
-              color: 'var(--yellow-700)',
-              boxShadow: 'inset 0 0 0 1px rgba(238,202,68,.18)',
-              flexShrink: 0,
-            }}
-          >
-            <Icon size={18} strokeWidth={2.2} />
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
-          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12 }}>{caption}</p>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            {badge && (
-              <Chip color="glass" size="sm">
-                {badge}
-              </Chip>
-            )}
-            {onClick && (
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
-                  fontWeight: 800,
-                  letterSpacing: '.12em',
-                  textTransform: 'uppercase',
-                  color: 'var(--yellow-700)',
-                }}
-              >
-                {actionLabel ?? 'Open'}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-
-  if (!onClick) {
-    return metricContent;
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: 0,
-        margin: 0,
-        border: 'none',
-        background: 'transparent',
-        textAlign: 'left',
-        cursor: 'pointer',
-      }}
-      aria-label={`${label} - ${actionLabel ?? 'open details'}`}
-    >
-      {metricContent}
-    </button>
-  );
-}
-
 function SectionTitle({ title, caption }: { title: string; caption?: string }) {
   return (
     <div>
@@ -265,6 +139,108 @@ function SectionTitle({ title, caption }: { title: string; caption?: string }) {
         </p>
       )}
     </div>
+  );
+}
+
+function DashboardMetric({
+  label,
+  value,
+  caption,
+  icon: Icon,
+  onClick,
+}: {
+  label: string;
+  value: React.ReactNode;
+  caption: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  onClick?: () => void;
+}) {
+  const content = (
+    <Card hoverable style={{ height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 112 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '.18em',
+              textTransform: 'uppercase',
+              color: 'var(--text-label)',
+            }}
+          >
+            {label}
+          </span>
+          <span
+            aria-hidden="true"
+            style={{
+              width: 34,
+              height: 34,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 10,
+              background: 'var(--surface-2)',
+              color: 'var(--yellow-700)',
+              flexShrink: 0,
+            }}
+          >
+            <Icon size={17} strokeWidth={2.2} />
+          </span>
+        </div>
+        <div>
+          <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 900, lineHeight: 1.05, color: 'var(--text-h)' }}>
+            {value}
+          </p>
+          <p style={{ margin: '5px 0 0', color: 'var(--text-muted)', fontSize: 12.5, lineHeight: 1.45 }}>
+            {caption}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+
+  if (!onClick) return content;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ width: '100%', height: '100%', padding: 0, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer' }}
+      aria-label={`Open ${label}`}
+    >
+      {content}
+    </button>
+  );
+}
+
+function ActionButton({
+  label,
+  caption,
+  icon: Icon,
+  onClick,
+  primary = false,
+}: {
+  label: string;
+  caption: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={primary ? 'admin-action-button admin-action-button-primary' : 'admin-action-button'}
+      onClick={onClick}
+    >
+      <span className="admin-action-icon">
+        <Icon size={16} strokeWidth={2.25} />
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span className="admin-action-label">{label}</span>
+        <span className="admin-action-caption">{caption}</span>
+      </span>
+    </button>
   );
 }
 
@@ -336,40 +312,36 @@ export function AdminDashboardScreen() {
   }, [accessToken]);
 
   const now = Date.now();
-
   const studentUsers = users.filter((user) => user.userType === 'STUDENT');
   const facultyUsers = users.filter((user) => user.userType === 'FACULTY');
   const managerUsers = users.filter((user) => user.userType === 'MANAGER');
   const adminUsers = users.filter((user) => user.userType === 'ADMIN');
 
+  const activeAccounts = users.filter((user) => user.accountStatus === 'ACTIVE');
   const pendingInvites = users.filter((user) => user.accountStatus === 'INVITED');
   const suspendedUsers = users.filter((user) => user.accountStatus === 'SUSPENDED');
   const pendingStudentOnboarding = studentUsers.filter((user) => !user.studentProfile?.onboardingCompleted);
   const activeThisWeek = users.filter((user) => user.lastLoginAt && now - new Date(user.lastLoginAt).getTime() < ONE_WEEK_MS);
-  const invitedThisWeek = pendingInvites.filter((user) => {
+  const newThisWeek = users.filter((user) => {
     const invitedAt = new Date(user.invitedAt).getTime();
     return !Number.isNaN(invitedAt) && now - invitedAt < ONE_WEEK_MS;
   });
   const recentAccounts = [...users]
     .sort((a, b) => new Date(b.invitedAt).getTime() - new Date(a.invitedAt).getTime())
-    .slice(0, 6);
+    .slice(0, 5);
 
   const totalUsers = users.length;
-  const activeRatio = totalUsers === 0 ? 0 : Math.round((activeThisWeek.length / totalUsers) * 100);
-  const onboardingCompletion = studentUsers.length === 0
-    ? 100
-    : Math.round(((studentUsers.length - pendingStudentOnboarding.length) / studentUsers.length) * 100);
+  const activeAccountsRatio = totalUsers === 0 ? 0 : Math.round((activeAccounts.length / totalUsers) * 100);
+  const activeThisWeekRatio = totalUsers === 0 ? 0 : Math.round((activeThisWeek.length / totalUsers) * 100);
   const accountAvailability = totalUsers === 0
     ? 100
     : Math.round(((totalUsers - suspendedUsers.length) / totalUsers) * 100);
+  const onboardingCompletion = studentUsers.length === 0
+    ? 100
+    : Math.round(((studentUsers.length - pendingStudentOnboarding.length) / studentUsers.length) * 100);
   const inviteClearance = totalUsers === 0
     ? 100
     : Math.max(0, Math.round(((totalUsers - pendingInvites.length) / totalUsers) * 100));
-
-  const systemHealth = totalUsers === 0
-    ? 100
-    : Number((100 - (suspendedUsers.length / totalUsers) * 100).toFixed(1));
-  const systemHealthLabel = systemHealth >= 98 ? 'Optimal' : systemHealth >= 92 ? 'Stable' : 'Watchlist';
 
   const roleDistribution = [
     { label: 'Students', count: studentUsers.length, color: 'yellow' as const, path: '/admin/students' },
@@ -381,136 +353,260 @@ export function AdminDashboardScreen() {
     percent: totalUsers === 0 ? 0 : Math.round((item.count / totalUsers) * 100),
   }));
 
-  const trafficBars = React.useMemo(() => {
-    const baseline = [36, 42, 39, 46, 44, 53, 49, 58, 55, 62, 59, 68];
-    const activeBoost = Math.round(activeRatio * 0.12);
-    const friction = Math.round((pendingInvites.length + suspendedUsers.length) * 0.8);
-
-    return baseline.map((base, index) => {
-      const adjustment = index % 2 === 0 ? 3 : -2;
-      return Math.max(18, Math.min(96, base + activeBoost - friction + adjustment));
-    });
-  }, [activeRatio, pendingInvites.length, suspendedUsers.length]);
-
-  const serverLoad = Math.min(
-    96,
-    Math.max(18, Math.round(32 + activeRatio * 0.55 + pendingInvites.length * 1.8 + suspendedUsers.length * 2.4)),
-  );
-
   const attentionItems = [
     {
       label: 'Pending invite follow-up',
+      caption: 'Send reminders or review old invites',
       value: pendingInvites.length,
       path: '/admin/users',
       icon: UserPlus,
+      color: pendingInvites.length > 0 ? 'orange' : 'green',
     },
     {
-      label: 'Incomplete student onboarding',
+      label: 'Student onboarding',
+      caption: 'Students still missing profile setup',
       value: pendingStudentOnboarding.length,
       path: '/admin/students',
       icon: GraduationCap,
+      color: pendingStudentOnboarding.length > 0 ? 'yellow' : 'green',
     },
     {
-      label: 'Suspended account review',
+      label: 'Suspended accounts',
+      caption: 'Accounts requiring access review',
       value: suspendedUsers.length,
       path: '/admin/users',
       icon: AlertCircle,
+      color: suspendedUsers.length > 0 ? 'red' : 'green',
     },
-  ];
+  ] as const;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="admin-dashboard-screen">
       <style>{`
-        .admin-command-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-          gap: 18px;
-          align-items: start;
+        .admin-dashboard-screen {
+          display: flex;
+          flex-direction: column;
+          gap: 28px;
+        }
+        .admin-dashboard-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .admin-dashboard-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
         }
         .admin-kpi-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-          gap: 14px;
-        }
-        .admin-visual-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1.7fr) minmax(250px, .9fr);
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 16px;
+          align-items: stretch;
         }
-        .admin-traffic-shell {
-          position: relative;
-          min-height: 226px;
-          border-radius: var(--radius-md);
-          border: 1px solid rgba(238,202,68,.12);
-          background:
-            linear-gradient(180deg, rgba(238,202,68,.08), rgba(238,202,68,.02) 58%, transparent),
-            var(--surface-2);
-          overflow: hidden;
-          padding: 14px;
-        }
-        .admin-traffic-grid-lines {
-          position: absolute;
-          inset: 14px;
-          display: grid;
-          grid-template-rows: repeat(4, 1fr);
-          pointer-events: none;
-        }
-        .admin-traffic-grid-lines > span {
-          border-top: 1px dashed rgba(255,255,255,.08);
-        }
-        .admin-traffic-bars {
-          position: relative;
-          z-index: 1;
-          height: 190px;
+        .admin-dashboard-grid {
           display: grid;
           grid-template-columns: repeat(12, minmax(0, 1fr));
-          align-items: end;
-          gap: 7px;
+          gap: 16px;
+          align-items: stretch;
         }
-        .admin-traffic-bar {
-          border-radius: 6px 6px 2px 2px;
-          background: linear-gradient(180deg, rgba(238,202,68,.96) 0%, rgba(238,202,68,.26) 100%);
-          box-shadow: 0 0 0 1px rgba(238,202,68,.18);
-          opacity: .9;
-          transition: height .35s ease, opacity .2s ease;
+        .admin-card-span-3 { grid-column: span 3; }
+        .admin-card-span-4 { grid-column: span 4; }
+        .admin-card-span-5 { grid-column: span 5; }
+        .admin-card-span-7 { grid-column: span 7; }
+        .admin-card-span-8 { grid-column: span 8; }
+        .admin-card-span-12 { grid-column: span 12; }
+        .admin-card-fill {
+          height: 100%;
         }
-        .admin-traffic-bar:hover {
-          opacity: 1;
+        .admin-health-layout {
+          display: grid;
+          grid-template-columns: minmax(220px, .82fr) minmax(0, 1.18fr);
+          gap: 18px;
+          align-items: stretch;
         }
-        .admin-attention-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          width: 100%;
-          min-height: 54px;
-          padding: 10px 12px;
+        .admin-health-score {
+          display: grid;
+          align-content: space-between;
+          gap: 16px;
+          min-height: 196px;
+          padding: 16px;
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
           background: var(--surface-2);
-          color: var(--text-body);
-          text-align: left;
-          cursor: pointer;
-          transition: border-color .2s ease, transform .14s ease;
         }
-        .admin-attention-item:hover {
-          border-color: rgba(238,202,68,.34);
-          transform: translateY(-1px);
+        .admin-inline-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
         }
-        .admin-role-button {
-          min-height: 68px;
+        .admin-inline-stat {
+          min-height: 74px;
           padding: 12px;
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
           background: var(--surface-2);
+        }
+        .admin-inline-stat strong {
+          display: block;
+          margin-top: 8px;
+          font-family: var(--font-display);
+          font-size: 22px;
+          line-height: 1;
           color: var(--text-h);
+        }
+        .admin-inline-stat span {
+          font-family: var(--font-mono);
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: .15em;
+          text-transform: uppercase;
+          color: var(--text-muted);
+        }
+        .admin-action-button,
+        .admin-attention-button,
+        .admin-role-button,
+        .admin-account-button {
+          width: 100%;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: var(--surface-2);
+          color: var(--text-body);
           cursor: pointer;
           text-align: left;
-          transition: border-color .2s ease, transform .14s ease;
+          transition: border-color .18s ease, transform .14s ease, background .18s ease;
         }
-        .admin-role-button:hover {
+        .admin-action-button:hover,
+        .admin-attention-button:hover,
+        .admin-role-button:hover,
+        .admin-account-button:hover {
           border-color: rgba(238,202,68,.34);
           transform: translateY(-1px);
+        }
+        .admin-action-button {
+          min-height: 64px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px;
+        }
+        .admin-action-button-primary {
+          background: rgba(238,202,68,.12);
+          border-color: rgba(238,202,68,.32);
+        }
+        .admin-action-icon {
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          background: var(--surface);
+          color: var(--yellow-700);
+          flex-shrink: 0;
+        }
+        .admin-action-label,
+        .admin-action-caption {
+          display: block;
+          min-width: 0;
+        }
+        .admin-action-label {
+          color: var(--text-h);
+          font-family: var(--font-display);
+          font-size: 13px;
+          font-weight: 800;
+        }
+        .admin-action-caption {
+          margin-top: 3px;
+          color: var(--text-muted);
+          font-size: 11.5px;
+          line-height: 1.35;
+        }
+        .admin-role-button {
+          min-height: 82px;
+          padding: 12px;
+        }
+        .admin-role-header,
+        .admin-account-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 9px;
+        }
+        .admin-role-label,
+        .admin-account-label {
+          color: var(--text-h);
+          font-family: var(--font-display);
+          font-size: 13px;
+          font-weight: 800;
+        }
+        .admin-role-count,
+        .admin-account-date {
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: .13em;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+        .admin-attention-button {
+          min-height: 76px;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 10px;
+          padding: 12px;
+        }
+        .admin-attention-icon {
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          background: var(--surface);
+          color: var(--yellow-700);
+        }
+        .admin-attention-title {
+          display: block;
+          color: var(--text-h);
+          font-size: 12.5px;
+          font-weight: 800;
+          line-height: 1.25;
+        }
+        .admin-attention-caption {
+          display: block;
+          margin-top: 3px;
+          color: var(--text-muted);
+          font-size: 11.5px;
+          line-height: 1.35;
+        }
+        .admin-attention-value {
+          font-family: var(--font-display);
+          font-size: 24px;
+          font-weight: 900;
+          color: var(--text-h);
+        }
+        .admin-account-button {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+          min-height: 64px;
+          padding: 10px 12px;
+        }
+        .admin-account-meta {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
         }
         .admin-activity-avatar {
           width: 30px;
@@ -529,85 +625,50 @@ export function AdminDashboardScreen() {
           border: 1px solid rgba(238,202,68,.24);
           flex-shrink: 0;
         }
-        .admin-server-bars {
-          position: absolute;
-          right: 16px;
-          bottom: 0;
-          display: flex;
-          align-items: flex-end;
-          gap: 5px;
-          opacity: .28;
-          height: 92px;
-        }
-        .admin-server-bars > span {
-          width: 8px;
-          border-radius: 4px 4px 0 0;
-          background: var(--yellow-400);
-        }
-        .admin-recent-account-row {
-          display: grid;
-          grid-template-columns: minmax(220px, 1fr) auto auto;
-          gap: 12px;
-          align-items: center;
-          padding: 10px 12px;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: var(--surface-2);
-        }
-        .admin-recent-account-meta {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-        .admin-recent-account-button {
-          width: 100%;
-          border: 1px solid var(--border);
-          cursor: pointer;
-          text-align: left;
-          transition: border-color .2s ease, transform .14s ease;
-        }
-        .admin-recent-account-button:hover {
-          border-color: rgba(238,202,68,.34);
-          transform: translateY(-1px);
-        }
-        @keyframes admin-status-pulse {
-          0%, 100% {
-            opacity: .55;
-            transform: scale(.92);
+        @media (max-width: 1180px) {
+          .admin-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
-          50% {
-            opacity: 1;
-            transform: scale(1);
+          .admin-card-span-3,
+          .admin-card-span-4,
+          .admin-card-span-5,
+          .admin-card-span-7,
+          .admin-card-span-8 {
+            grid-column: span 6;
           }
-        }
-        @media (max-width: 1160px) {
-          .admin-command-grid {
+          .admin-health-layout {
             grid-template-columns: 1fr;
           }
         }
-        @media (max-width: 780px) {
-          .admin-visual-grid {
+        @media (max-width: 760px) {
+          .admin-dashboard-screen {
+            gap: 24px;
+          }
+          .admin-kpi-grid,
+          .admin-dashboard-grid {
             grid-template-columns: 1fr;
           }
-          .admin-recent-account-row {
+          .admin-card-span-3,
+          .admin-card-span-4,
+          .admin-card-span-5,
+          .admin-card-span-7,
+          .admin-card-span-8,
+          .admin-card-span-12 {
+            grid-column: 1;
+          }
+          .admin-inline-stat-grid {
             grid-template-columns: 1fr;
           }
-          .admin-recent-account-meta {
+          .admin-account-button {
+            grid-template-columns: 1fr;
+          }
+          .admin-account-meta {
             justify-content: flex-start;
-          }
-          .admin-traffic-shell {
-            min-height: 188px;
-          }
-          .admin-traffic-bars {
-            height: 150px;
-            gap: 5px;
           }
         }
       `}</style>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div className="admin-dashboard-header">
         <div>
           <p
             style={{
@@ -615,12 +676,12 @@ export function AdminDashboardScreen() {
               fontFamily: 'var(--font-mono)',
               fontSize: 10,
               fontWeight: 900,
-              letterSpacing: '.34em',
+              letterSpacing: '.35em',
               textTransform: 'uppercase',
               color: 'var(--text-muted)',
             }}
           >
-            Workspace Insight
+            System Console
           </p>
           <h1
             style={{
@@ -628,19 +689,25 @@ export function AdminDashboardScreen() {
               fontFamily: 'var(--font-display)',
               fontSize: 36,
               fontWeight: 900,
+              letterSpacing: 0,
               lineHeight: 1.1,
               color: 'var(--text-h)',
             }}
           >
             Admin Dashboard
           </h1>
-          <p style={{ margin: '8px 0 0', maxWidth: 720, color: 'var(--text-muted)', fontSize: 14, lineHeight: 1.6 }}>
-            A command-center view of account lifecycle, onboarding progress, role composition, and admin activity.
+          <p style={{ margin: '6px 0 0', maxWidth: 720, color: 'var(--text-muted)', fontSize: 14, fontWeight: 500, lineHeight: 1.55 }}>
+            Monitor users, onboarding, account status, and recent admin activity from one clean overview.
           </p>
         </div>
-        <Chip color="yellow" dot>
-          Command Center
-        </Chip>
+        <div className="admin-dashboard-actions">
+          <Button variant="subtle" size="sm" iconLeft={<BookOpen size={14} />} onClick={() => router.push('/admin/audit-log')}>
+            Audit Log
+          </Button>
+          <Button variant="primary" size="sm" iconLeft={<UserPlus size={14} />} onClick={() => router.push('/admin/users')}>
+            Add User
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -650,125 +717,236 @@ export function AdminDashboardScreen() {
       )}
 
       {loading ? (
-        <div style={{ display: 'grid', gap: 14 }}>
-          <Skeleton variant="rect" height={96} />
-          <Skeleton variant="rect" height={220} />
-          <Skeleton variant="rect" height={300} />
+        <div style={{ display: 'grid', gap: 16 }}>
+          <div className="admin-kpi-grid">
+            <Skeleton variant="rect" height={160} />
+            <Skeleton variant="rect" height={160} />
+            <Skeleton variant="rect" height={160} />
+            <Skeleton variant="rect" height={160} />
+          </div>
+          <Skeleton variant="rect" height={260} />
+          <Skeleton variant="rect" height={320} />
         </div>
       ) : (
-        <div className="admin-command-grid">
-          <div style={{ display: 'grid', gap: 16 }}>
-            <div className="admin-kpi-grid">
-              <DashboardMetric
-                label="Total Users"
-                value={totalUsers}
-                caption="Directory accounts across all roles"
-                badge={invitedThisWeek.length > 0 ? `+${invitedThisWeek.length} this week` : 'No new invites'}
-                onClick={() => router.push('/admin/users')}
-                actionLabel="Users"
-                icon={Users}
-              />
-              <DashboardMetric
-                label="Active This Week"
-                value={activeThisWeek.length}
-                caption="Users with a recent login"
-                badge={`${activeRatio}% of directory`}
-                onClick={() => router.push('/admin/analytics')}
-                actionLabel="Analytics"
-                icon={Activity}
-              />
-              <DashboardMetric
-                label="Pending Invites"
-                value={pendingInvites.length}
-                caption="Accounts waiting for first access"
-                badge={pendingInvites.length === 0 ? 'All clear' : 'Needs follow-up'}
-                onClick={() => router.push('/admin/users')}
-                actionLabel="Review"
-                icon={UserPlus}
-              />
-              <DashboardMetric
-                label="System Health"
-                value={`${systemHealth}%`}
-                caption="Availability weighted by account state"
-                badge={systemHealthLabel}
-                onClick={() => router.push('/admin/analytics')}
-                actionLabel="Health"
-                icon={ShieldCheck}
-              />
-            </div>
+        <>
+          <div className="admin-kpi-grid">
+            <DashboardMetric
+              label="Total Users"
+              value={totalUsers}
+              caption={`${newThisWeek.length} new account${newThisWeek.length === 1 ? '' : 's'} this week`}
+              icon={Users}
+              onClick={() => router.push('/admin/users')}
+            />
+            <DashboardMetric
+              label="Active Accounts"
+              value={activeAccounts.length}
+              caption={`${activeAccountsRatio}% of the directory is active`}
+              icon={ShieldCheck}
+              onClick={() => router.push('/admin/users')}
+            />
+            <DashboardMetric
+              label="Pending Invites"
+              value={pendingInvites.length}
+              caption="Accounts waiting for first access"
+              icon={UserPlus}
+              onClick={() => router.push('/admin/users')}
+            />
+            <DashboardMetric
+              label="Active This Week"
+              value={activeThisWeek.length}
+              caption={`${activeThisWeekRatio}% logged in recently`}
+              icon={Activity}
+              onClick={() => router.push('/admin/analytics')}
+            />
+          </div>
 
-            <div className="admin-visual-grid">
-              <Card>
-                <div style={{ display: 'grid', gap: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <SectionTitle title="Traffic & Engagement" caption="Behavior trend derived from active users and account pressure." />
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <Chip color="glass" size="sm">
-                        Last 7 days
-                      </Chip>
-                      <Button variant="ghost" size="xs" onClick={() => router.push('/admin/analytics')}>
-                        Open
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="admin-traffic-shell" role="img" aria-label="Activity trend chart">
-                    <div className="admin-traffic-grid-lines">
-                      <span />
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                    <div className="admin-traffic-bars">
-                      {trafficBars.map((value, index) => (
-                        <span key={`${value}-${index}`} className="admin-traffic-bar" style={{ height: `${value}%` }} />
-                      ))}
-                    </div>
-                  </div>
+          <div className="admin-dashboard-grid">
+            <Card className="admin-card-span-8 admin-card-fill">
+              <div style={{ display: 'grid', gap: 16, height: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                  <SectionTitle title="Account Health" caption="The most important account lifecycle signals." />
+                  <Chip color={accountAvailability >= 95 ? 'green' : accountAvailability >= 85 ? 'orange' : 'red'} dot>
+                    {accountAvailability >= 95 ? 'Healthy' : accountAvailability >= 85 ? 'Review' : 'Attention'}
+                  </Chip>
                 </div>
-              </Card>
 
-              <Card>
-                <div style={{ display: 'grid', gap: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <SectionTitle title="Role Distribution" caption="Current account split by directory role." />
-                    <Button variant="ghost" size="xs" onClick={() => router.push('/admin/users')}>
-                      Manage
-                    </Button>
-                  </div>
-                  <div style={{ display: 'grid', gap: 12 }}>
-                    {roleDistribution.map((entry) => (
-                      <button
-                        key={entry.label}
-                        type="button"
-                        onClick={() => router.push(entry.path)}
+                <div className="admin-health-layout">
+                  <div className="admin-health-score">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <div>
+                        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12.5, fontWeight: 700 }}>Directory availability</p>
+                        <p style={{ margin: '8px 0 0', fontFamily: 'var(--font-display)', fontSize: 46, fontWeight: 900, lineHeight: 1, color: 'var(--text-h)' }}>
+                          {accountAvailability}%
+                        </p>
+                      </div>
+                      <span
                         style={{
-                          border: 'none',
-                          background: 'transparent',
-                          padding: 0,
-                          textAlign: 'left',
-                          cursor: 'pointer',
+                          width: 42,
+                          height: 42,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 12,
+                          background: 'var(--surface)',
+                          color: 'var(--yellow-700)',
                         }}
-                        aria-label={`Open ${entry.label} directory`}
                       >
-                        <Progress
-                          label={`${entry.label} (${entry.count})`}
-                          value={entry.percent}
-                          color={entry.color}
-                          showValue
-                          size="sm"
-                        />
-                      </button>
-                    ))}
+                        <ShieldCheck size={20} strokeWidth={2.3} />
+                      </span>
+                    </div>
+                    <Progress value={accountAvailability} color={accountAvailability >= 95 ? 'green' : accountAvailability >= 85 ? 'orange' : 'red'} size="sm" />
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.45 }}>
+                      Availability is based on active directory access and suspended account pressure.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'grid', alignContent: 'space-between', gap: 14 }}>
+                    <div className="admin-inline-stat-grid">
+                      <div className="admin-inline-stat">
+                        <span>Active</span>
+                        <strong>{activeAccounts.length}</strong>
+                      </div>
+                      <div className="admin-inline-stat">
+                        <span>Invited</span>
+                        <strong>{pendingInvites.length}</strong>
+                      </div>
+                      <div className="admin-inline-stat">
+                        <span>Suspended</span>
+                        <strong>{suspendedUsers.length}</strong>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <Progress label="Active accounts" value={activeAccountsRatio} color="green" showValue size="sm" />
+                      <Progress label="Invite clearance" value={inviteClearance} color="yellow" showValue size="sm" />
+                      <Progress label="Student onboarding" value={onboardingCompletion} color="blue" showValue size="sm" />
+                    </div>
                   </div>
                 </div>
-              </Card>
-            </div>
+              </div>
+            </Card>
 
-            <Card>
+            <Card className="admin-card-span-4 admin-card-fill">
+              <div style={{ display: 'grid', gap: 12, height: '100%' }}>
+                <SectionTitle title="Quick Actions" caption="Frequent admin workflows." />
+                <div style={{ display: 'grid', gap: 9 }}>
+                  <ActionButton
+                    primary
+                    label="Add User"
+                    caption="Invite a new campus account"
+                    icon={UserPlus}
+                    onClick={() => router.push('/admin/users')}
+                  />
+                  <ActionButton
+                    label="Manage Users"
+                    caption="Search, filter, and update access"
+                    icon={Users}
+                    onClick={() => router.push('/admin/users')}
+                  />
+                  <ActionButton
+                    label="New Ticket"
+                    caption="Create a support request"
+                    icon={TicketPlus}
+                    onClick={() => setSubmitModalOpen(true)}
+                  />
+                  <ActionButton
+                    label="Notifications"
+                    caption="Review campus messages"
+                    icon={Bell}
+                    onClick={() => router.push('/admin/notifications')}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="admin-card-span-5 admin-card-fill">
+              <div style={{ display: 'grid', gap: 14, height: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                  <SectionTitle title="Role Distribution" caption="Current users by directory role." />
+                  <Button variant="ghost" size="xs" onClick={() => router.push('/admin/users')}>
+                    Manage
+                  </Button>
+                </div>
+                <div style={{ display: 'grid', gap: 9 }}>
+                  {roleDistribution.map((entry) => (
+                    <button key={entry.label} type="button" className="admin-role-button" onClick={() => router.push(entry.path)}>
+                      <div className="admin-role-header">
+                        <span className="admin-role-label">{entry.label}</span>
+                        <span className="admin-role-count">{entry.count} users</span>
+                      </div>
+                      <Progress value={entry.percent} color={entry.color} showValue size="sm" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Card>
+
+            <Card className="admin-card-span-3 admin-card-fill">
+              <div style={{ display: 'grid', gap: 12, height: '100%' }}>
+                <SectionTitle title="Needs Attention" caption="Start with these admin checks." />
+                <div style={{ display: 'grid', gap: 9 }}>
+                  {attentionItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button key={item.label} type="button" className="admin-attention-button" onClick={() => router.push(item.path)}>
+                        <span className="admin-attention-icon">
+                          <Icon size={16} strokeWidth={2.25} />
+                        </span>
+                        <span style={{ minWidth: 0 }}>
+                          <span className="admin-attention-title">{item.label}</span>
+                          <span className="admin-attention-caption">{item.caption}</span>
+                        </span>
+                        <span className="admin-attention-value">{item.value}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </Card>
+
+            <Card className="admin-card-span-4 admin-card-fill">
+              <div style={{ display: 'grid', gap: 12, height: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                  <SectionTitle title="Recent Accounts" caption="Newest accounts in the directory." />
+                  <Button variant="ghost" size="xs" onClick={() => router.push('/admin/users')}>
+                    View All
+                  </Button>
+                </div>
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {recentAccounts.length === 0 ? (
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>No users have been created yet.</p>
+                  ) : (
+                    recentAccounts.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        className="admin-account-button"
+                        onClick={() => router.push(getUserDetailPath(user))}
+                        aria-label={`Open ${getUserDisplayName(user)} profile`}
+                      >
+                        <UserIdentityCell
+                          name={getUserDisplayName(user)}
+                          email={user.email}
+                          initials={getUserAvatarInitials(user)}
+                          src={user.userType === 'STUDENT' ? user.studentProfile?.profileImageUrl : undefined}
+                        />
+                        <span className="admin-account-meta">
+                          <Chip color={getUserTypeChipColor(user.userType)} dot size="sm">
+                            {getUserTypeLabel(user.userType)}
+                          </Chip>
+                          <span className="admin-account-date">{formatDate(user.invitedAt)}</span>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            <Card className="admin-card-span-12">
               <div style={{ display: 'grid', gap: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <SectionTitle title="Recent Activity" caption="Latest account lifecycle actions captured from audit logs." />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                  <SectionTitle title="Recent Activity" caption="Latest account lifecycle actions from audit logs." />
                   <Button variant="ghost" size="xs" onClick={() => router.push('/admin/audit-log')}>
                     View All
                   </Button>
@@ -792,6 +970,7 @@ export function AdminDashboardScreen() {
                           <TableHeader>Actor</TableHeader>
                           <TableHeader>Action</TableHeader>
                           <TableHeader>Target</TableHeader>
+                          <TableHeader>Status</TableHeader>
                           <TableHeader style={{ textAlign: 'right' }}>Time</TableHeader>
                         </TableRow>
                       </TableHead>
@@ -799,9 +978,9 @@ export function AdminDashboardScreen() {
                         {recentActivity.map((entry) => (
                           <TableRow key={entry.id}>
                             <TableCell>
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                                 <span className="admin-activity-avatar">{emailInitials(entry.performedByEmail)}</span>
-                                <span style={{ color: 'var(--text-h)', fontWeight: 650 }}>{entry.performedByEmail ?? 'System'}</span>
+                                <span style={{ color: 'var(--text-h)', fontWeight: 650, wordBreak: 'break-word' }}>{entry.performedByEmail ?? 'System'}</span>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -809,10 +988,15 @@ export function AdminDashboardScreen() {
                                 {auditActionLabel(entry.action)}
                               </Chip>
                             </TableCell>
-                            <TableCell style={{ color: 'var(--text-body)', fontSize: 12.5 }}>
+                            <TableCell style={{ color: 'var(--text-body)', fontSize: 12.5, wordBreak: 'break-word' }}>
                               {entry.targetUserEmail ?? '-'}
                             </TableCell>
-                            <TableCell style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: 12 }}>
+                            <TableCell>
+                              <Chip color={auditChipColor(entry.action)} size="sm">
+                                Recorded
+                              </Chip>
+                            </TableCell>
+                            <TableCell style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>
                               {relativeTime(entry.createdAt)}
                             </TableCell>
                           </TableRow>
@@ -823,196 +1007,8 @@ export function AdminDashboardScreen() {
                 )}
               </div>
             </Card>
-
-            <Card>
-              <div style={{ display: 'grid', gap: 14 }}>
-                <SectionTitle title="Recent Accounts" caption="Newest accounts created in the directory." />
-                <div style={{ display: 'grid', gap: 9 }}>
-                  {recentAccounts.length === 0 ? (
-                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>No users have been created yet.</p>
-                  ) : (
-                    recentAccounts.map((user) => (
-                      <button
-                        key={user.id}
-                        type="button"
-                        className="admin-recent-account-row admin-recent-account-button"
-                        onClick={() => router.push(getUserDetailPath(user))}
-                        aria-label={`Open ${getUserDisplayName(user)} profile`}
-                      >
-                        <UserIdentityCell
-                          name={getUserDisplayName(user)}
-                          email={user.email}
-                          initials={getUserAvatarInitials(user)}
-                          src={user.userType === 'STUDENT' ? user.studentProfile?.profileImageUrl : undefined}
-                        />
-                        <Chip color={getUserTypeChipColor(user.userType)} dot>
-                          {getUserTypeLabel(user.userType)}
-                        </Chip>
-                        <div className="admin-recent-account-meta">
-                          <Chip color={getAccountStatusChipColor(user.accountStatus)} dot>
-                            {getAccountStatusLabel(user.accountStatus)}
-                          </Chip>
-                          <span style={{ minWidth: 84, textAlign: 'right', color: 'var(--text-muted)', fontSize: 12 }}>
-                            {formatDate(user.invitedAt)}
-                          </span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            </Card>
           </div>
-
-          <aside style={{ display: 'grid', gap: 16 }}>
-            <Card>
-              <div style={{ display: 'grid', gap: 12 }}>
-                <SectionTitle title="Quick Actions" caption="Frequent admin workflows." />
-                <Button variant="primary" size="sm" fullWidth iconLeft={<UserPlus size={14} />} onClick={() => router.push('/admin/users')}>
-                  Add New User
-                </Button>
-                <Button variant="subtle" size="sm" fullWidth iconLeft={<Users size={14} />} onClick={() => router.push('/admin/users')}>
-                  User Management
-                </Button>
-                <Button variant="subtle" size="sm" fullWidth iconLeft={<TicketPlus size={14} />} onClick={() => setSubmitModalOpen(true)}>
-                  New Ticket
-                </Button>
-                <Button variant="subtle" size="sm" fullWidth iconLeft={<Bell size={14} />} onClick={() => router.push('/admin/notifications')}>
-                  Notifications
-                </Button>
-                <Button variant="subtle" size="sm" fullWidth iconLeft={<BookOpen size={14} />} onClick={() => router.push('/admin/reports')}>
-                  Reports
-                </Button>
-              </div>
-            </Card>
-
-            <Card>
-              <div style={{ display: 'grid', gap: 12 }}>
-                <SectionTitle title="Role Directories" caption="Jump straight into role-level user lists." />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
-                  {[
-                    { label: 'Students', path: '/admin/students', count: studentUsers.length },
-                    { label: 'Faculty', path: '/admin/faculty', count: facultyUsers.length },
-                    { label: 'Managers', path: '/admin/managers', count: managerUsers.length },
-                    { label: 'Admins', path: '/admin/admins', count: adminUsers.length },
-                  ].map((item) => (
-                    <button
-                      key={item.path}
-                      type="button"
-                      className="admin-role-button"
-                      onClick={() => router.push(item.path)}
-                    >
-                      <span style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 850 }}>{item.label}</span>
-                      <span
-                        style={{
-                          display: 'block',
-                          marginTop: 6,
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 9,
-                          fontWeight: 800,
-                          letterSpacing: '.12em',
-                          textTransform: 'uppercase',
-                          color: 'var(--text-muted)',
-                        }}
-                      >
-                        {item.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div style={{ display: 'grid', gap: 10 }}>
-                <SectionTitle title="Needs Attention" caption="Priority queue before deep review." />
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {attentionItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <button key={item.label} type="button" className="admin-attention-item" onClick={() => router.push(item.path)}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 750 }}>
-                          <Icon size={15} color="var(--yellow-700)" />
-                          {item.label}
-                        </span>
-                        <strong style={{ fontFamily: 'var(--font-display)', color: 'var(--text-h)', fontSize: 17 }}>{item.value}</strong>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div style={{ display: 'grid', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <SectionTitle title="System Status" caption="Live admin operations health." />
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--yellow-400)', animation: 'admin-status-pulse 1.8s ease-in-out infinite' }} />
-                    <Button variant="ghost" size="xs" onClick={() => router.push('/admin/analytics')}>
-                      Open
-                    </Button>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gap: 12 }}>
-                  <Progress label="Directory availability" value={accountAvailability} color="green" showValue size="sm" />
-                  <Progress label="Onboarding completion" value={onboardingCompletion} color="blue" showValue size="sm" />
-                  <Progress label="Invite clearance" value={inviteClearance} color="yellow" showValue size="sm" />
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div style={{ position: 'relative', minHeight: 170, display: 'grid', alignContent: 'space-between', gap: 16, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
-                    <span
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 9,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'rgba(238,202,68,.14)',
-                        color: 'var(--yellow-700)',
-                      }}
-                    >
-                      <Gauge size={16} strokeWidth={2.4} />
-                    </span>
-                    <div>
-                      <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 850, color: 'var(--text-h)' }}>Server Load</p>
-                      <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 12 }}>Admin cluster alpha</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="xs" onClick={() => router.push('/admin/analytics')}>
-                    Open
-                  </Button>
-                </div>
-
-                <div style={{ display: 'grid', gap: 10, position: 'relative', zIndex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 900, lineHeight: 1, color: 'var(--yellow-600)' }}>
-                      {serverLoad}
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--text-muted)', lineHeight: 1 }}>%</span>
-                  </div>
-                  <Progress value={serverLoad} color={serverLoad > 86 ? 'red' : serverLoad > 70 ? 'orange' : 'green'} size="sm" />
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 12 }}>
-                    <Database size={14} />
-                    Capacity reacts to active sessions and queue pressure.
-                  </div>
-                </div>
-
-                <div className="admin-server-bars" aria-hidden="true">
-                  {trafficBars.slice(-6).map((value, index) => (
-                    <span key={`server-${index}`} style={{ height: `${Math.max(24, Math.round(value * 0.92))}%` }} />
-                  ))}
-                </div>
-              </div>
-            </Card>
-          </aside>
-        </div>
+        </>
       )}
 
       <SubmitTicketModal

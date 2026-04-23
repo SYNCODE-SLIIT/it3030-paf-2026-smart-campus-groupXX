@@ -52,3 +52,4 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
