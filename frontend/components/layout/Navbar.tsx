@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Avatar, Button, GlassPill } from '@/components/ui';
-import { Menu, X } from 'lucide-react';
+import { Avatar, Button, GlassPill, IconButton } from '@/components/ui';
+import { LogOut, Menu, X } from 'lucide-react';
 import type { UserType } from '@/lib/api-types';
 
 export interface NavItem {
@@ -141,9 +141,14 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
                 >
                   {user.name}
                 </span>
-                <Button variant="ghost" size="sm" onClick={onLogout} style={{ borderRadius: 100 }}>
-                  Sign out
-                </Button>
+                <IconButton
+                  icon={<LogOut size={17} strokeWidth={2.4} />}
+                  variant="danger"
+                  size="md"
+                  title="Sign out"
+                  aria-label="Sign out"
+                  onClick={onLogout}
+                />
               </>
             ) : (
               <Button variant="glass" size="sm" onClick={onLogin} style={{ borderRadius: 100 }}>

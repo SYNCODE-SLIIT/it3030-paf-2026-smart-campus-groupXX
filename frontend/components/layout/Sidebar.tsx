@@ -196,6 +196,7 @@ export function Sidebar({
   return (
     <GlassPill
       as="aside"
+      className="app-sidebar"
       radius={22}
       style={inline ? {
         position: 'relative',
@@ -251,7 +252,19 @@ export function Sidebar({
         </div>
 
         {/* Nav sections */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div
+          className="sidebar-nav-scroll"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            padding: '14px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 20,
+          }}
+        >
           {sections.map((section, i) => (
             <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {section.title && (
