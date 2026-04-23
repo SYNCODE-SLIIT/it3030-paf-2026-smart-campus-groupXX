@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import jakarta.persistence.EntityManager;
+
 import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.AppEnums.ResourceStatus;
 import com.university.smartcampus.booking.BookingEntity;
@@ -72,6 +74,7 @@ public class NotificationService {
     private final ManagerRepository managerRepository;
     private final BookingRepository bookingRepository;
     private final SmartCampusProperties properties;
+    private final EntityManager entityManager;
 
     public NotificationService(
         NotificationEventRepository eventRepository,
@@ -82,7 +85,8 @@ public class NotificationService {
         UserRepository userRepository,
         ManagerRepository managerRepository,
         BookingRepository bookingRepository,
-        SmartCampusProperties properties
+        SmartCampusProperties properties,
+        EntityManager entityManager
     ) {
         this.eventRepository = eventRepository;
         this.recipientRepository = recipientRepository;
@@ -93,6 +97,7 @@ public class NotificationService {
         this.managerRepository = managerRepository;
         this.bookingRepository = bookingRepository;
         this.properties = properties;
+        this.entityManager = entityManager;
     }
 
     @Transactional(readOnly = true)
@@ -162,8 +167,8 @@ public class NotificationService {
             preference.setEmailEnabled(Boolean.TRUE.equals(categoryRequest.emailEnabled()));
         }
 
-        // Persist explicitly to handle detached instances created via repository merge semantics.
-        preferenceRepository.saveAll(preferences.values());
+        // Flush dirty managed entities directly — avoids merge() semantics that can interfere with @IdClass entities.
+        entityManager.flush();
 
         return toPreferencesResponse(preferences);
     }
@@ -879,7 +884,7 @@ public class NotificationService {
         Map<NotificationDomain, NotificationPreferenceEntity> preferences = new EnumMap<>(NotificationDomain.class);
         preferenceRepository.findByUserId(user.getId()).forEach(preference -> preferences.put(preference.getDomain(), preference));
 
-        List<NotificationPreferenceEntity> created = new ArrayList<>();
+        boolean hasNew = false;
         for (NotificationDomain domain : NotificationDomain.values()) {
             if (preferences.containsKey(domain)) {
                 continue;
@@ -890,14 +895,16 @@ public class NotificationService {
             preference.setDomain(domain);
             preference.setInAppEnabled(defaultInAppEnabled(preferences));
             preference.setEmailEnabled(defaultEmailEnabled(user, preferences));
+            // Use persist() directly so the original object becomes the managed instance.
+            // The repository's save() method calls merge() for @IdClass entities with assigned IDs,
+            // which returns a different managed copy and leaves the original detached.
+            entityManager.persist(preference);
             preferences.put(domain, preference);
-            created.add(preference);
+            hasNew = true;
         }
 
-        if (!created.isEmpty()) {
-            preferenceRepository.saveAllAndFlush(created).forEach(preference ->
-                preferences.put(preference.getDomain(), preference)
-            );
+        if (hasNew) {
+            entityManager.flush();
         }
 
         return preferences;
