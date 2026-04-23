@@ -34,6 +34,8 @@ import com.university.smartcampus.user.entity.UserEntity;
 import com.university.smartcampus.user.repository.ManagerRepository;
 import com.university.smartcampus.user.repository.UserRepository;
 
+import jakarta.persistence.EntityManager;
+
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
@@ -61,6 +63,9 @@ class NotificationServiceTest {
     @Mock
     private BookingRepository bookingRepository;
 
+    @Mock
+    private EntityManager entityManager;
+
     private SmartCampusProperties properties;
     private NotificationService notificationService;
 
@@ -77,7 +82,8 @@ class NotificationServiceTest {
             userRepository,
             managerRepository,
             bookingRepository,
-            properties
+            properties,
+            entityManager
         );
     }
 
