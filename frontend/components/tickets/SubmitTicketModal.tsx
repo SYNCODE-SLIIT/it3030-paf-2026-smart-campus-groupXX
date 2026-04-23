@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Paperclip, TicketPlus, Trash2, Upload } from 'lucide-react';
+import { Paperclip, Search, TicketPlus, Trash2, Upload } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Button, Dialog, Input, Select, Textarea } from '@/components/ui';
 import { createTicket, getErrorMessage, listResourceOptions, uploadTicketAttachment } from '@/lib/api-client';
-import type { ResourceOption, TicketCategory, TicketPriority } from '@/lib/api-types';
+import type { ResourceCategory, ResourceOption, TicketCategory, TicketPriority } from '@/lib/api-types';
+import { getResourceCategoryLabel, resourceCategoryOptions } from '@/lib/resource-display';
 
 const CATEGORY_OPTIONS: { value: TicketCategory; label: string }[] = [
   { value: 'ELECTRICAL', label: 'Electrical' },
@@ -49,6 +50,74 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function normalizeSearchText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function isWithinOneEdit(left: string, right: string): boolean {
+  if (Math.abs(left.length - right.length) > 1) return false;
+  if (left === right) return true;
+
+  let leftIndex = 0;
+  let rightIndex = 0;
+  let edits = 0;
+
+  while (leftIndex < left.length && rightIndex < right.length) {
+    if (left[leftIndex] === right[rightIndex]) {
+      leftIndex += 1;
+      rightIndex += 1;
+      continue;
+    }
+
+    edits += 1;
+    if (edits > 1) return false;
+
+    if (left.length > right.length) {
+      leftIndex += 1;
+    } else if (right.length > left.length) {
+      rightIndex += 1;
+    } else {
+      leftIndex += 1;
+      rightIndex += 1;
+    }
+  }
+
+  if (leftIndex < left.length || rightIndex < right.length) {
+    edits += 1;
+  }
+
+  return edits <= 1;
+}
+
+function tokenMatchesSearchWord(token: string, searchWord: string): boolean {
+  if (token.includes(searchWord) || token.startsWith(searchWord)) return true;
+  return searchWord.length >= 4 && isWithinOneEdit(token, searchWord);
+}
+
+function resourceMatchesSearch(resource: ResourceOption, searchText: string): boolean {
+  const searchWords = normalizeSearchText(searchText).split(' ').filter(Boolean);
+  if (searchWords.length === 0) return true;
+
+  const tokens = [
+    resource.name,
+    resource.code,
+    resource.locationName,
+    resource.subcategory,
+    resource.category,
+    getResourceCategoryLabel(resource.category),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .flatMap((value) => normalizeSearchText(value).split(' ').filter(Boolean));
+
+  return searchWords.every((searchWord) =>
+    tokens.some((token) => tokenMatchesSearchWord(token, searchWord)),
+  );
+}
+
 export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModalProps) {
   const { session } = useAuth();
   const accessToken = session?.access_token ?? null;
@@ -60,8 +129,11 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
   const [resources, setResources] = React.useState<ResourceOption[]>([]);
   const [resourcesLoading, setResourcesLoading] = React.useState(false);
   const [resourceLoadError, setResourceLoadError] = React.useState<string | null>(null);
+  const [resourceCategoryFilter, setResourceCategoryFilter] = React.useState<ResourceCategory | ''>('');
+  const [resourceSearch, setResourceSearch] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const deferredResourceSearch = React.useDeferredValue(resourceSearch);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -100,24 +172,51 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
     };
   }, [accessToken, open]);
 
-  const resourceOptions = React.useMemo(
-    () => [
-      { value: '', label: 'No resource' },
-      ...resources.map((resource) => ({ value: resource.id, label: resource.name })),
-    ],
-    [resources],
-  );
-
   const selectedResource = React.useMemo(
     () => resources.find((resource) => resource.id === s2.resourceId) ?? null,
     [resources, s2.resourceId],
   );
+
+  const filteredResources = React.useMemo(
+    () =>
+      resources.filter((resource) => {
+        if (resourceCategoryFilter && resource.category !== resourceCategoryFilter) return false;
+        return resourceMatchesSearch(resource, deferredResourceSearch);
+      }),
+    [deferredResourceSearch, resourceCategoryFilter, resources],
+  );
+
+  const resourceOptions = React.useMemo(() => {
+    const filteredOptions = filteredResources.map((resource) => ({
+      value: resource.id,
+      label: resource.name,
+    }));
+
+    if (selectedResource && !filteredResources.some((resource) => resource.id === selectedResource.id)) {
+      filteredOptions.unshift({
+        value: selectedResource.id,
+        label: `Selected: ${selectedResource.name}`,
+      });
+    }
+
+    return [{ value: '', label: 'No resource' }, ...filteredOptions];
+  }, [filteredResources, selectedResource]);
+
+  const resourceFilterDisabled = resourcesLoading || Boolean(resourceLoadError);
+  const resourceHelperText = resourceLoadError
+    ?? (resourcesLoading
+      ? 'Loading resources'
+      : filteredResources.length === 0 && (resourceCategoryFilter || resourceSearch.trim())
+        ? 'No resources match the filters'
+        : `Optional · showing ${filteredResources.length} of ${resources.length} resources`);
 
   function reset() {
     setStep(1);
     setS1(INIT_STEP1);
     setS2(INIT_STEP2);
     setFiles([]);
+    setResourceCategoryFilter('');
+    setResourceSearch('');
     setError(null);
     setSubmitting(false);
   }
@@ -314,7 +413,31 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
               placeholder="Select priority"
               options={PRIORITY_OPTIONS}
             />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+              <Select
+                id="st-resource-category"
+                label="Resource Category"
+                value={resourceCategoryFilter}
+                onChange={(e) => {
+                  setResourceCategoryFilter(e.target.value as ResourceCategory | '');
+                }}
+                options={[
+                  { value: '', label: 'All categories' },
+                  ...resourceCategoryOptions,
+                ]}
+                disabled={resourceFilterDisabled}
+              />
+              <Input
+                id="st-resource-search"
+                label="Search Resources"
+                placeholder="Search by name, code, or location"
+                value={resourceSearch}
+                onChange={(e) => setResourceSearch(e.target.value)}
+                iconLeft={<Search size={14} />}
+                disabled={resourceFilterDisabled}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
               <div>
                 <Select
                   id="st-resource"
@@ -325,7 +448,7 @@ export function SubmitTicketModal({ open, onClose, onSuccess }: SubmitTicketModa
                   disabled={resourcesLoading || Boolean(resourceLoadError)}
                 />
                 <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                  {resourceLoadError ?? (resourcesLoading ? 'Loading resources' : 'Optional')}
+                  {resourceHelperText}
                 </p>
               </div>
               <div>
