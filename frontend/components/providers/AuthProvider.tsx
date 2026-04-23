@@ -66,6 +66,18 @@ export function AuthProvider({
     return code === 'refresh_token_not_found' || message.includes('refresh token not found');
   }, []);
 
+  const clearStaleBrowserSession = React.useCallback(async () => {
+    if (!supabase) {
+      return;
+    }
+
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+      // Ignore cleanup failures for stale local auth artifacts.
+    }
+  }, [supabase]);
+
   const getSafeSession = React.useCallback(async () => {
     if (!supabase) {
       return null;
@@ -79,29 +91,55 @@ export function AuthProvider({
 
       if (error) {
         if (isMissingRefreshTokenError(error)) {
-          try {
-            await supabase.auth.signOut({ scope: 'local' });
-          } catch {
-            // Ignore cleanup failures for stale local auth artifacts.
-          }
+          await clearStaleBrowserSession();
         }
 
         return null;
       }
 
-      return currentSession ?? null;
+      if (currentSession) {
+        return currentSession;
+      }
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        if (isMissingRefreshTokenError(userError)) {
+          await clearStaleBrowserSession();
+        }
+
+        return null;
+      }
+
+      if (!user) {
+        return null;
+      }
+
+      const {
+        data: { session: refreshedSession },
+        error: refreshedSessionError,
+      } = await supabase.auth.getSession();
+
+      if (refreshedSessionError) {
+        if (isMissingRefreshTokenError(refreshedSessionError)) {
+          await clearStaleBrowserSession();
+        }
+
+        return null;
+      }
+
+      return refreshedSession ?? null;
     } catch (error) {
       if (isMissingRefreshTokenError(error)) {
-        try {
-          await supabase.auth.signOut({ scope: 'local' });
-        } catch {
-          // Ignore cleanup failures for stale local auth artifacts.
-        }
+        await clearStaleBrowserSession();
       }
 
       return null;
     }
-  }, [isMissingRefreshTokenError, supabase]);
+  }, [clearStaleBrowserSession, isMissingRefreshTokenError, supabase]);
 
   const applyResolvedAuthState = React.useCallback((nextSession: Session | null, nextUser: UserResponse | null) => {
     setSession(nextSession);
@@ -183,6 +221,11 @@ export function AuthProvider({
 
       if (sameInitialUser && initialSession) {
         setSession(initialSession);
+        setLoading(false);
+        return;
+      }
+
+      if (initialAppUser && !initialSession) {
         setLoading(false);
         return;
       }

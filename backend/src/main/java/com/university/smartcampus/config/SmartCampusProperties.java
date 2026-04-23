@@ -211,6 +211,7 @@ public class SmartCampusProperties {
 
     public static class Cors {
         private String allowedOrigins;
+        private String allowedOriginPatterns;
 
         public String getAllowedOrigins() {
             return allowedOrigins;
@@ -218,6 +219,14 @@ public class SmartCampusProperties {
 
         public void setAllowedOrigins(String allowedOrigins) {
             this.allowedOrigins = allowedOrigins;
+        }
+
+        public String getAllowedOriginPatterns() {
+            return allowedOriginPatterns;
+        }
+
+        public void setAllowedOriginPatterns(String allowedOriginPatterns) {
+            this.allowedOriginPatterns = allowedOriginPatterns;
         }
     }
 

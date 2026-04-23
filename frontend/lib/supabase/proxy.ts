@@ -10,6 +10,7 @@ const SESSION_REFRESH_PREFIXES = [
   '/booking-managers',
   '/catalog-managers',
   '/faculty',
+  '/login',
   '/managers',
   '/portal',
   '/student',
