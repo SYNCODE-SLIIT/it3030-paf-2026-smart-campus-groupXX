@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
-import { Alert, Button, Card, Dialog, Skeleton, Tabs } from '@/components/ui';
+import { Alert, Button, Card, Dialog, Tabs } from '@/components/ui';
 import { SubmitTicketModal, TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
 import { assignTicket, deleteTicket, getErrorMessage, listMyTickets, listUsers } from '@/lib/api-client';
 import type { TicketPriority, TicketStatus, TicketSummaryResponse, UserResponse } from '@/lib/api-types';
@@ -203,7 +203,7 @@ export function AdminTicketsScreen() {
         showToast('error', 'Assignment failed', getErrorMessage(err, 'Could not assign ticket.'));
       }
     },
-    [accessToken],
+    [accessToken, showToast],
   );
 
   const queueFiltered = React.useMemo(() => {
@@ -254,7 +254,7 @@ export function AdminTicketsScreen() {
     } finally {
       setDeleting(false);
     }
-  }, [accessToken, deleteConfirmCode]);
+  }, [accessToken, deleteConfirmCode, showToast]);
 
   const handleView = React.useCallback(
     (code: string) => { router.push(`/admin/tickets/${code}`); },

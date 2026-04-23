@@ -38,10 +38,14 @@ yarn-error.log*
 # ==========================================
 # Never commit your Google OAuth secrets or DB passwords
 .env
+.env.*
+.env.example
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.envrc
+.vercel/
 *.pem
 
 # OS specific

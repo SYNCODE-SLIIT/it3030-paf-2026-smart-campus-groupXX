@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 type AvatarShape = 'circle' | 'square';
@@ -64,9 +65,12 @@ export function Avatar({
   if (src) {
     return (
       <span className={className} style={base}>
-        <img
+        <Image
           src={src}
           alt={alt}
+          width={px}
+          height={px}
+          unoptimized
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
       </span>

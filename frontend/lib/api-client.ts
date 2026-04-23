@@ -71,20 +71,14 @@ import {
   type UserResponse,
   type UserType,
 } from '@/lib/api-types';
-import { getServerApiBaseUrl } from '@/lib/backend-url';
+import { requireApiBaseUrl } from '@/lib/backend-url';
 
 function resolveApiBaseUrl() {
-  if (typeof window !== 'undefined') {
-    return '';
-  }
+  return requireApiBaseUrl();
+}
 
-  const apiBaseUrl = getServerApiBaseUrl();
-
-  if (!apiBaseUrl) {
-    throw new Error('API base URL is not configured.');
-  }
-
-  return apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+function buildApiUrl(path: string) {
+  return `${resolveApiBaseUrl()}${path}`;
 }
 
 export class ApiError extends Error {
@@ -119,7 +113,7 @@ const STATUS_MESSAGES: Partial<Record<number, string>> = {
   404: 'The requested item could not be found.',
   409: 'This record conflicts with an existing item.',
   500: 'The server hit an unexpected problem. Please try again.',
-  502: 'The frontend cannot reach the backend service. Please make sure the backend is running.',
+  502: 'The backend service is temporarily unreachable. Please try again.',
   503: 'The service is temporarily unavailable. Please try again shortly.',
   504: 'The backend took too long to respond. Please try again.',
 };
@@ -220,7 +214,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   for (let attempt = 0; attempt <= 1; attempt += 1) {
     try {
-      response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+      response = await fetch(buildApiUrl(path), {
         method: options.method ?? 'GET',
         headers,
         body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -235,7 +229,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       if (error instanceof TypeError) {
         throw new ApiError(
           0,
-          'Cannot reach the backend API. Make sure the backend service is running and reachable at NEXT_PUBLIC_API_URL.',
+          'Cannot reach the backend API. Make sure NEXT_PUBLIC_API_URL points to the running backend service.',
         );
       }
 
@@ -811,6 +805,25 @@ export async function cancelApprovedBookingAsManager(
   });
 }
 
+export async function approvePendingRecurringBooking(accessToken: string, recurringBookingId: string) {
+  return request<RecurringBookingResponse>(`/api/admin/recurring-bookings/${recurringBookingId}/approve-pending`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function cancelFutureRecurringBooking(
+  accessToken: string,
+  recurringBookingId: string,
+  payload?: CancelBookingRequest,
+) {
+  return request<RecurringBookingResponse>(`/api/admin/recurring-bookings/${recurringBookingId}/cancel-future`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
 // Recurring Bookings
 export async function createRecurringBooking(accessToken: string, payload: CreateRecurringBookingRequest) {
   return request<RecurringBookingResponse>('/api/recurring-bookings', {
@@ -987,7 +1000,7 @@ export async function uploadStudentProfileImage(accessToken: string, file: File)
   let response: Response;
 
   try {
-    response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    response = await fetch(buildApiUrl(path), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -1000,7 +1013,7 @@ export async function uploadStudentProfileImage(accessToken: string, file: File)
     if (error instanceof TypeError) {
       throw new ApiError(
         0,
-        'Cannot reach the backend API. Make sure the backend service is running and reachable at NEXT_PUBLIC_API_URL.',
+        'Cannot reach the backend API. Make sure NEXT_PUBLIC_API_URL points to the running backend service.',
       );
     }
 
@@ -1147,7 +1160,7 @@ export async function uploadTicketAttachment(
   let response: Response;
 
   try {
-    response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    response = await fetch(buildApiUrl(path), {
       method: 'POST',
       headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
       body: formData,
@@ -1155,7 +1168,7 @@ export async function uploadTicketAttachment(
     });
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new ApiError(0, 'Cannot reach the backend API. Make sure the backend service is running and reachable at NEXT_PUBLIC_API_URL.');
+      throw new ApiError(0, 'Cannot reach the backend API. Make sure NEXT_PUBLIC_API_URL points to the running backend service.');
     }
     throw error;
   }

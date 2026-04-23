@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Paperclip, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui';
 import type { TicketAttachmentResponse } from '@/lib/api-types';
@@ -115,9 +116,12 @@ export function TicketAttachmentsCard({
                       textDecoration: 'none',
                     }}
                   >
-                    <img
+                    <Image
                       src={a.fileUrl}
                       alt={a.fileName}
+                      width={320}
+                      height={120}
+                      unoptimized
                       style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
                     />
                     <div style={{ padding: '8px 10px' }}>
