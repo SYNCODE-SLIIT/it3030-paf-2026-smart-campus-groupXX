@@ -15,12 +15,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import jakarta.persistence.EntityManager;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import jakarta.persistence.EntityManager;
 
 import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.AppEnums.ResourceStatus;
@@ -168,7 +169,7 @@ public class NotificationService {
         }
 
         // Flush dirty managed entities directly — avoids merge() semantics that can interfere with @IdClass entities.
-        entityManager.flush();
+        preferenceRepository.flush();
 
         return toPreferencesResponse(preferences);
     }

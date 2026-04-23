@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.persistence.EntityManager;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +36,6 @@ import com.university.smartcampus.user.entity.UserEntity;
 import com.university.smartcampus.user.repository.ManagerRepository;
 import com.university.smartcampus.user.repository.UserRepository;
 
-import jakarta.persistence.EntityManager;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
