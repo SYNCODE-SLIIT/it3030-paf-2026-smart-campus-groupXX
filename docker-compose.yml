@@ -2,14 +2,16 @@ services:
   backend:
     image: maven:3.9.6-eclipse-temurin-21
     working_dir: /app
-    command: sh -c "sed -i 's/\r$//' /app/scripts/dev-autoreload.sh && chmod +x /app/scripts/dev-autoreload.sh && /app/scripts/dev-autoreload.sh"
+    command: mvn -q -DskipTests spring-boot:run
     ports:
       - "8080:8080"
     environment:
-      RELOAD_POLL_INTERVAL_SECONDS: "2"
       SPRING_PROFILES_ACTIVE: local
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
+      SPRING_FLYWAY_ENABLED: "false"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      SPRING_MAIN_LAZY_INITIALIZATION: "true"
       MAVEN_OPTS: "-Xms128m -Xmx512m -XX:MaxMetaspaceSize=256m"
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-}
@@ -31,10 +33,10 @@ services:
           "CMD-SHELL",
           "status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/health || true); [ \"$$status\" = \"200\" ]"
         ]
-      interval: 10s
-      timeout: 10s
-      retries: 30
-      start_period: 180s
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
 
   frontend:
     build: ./frontend

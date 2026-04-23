@@ -213,6 +213,51 @@ function AuthCallbackClient() {
         router.replace(toInviteWelcome('wrong_account', undefined, retryState?.remainingAttempts, expectedInviteEmail));
       };
 
+      const isMissingRefreshTokenError = (error: unknown) => {
+        if (!error || typeof error !== 'object') {
+          return false;
+        }
+
+        const maybeError = error as { code?: string; message?: string };
+        const code = maybeError.code?.toLowerCase() ?? '';
+        const message = maybeError.message?.toLowerCase() ?? '';
+
+        return code === 'refresh_token_not_found' || message.includes('refresh token not found');
+      };
+
+      const loadExistingSession = async () => {
+        try {
+          const {
+            data: { session },
+            error,
+          } = await supabase.auth.getSession();
+
+          if (error) {
+            if (isMissingRefreshTokenError(error)) {
+              try {
+                await supabase.auth.signOut({ scope: 'local' });
+              } catch {
+                // Best-effort cleanup only.
+              }
+            }
+
+            return null;
+          }
+
+          return session;
+        } catch (error) {
+          if (isMissingRefreshTokenError(error)) {
+            try {
+              await supabase.auth.signOut({ scope: 'local' });
+            } catch {
+              // Best-effort cleanup only.
+            }
+          }
+
+          return null;
+        }
+      };
+
       try {
         const queryError = searchParams.get('error') ?? hashParams.get('error');
         const queryErrorCode = searchParams.get('error_code') ?? hashParams.get('error_code');
@@ -262,13 +307,6 @@ function AuthCallbackClient() {
         }
 
         let accessToken: string | null = null;
-
-        const loadExistingSession = async () => {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          return session;
-        };
 
         const confirmBrowserSession = async (candidateSession?: Session | null) => {
           const session = await loadExistingSession();
@@ -558,9 +596,7 @@ function AuthCallbackClient() {
         router.replace(nextPath);
       } catch (error) {
         const accessDenied = error instanceof ApiError && (error.status === 401 || error.status === 403);
-        const {
-          data: { session: failedSession },
-        } = await supabase.auth.getSession();
+        const failedSession = await loadExistingSession();
         const inviteFlowState = readInviteFlowState();
         const expectedInviteEmail = resolveInviteExpectedEmail(inviteFlowState?.expectedEmail, queryInviteEmailHint);
         const recoveryFlowState = readRecoveryFlowState();
@@ -645,6 +681,17 @@ function AuthCallbackClient() {
               : isRecoveryFlow
                 ? toRecoveryWelcome('access_denied', expectedRecoveryEmail ?? undefined)
               : '/login?reason=access_denied',
+          );
+          return;
+        }
+
+        if (isMissingRefreshTokenError(error)) {
+          router.replace(
+            isInviteFlow
+              ? toInviteWelcome('auth_required', undefined, undefined, expectedInviteEmail ?? undefined)
+              : isRecoveryFlow
+                ? toRecoveryWelcome('auth_required', expectedRecoveryEmail ?? undefined)
+                : '/login?reason=auth_required',
           );
           return;
         }
