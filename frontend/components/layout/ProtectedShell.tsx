@@ -422,7 +422,7 @@ export function ProtectedShell({
       <div
         style={{
           minHeight: '100vh',
-          background: 'linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%)',
+          background: 'var(--bg)',
         }}
       >
         <Navbar
@@ -446,7 +446,7 @@ export function ProtectedShell({
     <div
       style={{
         minHeight: '100vh',
-        background: 'linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%)',
+        background: 'var(--bg)',
       }}
     >
       <Sidebar

@@ -16,7 +16,7 @@ function LoadingState({ title, message }: { title: string; message: string }) {
       style={{
         minHeight: '100vh',
         padding: '32px 24px 48px',
-        background: 'linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%)',
+        background: 'var(--bg)',
       }}
     >
       <div style={{ maxWidth: 1120, margin: '0 auto', display: 'grid', gap: 20 }}>
