@@ -14,14 +14,7 @@ interface RecurringBookingFormProps {
   isLoading?: boolean;
 }
 
-const DURATION_HINTS: Record<string, string> = {
-  SPACES: 'Max 3 hours',
-  LECTURE_HALL: 'Max 3 hours',
-  LABORATORY: 'Max 3 hours',
-  LIBRARY_SPACE: 'Max 3 hours',
-  MEETING_ROOM: 'Max 3 hours',
-  EVENT_SPACE: 'Max 3 hours',
-};
+const SPACES_DURATION_HINT = 'Max 3 hours';
 
 function normalizeSubcategory(value: string | null) {
   if (!value) {
@@ -76,7 +69,7 @@ export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading 
         (resource) => normalizeSubcategory(resource.subcategory) === normalizeSubcategory(formData.subcategory),
       )
     : categoryFilteredResources;
-  const selectedSubcategoryHint = DURATION_HINTS[normalizeSubcategory(formData.subcategory)] ?? null;
+  const selectedCategoryHint = formData.category === 'SPACES' ? SPACES_DURATION_HINT : null;
 
   function validateForm() {
     const nextErrors: Record<string, string> = {};
@@ -178,8 +171,8 @@ export function RecurringBookingForm({ resources, onSubmit, onCancel, isLoading 
               }))}
               options={[{ value: '', label: 'Select subcategory' }, ...subcategoryOptions]}
             />
-            {selectedSubcategoryHint && (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedSubcategoryHint}</span>
+            {selectedCategoryHint && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedCategoryHint}</span>
             )}
             {errors.subcategory && <span style={{ fontSize: 12, color: 'var(--text-error)' }}>{errors.subcategory}</span>}
           </div>
