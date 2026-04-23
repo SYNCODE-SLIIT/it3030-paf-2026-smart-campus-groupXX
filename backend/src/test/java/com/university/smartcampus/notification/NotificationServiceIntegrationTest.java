@@ -34,7 +34,7 @@ import com.university.smartcampus.user.entity.StudentEntity;
 import com.university.smartcampus.user.entity.UserEntity;
 import com.university.smartcampus.user.repository.UserRepository;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.notifications.email.enabled=true")
 @Transactional
 class NotificationServiceIntegrationTest extends AbstractPostgresIntegrationTest {
 
