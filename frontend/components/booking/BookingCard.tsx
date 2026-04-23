@@ -4,12 +4,14 @@ import React from 'react';
 import { CalendarClock, Clock3, MapPin, UserRound } from 'lucide-react';
 
 import { Button, Chip, Skeleton } from '@/components/ui';
-import type { BookingResponse, BookingStatus, CheckInStatus, ResourceResponse } from '@/lib/api-types';
+import type { BookingResponse, BookingStatus, CheckInStatus, ResourceOption, ResourceResponse } from '@/lib/api-types';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
+
+type BookingCardResource = ResourceResponse | ResourceOption;
 
 interface BookingCardProps {
   booking: BookingResponse;
-  resource?: ResourceResponse | null;
+  resource?: BookingCardResource | null;
   showRequester?: boolean;
   actions?: React.ReactNode;
   onLocation?: () => void;
@@ -95,13 +97,17 @@ function formatRequester(booking: BookingResponse) {
   return booking.requesterRegistrationNumber ?? booking.requesterId.slice(0, 8);
 }
 
-function summarizeLocation(resource?: ResourceResponse | null) {
+function summarizeLocation(resource?: BookingCardResource | null) {
   if (!resource) {
     return 'Location unavailable';
   }
 
-  const locationName = resource.locationDetails?.locationName ?? resource.location ?? 'Location unavailable';
-  const buildingName = resource.locationDetails?.buildingName;
+  const locationName =
+    ('locationDetails' in resource ? resource.locationDetails?.locationName : null)
+    ?? ('location' in resource ? resource.location : null)
+    ?? ('locationName' in resource ? resource.locationName : null)
+    ?? 'Location unavailable';
+  const buildingName = 'locationDetails' in resource ? resource.locationDetails?.buildingName : null;
 
   return buildingName ? `${locationName} · ${buildingName}` : locationName;
 }
@@ -122,7 +128,7 @@ function statusNote(booking: BookingResponse) {
   return 'No purpose provided for this booking.';
 }
 
-function isSpaceResource(resource?: ResourceResponse | null) {
+function isSpaceResource(resource?: BookingCardResource | null) {
   return resource?.category === 'SPACES';
 }
 

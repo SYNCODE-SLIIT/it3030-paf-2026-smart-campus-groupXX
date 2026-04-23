@@ -72,6 +72,22 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
 
     @BeforeEach
     void resetProvider() {
+        entityManager.createNativeQuery("""
+            TRUNCATE TABLE
+                admin_audit_logs,
+                ticket_status_history,
+                ticket_assignment_history,
+                ticket_comments,
+                ticket_attachments,
+                tickets,
+                students,
+                managers,
+                faculty,
+                admins,
+                users
+            RESTART IDENTITY CASCADE
+            """).executeUpdate();
+        entityManager.clear();
         recordingAuthProviderClient.reset();
         recordingAuthIdentityClient.reset();
     }
@@ -398,7 +414,7 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
         AdminEntity adminProfile = new AdminEntity();
         adminProfile.setUser(user);
         adminProfile.setFullName("Admin User");
-        adminProfile.setEmployeeNumber("ADM-001");
+        adminProfile.setEmployeeNumber("ADM-" + UUID.randomUUID().toString().substring(0, 8));
         user.setAdminProfile(adminProfile);
 
         return userRepository.save(user);
@@ -417,7 +433,7 @@ class UserManagementServiceTest extends AbstractPostgresIntegrationTest {
         manager.setUser(user);
         manager.setFirstName("Manager");
         manager.setLastName("User");
-        manager.setEmployeeNumber("MGR-001");
+        manager.setEmployeeNumber("MGR-" + UUID.randomUUID().toString().substring(0, 8));
         manager.setManagerRole(managerRole);
         user.setManagerProfile(manager);
 

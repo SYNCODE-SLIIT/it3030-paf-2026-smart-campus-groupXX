@@ -36,7 +36,7 @@ import {
   listMyBookings,
   listMyRecurringBookings,
   listNotifications,
-  listResources,
+  listResourceOptions,
   requestBookingModification,
 } from '@/lib/api-client';
 import type {
@@ -49,7 +49,6 @@ import type {
   ResourceRemainingRangesResponse,
   ResourceOption,
 } from '@/lib/api-types';
-import { getLocationTypeLabel, getWingLabel } from '@/lib/location-display';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
 
 type TabType = 'bookings' | 'recurring' | 'calendar';
@@ -136,11 +135,11 @@ function canCancelByRequester(booking: BookingResponse) {
   return Number.isFinite(startTime) && startTime > Date.now();
 }
 
-function isSpaceResource(resource?: ResourceResponse | null) {
+function isSpaceResource(resource?: ResourceOption | null) {
   return resource?.category === 'SPACES';
 }
 
-function isCheckInAvailable(booking: BookingResponse, resource?: ResourceResponse | null) {
+function isCheckInAvailable(booking: BookingResponse, resource?: ResourceOption | null) {
   if (!isSpaceResource(resource)) {
     return false;
   }
@@ -236,7 +235,7 @@ export function RequesterBookingsScreenEnhanced({
   const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
-  const [resources, setResources] = React.useState<ResourceResponse[]>([]);
+  const [resources, setResources] = React.useState<ResourceOption[]>([]);
   const [bookings, setBookings] = React.useState<BookingResponse[]>([]);
   const [recurringBookings, setRecurringBookings] = React.useState<RecurringBookingResponse[]>([]);
   const [notifications, setNotifications] = React.useState<NotificationResponse[]>([]);
@@ -459,10 +458,7 @@ export function RequesterBookingsScreenEnhanced({
 
   const selectedCheckInBooking = bookings.find((booking) => booking.id === checkInBookingId) ?? null;
   const selectedLocationResource = locationBooking ? resourceById.get(locationBooking.resource.id) ?? null : null;
-  const selectedLocationDetails = selectedLocationResource?.locationDetails ?? null;
-  const selectedLocationBuildingLabel = selectedLocationDetails?.buildingName
-    ? `${selectedLocationDetails.buildingName}${selectedLocationDetails.buildingCode ? ` (${selectedLocationDetails.buildingCode})` : ''}`
-    : 'N/A';
+  const selectedLocationName = selectedLocationResource?.locationName ?? null;
 
   const bookableResources = React.useMemo(
     () => resources.filter((resource) => resource.status === 'ACTIVE' && resource.bookable),
@@ -521,7 +517,7 @@ export function RequesterBookingsScreenEnhanced({
         booking.resource.code.toLowerCase().includes(needle)
         || booking.resource.name.toLowerCase().includes(needle)
         || (booking.purpose ?? '').toLowerCase().includes(needle)
-        || (resource?.locationDetails?.locationName ?? resource?.location ?? '').toLowerCase().includes(needle)
+        || (resource?.locationName ?? '').toLowerCase().includes(needle)
       );
     });
   }, [bookings, deferredSearch, resourceById]);
@@ -1028,7 +1024,7 @@ export function RequesterBookingsScreenEnhanced({
                     Location
                   </span>
                   <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                    {selectedLocationDetails?.locationName ?? selectedLocationResource.location ?? 'N/A'}
+                    {selectedLocationName ?? 'N/A'}
                   </span>
                 </div>
                 <div style={{ display: 'grid', gap: 4 }}>
@@ -1036,7 +1032,7 @@ export function RequesterBookingsScreenEnhanced({
                     Type
                   </span>
                   <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                    {selectedLocationDetails ? getLocationTypeLabel(selectedLocationDetails.locationType) : 'N/A'}
+                    N/A
                   </span>
                 </div>
                 <div style={{ display: 'grid', gap: 4 }}>
@@ -1044,7 +1040,7 @@ export function RequesterBookingsScreenEnhanced({
                     Building
                   </span>
                   <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                    {selectedLocationBuildingLabel}
+                    N/A
                   </span>
                 </div>
                 <div style={{ display: 'grid', gap: 4 }}>
@@ -1052,7 +1048,7 @@ export function RequesterBookingsScreenEnhanced({
                     Wing
                   </span>
                   <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                    {selectedLocationDetails ? getWingLabel(selectedLocationDetails.wing) : 'N/A'}
+                    N/A
                   </span>
                 </div>
                 <div style={{ display: 'grid', gap: 4 }}>
@@ -1060,7 +1056,7 @@ export function RequesterBookingsScreenEnhanced({
                     Floor
                   </span>
                   <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                    {selectedLocationDetails?.floor ?? 'N/A'}
+                    N/A
                   </span>
                 </div>
                 <div style={{ display: 'grid', gap: 4 }}>
@@ -1068,7 +1064,7 @@ export function RequesterBookingsScreenEnhanced({
                     Room Code
                   </span>
                   <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                    {selectedLocationDetails?.roomCode ?? 'N/A'}
+                    N/A
                   </span>
                 </div>
               </div>

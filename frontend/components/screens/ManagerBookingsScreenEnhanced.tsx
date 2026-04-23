@@ -38,9 +38,8 @@ import type {
   BookingModificationResponse,
   BookingResponse,
   BookingStatus,
-  ResourceResponse,
+  ResourceOption,
 } from '@/lib/api-types';
-import { getLocationTypeLabel, getWingLabel } from '@/lib/location-display';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
 
 type TabType = 'bookings' | 'modifications' | 'checkins';
@@ -90,7 +89,7 @@ function isCheckInWindow(booking: BookingResponse) {
   return startTime <= now && endTime > now;
 }
 
-function isSpaceResource(resource?: ResourceResponse | null) {
+function isSpaceResource(resource?: ResourceOption | null) {
   return resource?.category === 'SPACES';
 }
 
@@ -264,7 +263,7 @@ export function ManagerBookingsScreenEnhanced() {
         || (booking.purpose ?? '').toLowerCase().includes(needle)
         || (booking.requesterRegistrationNumber ?? '').toLowerCase().includes(needle)
         || booking.requesterId.toLowerCase().includes(needle)
-        || (resource?.locationDetails?.locationName ?? resource?.location ?? '').toLowerCase().includes(needle)
+        || (resource?.locationName ?? '').toLowerCase().includes(needle)
       );
     });
   }, [bookings, categoryFilter, deferredSearch, resourceById, resourceFilter, statusFilter, subcategoryFilter]);
@@ -286,10 +285,7 @@ export function ManagerBookingsScreenEnhanced() {
   );
 
   const selectedLocationResource = locationBooking ? resourceById.get(locationBooking.resource.id) ?? null : null;
-  const selectedLocationDetails = selectedLocationResource?.locationDetails ?? null;
-  const selectedLocationBuildingLabel = selectedLocationDetails?.buildingName
-    ? `${selectedLocationDetails.buildingName}${selectedLocationDetails.buildingCode ? ` (${selectedLocationDetails.buildingCode})` : ''}`
-    : 'N/A';
+  const selectedLocationName = selectedLocationResource?.locationName ?? null;
 
   const pendingBookings = bookings.filter((booking) => booking.status === 'PENDING').length;
   const approvedBookings = bookings.filter((booking) => booking.status === 'APPROVED').length;
@@ -712,7 +708,7 @@ export function ManagerBookingsScreenEnhanced() {
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                             {booking?.resource.code ?? shortId(modification.bookingId)}
-                            {resource?.locationDetails?.locationName ? ` · ${resource.locationDetails.locationName}` : ''}
+                            {resource?.locationName ? ` · ${resource.locationName}` : ''}
                           </div>
                         </div>
                         <Chip color="yellow" size="sm" dot>
@@ -968,7 +964,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Location
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  {selectedLocationDetails?.locationName ?? selectedLocationResource.location ?? 'N/A'}
+                  {selectedLocationName ?? 'N/A'}
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -976,7 +972,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Type
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  {selectedLocationDetails ? getLocationTypeLabel(selectedLocationDetails.locationType) : 'N/A'}
+                  N/A
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -984,7 +980,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Building
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  {selectedLocationBuildingLabel}
+                  N/A
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -992,7 +988,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Wing
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  {selectedLocationDetails ? getWingLabel(selectedLocationDetails.wing) : 'N/A'}
+                  N/A
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -1000,7 +996,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Floor
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  {selectedLocationDetails?.floor ?? 'N/A'}
+                  N/A
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -1008,7 +1004,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Room Code
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  {selectedLocationDetails?.roomCode ?? 'N/A'}
+                  N/A
                 </span>
               </div>
             </div>
