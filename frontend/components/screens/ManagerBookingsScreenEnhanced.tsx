@@ -3,10 +3,10 @@
 import React from 'react';
 import { Check, Search, X } from 'lucide-react';
 
+import { BookingAlert as Alert } from '@/components/booking/BookingAlert';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import {
-  Alert,
   Button,
   Card,
   Chip,
@@ -22,9 +22,11 @@ import {
   BookingSection,
 } from '@/components/booking/BookingCard';
 import {
+  approvePendingRecurringBooking,
   approveBooking,
   approveModification,
   cancelApprovedBookingAsManager,
+  cancelFutureRecurringBooking,
   completeBooking,
   getResource,
   getErrorMessage,
@@ -85,12 +87,51 @@ function shortId(value: string) {
   return value.length > 10 ? `${value.slice(0, 8)}...` : value;
 }
 
+function recurrenceLabel(pattern: BookingResponse['recurrencePattern']) {
+  switch (pattern) {
+    case 'DAILY':
+      return 'Daily';
+    case 'WEEKLY':
+      return 'Weekly';
+    case 'BIWEEKLY':
+      return 'Biweekly';
+    case 'MONTHLY':
+      return 'Monthly';
+    default:
+      return 'Recurring';
+  }
+}
+
+function createEmptyStatusCounts(): Record<BookingStatus, number> {
+  return {
+    PENDING: 0,
+    APPROVED: 0,
+    CHECKED_IN: 0,
+    COMPLETED: 0,
+    REJECTED: 0,
+    CANCELLED: 0,
+    NO_SHOW: 0,
+  };
+}
+
 function isCheckInWindow(booking: BookingResponse) {
   const now = Date.now();
   const startTime = new Date(booking.startTime).getTime();
   const endTime = new Date(booking.endTime).getTime();
   return startTime <= now && endTime > now;
 }
+
+type RecurringSeriesSummary = {
+  recurringBookingId: string;
+  recurrencePattern: BookingResponse['recurrencePattern'];
+  resource: BookingResponse['resource'];
+  requesterId: string;
+  requesterRegistrationNumber: string | null;
+  items: BookingResponse[];
+  counts: Record<BookingStatus, number>;
+  firstStartTime: string;
+  lastEndTime: string;
+};
 
 type BookingScreenResource = ResourceOption | ResourceResponse;
 
@@ -123,6 +164,107 @@ function ManagerBookingSectionsSkeleton() {
   );
 }
 
+function RecurringSeriesCard({
+  series,
+  onOpen,
+}: {
+  series: RecurringSeriesSummary;
+  onOpen: () => void;
+}) {
+  const recurrence = recurrenceLabel(series.recurrencePattern);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{
+        width: '100%',
+        minWidth: 320,
+        maxWidth: 340,
+        padding: 0,
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
+        background: 'var(--surface)',
+        boxShadow: 'var(--card-shadow)',
+        cursor: 'pointer',
+        textAlign: 'left',
+        overflow: 'hidden',
+      }}
+      aria-label={`Open recurring series for ${series.resource.name}`}
+    >
+      <div style={{ height: 3, background: 'var(--blue-400)' }} />
+
+      <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)', display: 'grid', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9.5,
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  letterSpacing: '.04em',
+                }}
+              >
+                {series.resource.code}
+              </span>
+              <Chip size="sm" color="blue">
+                {recurrence}
+              </Chip>
+              <Chip size="sm" color="neutral">
+                {series.items.length} shown
+              </Chip>
+            </div>
+            <p
+              style={{
+                margin: '0 0 4px',
+                fontSize: 13.5,
+                fontWeight: 600,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.3,
+                color: 'var(--text-h)',
+              }}
+            >
+              {series.resource.name}
+            </p>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-body)', lineHeight: 1.55 }}>
+              Click to open the full series timeline and bulk actions.
+            </p>
+          </div>
+          <Chip color="blue" size="sm" dot style={{ flexShrink: 0 }}>
+            Series
+          </Chip>
+        </div>
+      </div>
+
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <Chip color="yellow" size="sm">Pending {series.counts.PENDING}</Chip>
+        <Chip color="green" size="sm">Approved {series.counts.APPROVED}</Chip>
+        <Chip color="blue" size="sm">Checked In {series.counts.CHECKED_IN}</Chip>
+        <Chip color="neutral" size="sm">Cancelled {series.counts.CANCELLED}</Chip>
+      </div>
+
+      <div style={{ padding: '12px 16px 14px', display: 'grid', gap: 8, color: 'var(--text-body)', fontSize: 11.5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+          <span>First occurrence</span>
+          <span style={{ color: 'var(--text-h)', fontWeight: 600 }}>{formatDateTime(series.firstStartTime)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+          <span>Latest occurrence</span>
+          <span style={{ color: 'var(--text-h)', fontWeight: 600 }}>{formatDateTime(series.lastEndTime)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+          <span>Requester</span>
+          <span style={{ color: 'var(--text-h)', fontWeight: 600 }}>
+            {series.requesterRegistrationNumber ?? series.requesterId.slice(0, 8)}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export function ManagerBookingsScreenEnhanced() {
   const { session } = useAuth();
   const { showToast } = useToast();
@@ -149,6 +291,9 @@ export function ManagerBookingsScreenEnhanced() {
   } | null>(null);
   const [bookingDecisionReason, setBookingDecisionReason] = React.useState('');
   const [locationBooking, setLocationBooking] = React.useState<BookingResponse | null>(null);
+  const [selectedRecurringBookingId, setSelectedRecurringBookingId] = React.useState<string | null>(null);
+  const [recurringSeriesReason, setRecurringSeriesReason] = React.useState('');
+  const [activeRecurringBookingId, setActiveRecurringBookingId] = React.useState<string | null>(null);
   const [resourceDetailsById, setResourceDetailsById] = React.useState<Record<string, ResourceResponse>>({});
 
   const reload = React.useCallback(async () => {
@@ -301,10 +446,51 @@ export function ManagerBookingsScreenEnhanced() {
     });
   }, [bookings, categoryFilter, deferredSearch, detailedResourceById, resourceById, resourceFilter, statusFilter, subcategoryFilter]);
 
-  const groupedBookings = React.useMemo(
+  const recurringSeriesSummaries = React.useMemo(() => {
+    const grouped = new Map<string, RecurringSeriesSummary>();
+
+    filteredBookings.forEach((booking) => {
+      if (!booking.recurringBookingId) {
+        return;
+      }
+
+      const existing = grouped.get(booking.recurringBookingId);
+      if (existing) {
+        existing.items.push(booking);
+        existing.counts[booking.status] += 1;
+        if (new Date(booking.startTime).getTime() < new Date(existing.firstStartTime).getTime()) {
+          existing.firstStartTime = booking.startTime;
+        }
+        if (new Date(booking.endTime).getTime() > new Date(existing.lastEndTime).getTime()) {
+          existing.lastEndTime = booking.endTime;
+        }
+        return;
+      }
+
+      const counts = createEmptyStatusCounts();
+      counts[booking.status] = 1;
+
+      grouped.set(booking.recurringBookingId, {
+        recurringBookingId: booking.recurringBookingId,
+        recurrencePattern: booking.recurrencePattern,
+        resource: booking.resource,
+        requesterId: booking.requesterId,
+        requesterRegistrationNumber: booking.requesterRegistrationNumber,
+        items: [booking],
+        counts,
+        firstStartTime: booking.startTime,
+        lastEndTime: booking.endTime,
+      });
+    });
+
+    return Array.from(grouped.values())
+      .sort((left, right) => new Date(left.firstStartTime).getTime() - new Date(right.firstStartTime).getTime());
+  }, [filteredBookings]);
+
+  const groupedSingleBookings = React.useMemo(
     () => BOOKING_SECTIONS.map((section) => ({
       ...section,
-      items: filteredBookings.filter((booking) => booking.status === section.status),
+      items: filteredBookings.filter((booking) => !booking.recurringBookingId && booking.status === section.status),
     })).filter((section) => section.items.length > 0),
     [filteredBookings],
   );
@@ -315,6 +501,30 @@ export function ManagerBookingsScreenEnhanced() {
       return isSpaceResource(resource) && (booking.status === 'APPROVED' || booking.checkInStatus);
     }),
     [bookings, detailedResourceById, resourceById],
+  );
+  const selectedRecurringSeriesBookings = React.useMemo(
+    () => selectedRecurringBookingId
+      ? bookings
+        .filter((booking) => booking.recurringBookingId === selectedRecurringBookingId)
+        .sort((left, right) => new Date(left.startTime).getTime() - new Date(right.startTime).getTime())
+      : [],
+    [bookings, selectedRecurringBookingId],
+  );
+  const selectedRecurringSeriesLead = selectedRecurringSeriesBookings[0] ?? null;
+  const selectedRecurringSeriesCounts = React.useMemo(
+    () => selectedRecurringSeriesBookings.reduce<Record<BookingStatus, number>>((accumulator, booking) => {
+      accumulator[booking.status] = (accumulator[booking.status] ?? 0) + 1;
+      return accumulator;
+    }, createEmptyStatusCounts()),
+    [selectedRecurringSeriesBookings],
+  );
+  const selectedRecurringPendingCount = selectedRecurringSeriesCounts.PENDING ?? 0;
+  const selectedRecurringCancelableCount = React.useMemo(
+    () => selectedRecurringSeriesBookings.filter((booking) => {
+      const startTime = new Date(booking.startTime).getTime();
+      return startTime > Date.now() && (booking.status === 'PENDING' || booking.status === 'APPROVED');
+    }).length,
+    [selectedRecurringSeriesBookings],
   );
 
   const selectedLocationResource = locationBooking
@@ -460,6 +670,64 @@ export function ManagerBookingsScreenEnhanced() {
       showToast('error', 'Failed', getErrorMessage(error, 'Could not complete booking.'));
     } finally {
       setActiveBookingId(null);
+    }
+  }
+
+  async function handleApproveRecurringSeries() {
+    if (!accessToken || !selectedRecurringBookingId) {
+      return;
+    }
+
+    setActiveRecurringBookingId(selectedRecurringBookingId);
+    try {
+      await approvePendingRecurringBooking(accessToken, selectedRecurringBookingId);
+      const approvedCount = selectedRecurringPendingCount;
+      setSelectedRecurringBookingId(null);
+      setRecurringSeriesReason('');
+      await reload();
+      showToast(
+        'success',
+        'Series approved',
+        approvedCount === 1
+          ? 'Approved 1 pending occurrence in this series.'
+          : `Approved ${approvedCount} pending occurrences in this series.`,
+      );
+    } catch (error) {
+      showToast('error', 'Series approval failed', getErrorMessage(error, 'Could not approve this recurring series.'));
+    } finally {
+      setActiveRecurringBookingId(null);
+    }
+  }
+
+  async function handleCancelRecurringSeries() {
+    if (!accessToken || !selectedRecurringBookingId) {
+      return;
+    }
+
+    setActiveRecurringBookingId(selectedRecurringBookingId);
+    try {
+      await cancelFutureRecurringBooking(
+        accessToken,
+        selectedRecurringBookingId,
+        recurringSeriesReason.trim() ? { reason: recurringSeriesReason.trim() } : undefined,
+      );
+      const cancelledCount = selectedRecurringCancelableCount;
+      setSelectedRecurringBookingId(null);
+      setRecurringSeriesReason('');
+      await reload();
+      showToast(
+        'success',
+        'Series cancelled',
+        cancelledCount === 0
+          ? 'The recurring series has been deactivated.'
+          : cancelledCount === 1
+            ? 'Cancelled 1 future occurrence and deactivated the series.'
+            : `Cancelled ${cancelledCount} future occurrences and deactivated the series.`,
+      );
+    } catch (error) {
+      showToast('error', 'Series cancellation failed', getErrorMessage(error, 'Could not cancel this recurring series.'));
+    } finally {
+      setActiveRecurringBookingId(null);
     }
   }
 
@@ -639,79 +907,122 @@ export function ManagerBookingsScreenEnhanced() {
                 <Alert variant="info" title="No bookings">
                   No bookings are available yet.
                 </Alert>
-              ) : groupedBookings.length === 0 ? (
+              ) : recurringSeriesSummaries.length === 0 && groupedSingleBookings.length === 0 ? (
                 <Alert variant="info" title="No matches">
                   No bookings match the current filters.
                 </Alert>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 32, minWidth: 0 }}>
-                  {groupedBookings.map((section) => (
-                    <BookingSection
-                      key={section.status}
-                      label={section.label}
-                      color={section.color}
-                      count={section.items.length}
-                    >
-                      {section.items.map((booking) => {
-                        const actionBusy = activeBookingId === booking.id;
-
-                        return (
-                          <div key={booking.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
-                            <BookingCard
-                              booking={booking}
-                              resource={detailedResourceById.get(booking.resource.id) ?? resourceById.get(booking.resource.id)}
-                              showRequester
-                              onLocation={() => setLocationBooking(booking)}
-                              actions={
-                                <>
-                                  {booking.status === 'PENDING' && (
-                                    <>
-                                      <Button
-                                        size="xs"
-                                        variant="success"
-                                        iconLeft={<Check size={13} />}
-                                        loading={actionBusy}
-                                        onClick={() => {
-                                          void handleApproveBooking(booking);
-                                        }}
-                                      >
-                                        Approve
-                                      </Button>
-                                      <Button
-                                        size="xs"
-                                        variant="ghost-danger"
-                                        iconLeft={<X size={13} />}
-                                        loading={actionBusy}
-                                        onClick={() => {
-                                          setBookingDecision({ booking, action: 'reject' });
-                                          setBookingDecisionReason('');
-                                        }}
-                                      >
-                                        Reject
-                                      </Button>
-                                    </>
-                                  )}
-                                  {booking.status === 'APPROVED' && !isCheckInWindow(booking) && new Date(booking.startTime).getTime() > Date.now() && (
-                                    <Button
-                                      size="xs"
-                                      variant="ghost-danger"
-                                      loading={actionBusy}
-                                      onClick={() => {
-                                        setBookingDecision({ booking, action: 'cancelApproved' });
-                                        setBookingDecisionReason('');
-                                      }}
-                                    >
-                                      Cancel
-                                    </Button>
-                                  )}
-                                </>
-                              }
+                  {recurringSeriesSummaries.length > 0 && (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div>
+                        <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
+                          Recurring Series
+                        </p>
+                        <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 12.5 }}>
+                          Series are shown once and open into the full list of occurrences when clicked.
+                        </p>
+                      </div>
+                      <BookingSection
+                        label="Recurring Series"
+                        color="var(--blue-400)"
+                        count={recurringSeriesSummaries.length}
+                      >
+                        {recurringSeriesSummaries.map((series) => (
+                          <div key={series.recurringBookingId} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
+                            <RecurringSeriesCard
+                              series={series}
+                              onOpen={() => {
+                                setSelectedRecurringBookingId(series.recurringBookingId);
+                                setRecurringSeriesReason('');
+                              }}
                             />
                           </div>
-                        );
-                      })}
-                    </BookingSection>
-                  ))}
+                        ))}
+                      </BookingSection>
+                    </div>
+                  )}
+
+                  {groupedSingleBookings.length > 0 && (
+                    <div style={{ display: 'grid', gap: 18 }}>
+                      <div>
+                        <p style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
+                          Single Bookings
+                        </p>
+                        <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 12.5 }}>
+                          One-off bookings remain grouped by their individual status.
+                        </p>
+                      </div>
+
+                      {groupedSingleBookings.map((section) => (
+                        <BookingSection
+                          key={section.status}
+                          label={section.label}
+                          color={section.color}
+                          count={section.items.length}
+                        >
+                          {section.items.map((booking) => {
+                            const actionBusy = activeBookingId === booking.id;
+
+                            return (
+                              <div key={booking.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
+                                <BookingCard
+                                  booking={booking}
+                                  resource={detailedResourceById.get(booking.resource.id) ?? resourceById.get(booking.resource.id)}
+                                  showRequester
+                                  onLocation={() => setLocationBooking(booking)}
+                                  actions={
+                                    <>
+                                      {booking.status === 'PENDING' && (
+                                        <>
+                                          <Button
+                                            size="xs"
+                                            variant="success"
+                                            iconLeft={<Check size={13} />}
+                                            loading={actionBusy}
+                                            onClick={() => {
+                                              void handleApproveBooking(booking);
+                                            }}
+                                          >
+                                            Approve
+                                          </Button>
+                                          <Button
+                                            size="xs"
+                                            variant="ghost-danger"
+                                            iconLeft={<X size={13} />}
+                                            loading={actionBusy}
+                                            onClick={() => {
+                                              setBookingDecision({ booking, action: 'reject' });
+                                              setBookingDecisionReason('');
+                                            }}
+                                          >
+                                            Reject
+                                          </Button>
+                                        </>
+                                      )}
+                                      {booking.status === 'APPROVED' && !isCheckInWindow(booking) && new Date(booking.startTime).getTime() > Date.now() && (
+                                        <Button
+                                          size="xs"
+                                          variant="ghost-danger"
+                                          loading={actionBusy}
+                                          onClick={() => {
+                                            setBookingDecision({ booking, action: 'cancelApproved' });
+                                            setBookingDecisionReason('');
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      )}
+                                    </>
+                                  }
+                                />
+                              </div>
+                            );
+                          })}
+                        </BookingSection>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -832,6 +1143,18 @@ export function ManagerBookingsScreenEnhanced() {
                         onLocation={() => setLocationBooking(booking)}
                         actions={
                           <>
+                            {booking.recurringBookingId && (
+                              <Button
+                                size="xs"
+                                variant="ghost-accent"
+                                onClick={() => {
+                                  setSelectedRecurringBookingId(booking.recurringBookingId);
+                                  setRecurringSeriesReason('');
+                                }}
+                              >
+                                Series
+                              </Button>
+                            )}
                             {inWindow && !booking.checkInStatus && (
                               <>
                                 <Button
@@ -867,6 +1190,126 @@ export function ManagerBookingsScreenEnhanced() {
           )}
         </>
       )}
+
+      <Dialog
+        open={!!selectedRecurringBookingId}
+        onClose={() => {
+          if (activeRecurringBookingId === selectedRecurringBookingId) {
+            return;
+          }
+          setSelectedRecurringBookingId(null);
+          setRecurringSeriesReason('');
+        }}
+        title="Recurring Booking Series"
+        size="sm"
+      >
+        {selectedRecurringSeriesLead && (
+          <div style={{ padding: '20px 24px', display: 'grid', gap: 14 }}>
+            <div
+              style={{
+                display: 'grid',
+                gap: 6,
+                padding: 14,
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
+                background: 'var(--surface-2)',
+              }}
+            >
+              <strong style={{ color: 'var(--text-h)', fontSize: 16 }}>{selectedRecurringSeriesLead.resource.name}</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Chip color="blue" size="sm">
+                  {recurrenceLabel(selectedRecurringSeriesLead.recurrencePattern)}
+                </Chip>
+                <Chip color="neutral" size="sm">
+                  {selectedRecurringSeriesBookings.length} occurrences
+                </Chip>
+              </div>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                {selectedRecurringSeriesLead.resource.code}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Chip color="yellow" size="sm">Pending {selectedRecurringSeriesCounts.PENDING}</Chip>
+              <Chip color="green" size="sm">Approved {selectedRecurringSeriesCounts.APPROVED}</Chip>
+              <Chip color="blue" size="sm">Checked In {selectedRecurringSeriesCounts.CHECKED_IN}</Chip>
+              <Chip color="red" size="sm">Rejected {selectedRecurringSeriesCounts.REJECTED}</Chip>
+              <Chip color="neutral" size="sm">Cancelled {selectedRecurringSeriesCounts.CANCELLED}</Chip>
+            </div>
+
+            <div style={{ display: 'grid', gap: 8, maxHeight: 320, overflowY: 'auto', paddingRight: 4 }}>
+              {selectedRecurringSeriesBookings.map((booking) => (
+                <div
+                  key={booking.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <span style={{ color: 'var(--text-body)', fontSize: 12.5 }}>{formatDateTime(booking.startTime)}</span>
+                  <Chip color={
+                    booking.status === 'PENDING' ? 'yellow'
+                      : booking.status === 'APPROVED' ? 'green'
+                        : booking.status === 'CHECKED_IN' || booking.status === 'COMPLETED' ? 'blue'
+                          : booking.status === 'REJECTED' || booking.status === 'NO_SHOW' ? 'red'
+                            : 'neutral'
+                  } size="sm" dot>
+                    {booking.status.replaceAll('_', ' ')}
+                  </Chip>
+                </div>
+              ))}
+            </div>
+
+            <Textarea
+              label="Series cancellation reason"
+              placeholder="Optional note for cancelling future occurrences"
+              value={recurringSeriesReason}
+              onChange={(event) => setRecurringSeriesReason(event.target.value)}
+              rows={3}
+              disabled={activeRecurringBookingId === selectedRecurringBookingId}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSelectedRecurringBookingId(null);
+                  setRecurringSeriesReason('');
+                }}
+                disabled={activeRecurringBookingId === selectedRecurringBookingId}
+              >
+                Close
+              </Button>
+              <Button
+                variant="success"
+                onClick={() => {
+                  void handleApproveRecurringSeries();
+                }}
+                loading={activeRecurringBookingId === selectedRecurringBookingId}
+                disabled={selectedRecurringPendingCount === 0}
+              >
+                Approve Pending
+              </Button>
+              <Button
+                variant="ghost-danger"
+                onClick={() => {
+                  void handleCancelRecurringSeries();
+                }}
+                loading={activeRecurringBookingId === selectedRecurringBookingId}
+                disabled={selectedRecurringCancelableCount === 0}
+              >
+                Cancel Future
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
 
       <Dialog
         open={!!bookingDecision}

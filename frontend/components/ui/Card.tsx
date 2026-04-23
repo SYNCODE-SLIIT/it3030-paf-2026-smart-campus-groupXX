@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 
 interface CardProps {
   variant?: 'default' | 'dark';
@@ -58,9 +59,12 @@ export function Card({
       }}
     >
       {image && (
-        <img
+        <Image
           src={image}
           alt={imageAlt}
+          width={1200}
+          height={140}
+          unoptimized
           style={{
             width: '100%',
             height: 140,

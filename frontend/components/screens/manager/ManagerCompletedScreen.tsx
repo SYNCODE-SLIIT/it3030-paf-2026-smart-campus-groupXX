@@ -4,10 +4,10 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Chip, Skeleton, Tabs } from '@/components/ui';
+import { Alert, Chip, Tabs } from '@/components/ui';
 import { TicketCard, TicketsSectionSkeleton } from '@/components/tickets';
 import { getErrorMessage, listMyTickets } from '@/lib/api-client';
-import type { TicketPriority, TicketStatus, TicketSummaryResponse } from '@/lib/api-types';
+import type { TicketPriority, TicketSummaryResponse } from '@/lib/api-types';
 
 type CompletedTab = 'RESOLVED' | 'CLOSED' | 'REJECTED';
 

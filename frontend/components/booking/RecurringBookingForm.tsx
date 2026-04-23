@@ -3,7 +3,8 @@
 import React from 'react';
 import { CalendarRange, RotateCw } from 'lucide-react';
 
-import { Alert, Button, Card, Chip, Input, Select, Textarea } from '@/components/ui';
+import { BookingAlert as Alert } from '@/components/booking/BookingAlert';
+import { Button, Card, Chip, Input, Select, Textarea } from '@/components/ui';
 import type { CreateRecurringBookingRequest, RecurrencePattern, ResourceOption } from '@/lib/api-types';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
 

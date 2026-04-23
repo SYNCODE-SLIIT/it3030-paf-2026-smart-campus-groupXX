@@ -9,7 +9,6 @@ import { useToast } from '@/components/providers/ToastProvider';
 import { Alert, Button, Dialog, Skeleton, Textarea } from '@/components/ui';
 import {
   addTicketComment,
-  deleteResource,
   deleteTicketComment,
   getErrorMessage,
   getResource,
@@ -66,7 +65,6 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
   const [commentDeleting, setCommentDeleting] = React.useState<string | null>(null);
 
   const [resource, setResource] = React.useState<ResourceResponse | null>(null);
-  const [deactivatingResource, setDeactivatingResource] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!accessToken) { setLoading(false); setLoadError('Your session is unavailable.'); return; }
@@ -101,20 +99,6 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
   }, [accessToken, ticketRef]);
 
   React.useEffect(() => { void load(); }, [load]);
-
-  async function handleDeactivateResource() {
-    if (!accessToken || !resource) return;
-    setDeactivatingResource(true);
-    try {
-      await deleteResource(accessToken, resource.id);
-      setResource((prev) => prev ? { ...prev, status: 'INACTIVE' } : prev);
-      showToast('success', 'Resource deactivated', `${resource.name} is now inactive.`);
-    } catch (error) {
-      showToast('error', 'Failed', getErrorMessage(error, 'Could not deactivate resource.'));
-    } finally {
-      setDeactivatingResource(false);
-    }
-  }
 
   async function handleStatusChange(newStatus: TicketStatus) {
     if (!accessToken) return;
@@ -278,12 +262,7 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             />
           )}
           {resource && (
-            <TicketResourceCard
-              resource={resource}
-              canDeactivate
-              onDeactivate={() => { void handleDeactivateResource(); }}
-              deactivating={deactivatingResource}
-            />
+            <TicketResourceCard resource={resource} />
           )}
           <TicketDetailsCard ticket={ticket} />
           <TicketLifecycleCard ticket={ticket} history={history} />

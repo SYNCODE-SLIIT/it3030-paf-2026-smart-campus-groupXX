@@ -3,7 +3,8 @@
 import React from 'react';
 import { ArrowRight, CalendarClock, Clock3, FileText, Sparkles } from 'lucide-react';
 
-import { Alert, Button, Card, Chip, Dialog, Input, Textarea } from '@/components/ui';
+import { BookingAlert as Alert } from '@/components/booking/BookingAlert';
+import { Button, Card, Chip, Dialog, Input, Textarea } from '@/components/ui';
 import type { BookingResponse, RequestModificationRequest } from '@/lib/api-types';
 
 interface BookingModificationModalProps {

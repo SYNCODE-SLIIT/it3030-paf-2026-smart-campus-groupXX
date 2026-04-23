@@ -51,7 +51,21 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource(SmartCampusProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(parseCsv(properties.getSecurity().getCors().getAllowedOrigins()));
+        List<String> allowedOrigins = parseCsv(properties.getSecurity().getCors().getAllowedOrigins());
+        List<String> allowedOriginPatterns = parseCsv(properties.getSecurity().getCors().getAllowedOriginPatterns());
+
+        if (allowedOrigins.isEmpty() && allowedOriginPatterns.isEmpty()) {
+            allowedOrigins = List.of("http://localhost:3000");
+        }
+
+        if (!allowedOrigins.isEmpty()) {
+            configuration.setAllowedOrigins(allowedOrigins);
+        }
+
+        if (!allowedOriginPatterns.isEmpty()) {
+            configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+        }
+
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setMaxAge(3600L);
@@ -110,7 +124,7 @@ public class SecurityConfig {
 
     private List<String> parseCsv(String csv) {
         if (!StringUtils.hasText(csv)) {
-            return List.of("http://localhost:3000");
+            return List.of();
         }
 
         return Arrays.stream(csv.split(","))

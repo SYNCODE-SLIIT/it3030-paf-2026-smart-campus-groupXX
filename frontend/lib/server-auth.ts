@@ -39,7 +39,16 @@ export const getServerAuthState = cache(async (): Promise<ServerAuthState> => {
 
     const {
       data: { session },
+      error: sessionError,
     } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      return {
+        accessToken: null,
+        appUser: null,
+        isAuthenticated: false,
+      };
+    }
 
     const accessToken = session?.access_token ?? null;
 

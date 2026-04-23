@@ -54,6 +54,93 @@ export function AuthProvider({
     return value?.trim().toLowerCase() ?? null;
   }, []);
 
+  const isMissingRefreshTokenError = React.useCallback((error: unknown) => {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const maybeError = error as { code?: string; message?: string };
+    const code = maybeError.code?.toLowerCase() ?? '';
+    const message = maybeError.message?.toLowerCase() ?? '';
+
+    return code === 'refresh_token_not_found' || message.includes('refresh token not found');
+  }, []);
+
+  const clearStaleBrowserSession = React.useCallback(async () => {
+    if (!supabase) {
+      return;
+    }
+
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+      // Ignore cleanup failures for stale local auth artifacts.
+    }
+  }, [supabase]);
+
+  const getSafeSession = React.useCallback(async () => {
+    if (!supabase) {
+      return null;
+    }
+
+    try {
+      const {
+        data: { session: currentSession },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (error) {
+        if (isMissingRefreshTokenError(error)) {
+          await clearStaleBrowserSession();
+        }
+
+        return null;
+      }
+
+      if (currentSession) {
+        return currentSession;
+      }
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        if (isMissingRefreshTokenError(userError)) {
+          await clearStaleBrowserSession();
+        }
+
+        return null;
+      }
+
+      if (!user) {
+        return null;
+      }
+
+      const {
+        data: { session: refreshedSession },
+        error: refreshedSessionError,
+      } = await supabase.auth.getSession();
+
+      if (refreshedSessionError) {
+        if (isMissingRefreshTokenError(refreshedSessionError)) {
+          await clearStaleBrowserSession();
+        }
+
+        return null;
+      }
+
+      return refreshedSession ?? null;
+    } catch (error) {
+      if (isMissingRefreshTokenError(error)) {
+        await clearStaleBrowserSession();
+      }
+
+      return null;
+    }
+  }, [clearStaleBrowserSession, isMissingRefreshTokenError, supabase]);
+
   const applyResolvedAuthState = React.useCallback((nextSession: Session | null, nextUser: UserResponse | null) => {
     setSession(nextSession);
     sessionRef.current = nextSession;
@@ -121,9 +208,7 @@ export function AuthProvider({
     let mounted = true;
 
     const bootstrap = async () => {
-      const {
-        data: { session: initialSession },
-      } = await supabase.auth.getSession();
+      const initialSession = await getSafeSession();
 
       if (!mounted) {
         return;
@@ -136,6 +221,11 @@ export function AuthProvider({
 
       if (sameInitialUser && initialSession) {
         setSession(initialSession);
+        setLoading(false);
+        return;
+      }
+
+      if (initialAppUser && !initialSession) {
         setLoading(false);
         return;
       }
@@ -191,7 +281,7 @@ export function AuthProvider({
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [applyResolvedAuthState, initialAppUser, normalizeEmail, resolveAppUser, supabase]);
+  }, [applyResolvedAuthState, getSafeSession, initialAppUser, normalizeEmail, resolveAppUser, supabase]);
 
   const handleGoogleSignIn = React.useCallback(async (options?: { flow?: 'invite' | 'recovery' }) => {
     if (!supabase) {
@@ -286,9 +376,7 @@ export function AuthProvider({
 
       const missingSessionMessage =
         'Your secure session expired. Reopen the invite link or continue with Google/Microsoft to verify again.';
-      const {
-        data: { session: currentSession },
-      } = await supabase.auth.getSession();
+      const currentSession = await getSafeSession();
 
       if (currentSession?.access_token) {
         applyResolvedAuthState(currentSession, appUserRef.current);
@@ -319,7 +407,7 @@ export function AuthProvider({
         throw new Error(error.message);
       }
     },
-    [applyResolvedAuthState, supabase],
+    [applyResolvedAuthState, getSafeSession, supabase],
   );
 
   const handleSignOut = React.useCallback(async () => {
@@ -349,9 +437,7 @@ export function AuthProvider({
       return null;
     }
 
-    const {
-      data: { session: currentSession },
-    } = await supabase.auth.getSession();
+    const currentSession = await getSafeSession();
 
     if (!currentSession?.access_token) {
       hydrationTokenRef.current = null;
@@ -361,7 +447,7 @@ export function AuthProvider({
     }
 
     return resolveAppUser(currentSession);
-  }, [applyResolvedAuthState, resolveAppUser, supabase]);
+  }, [applyResolvedAuthState, getSafeSession, resolveAppUser, supabase]);
 
   const value = React.useMemo<AuthContextValue>(
     () => ({

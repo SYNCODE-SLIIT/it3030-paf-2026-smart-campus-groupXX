@@ -485,6 +485,8 @@ export interface BookingResponse {
   resource: ResourceSummary;
   requesterId: string;
   requesterRegistrationNumber: string | null;
+  recurringBookingId: string | null;
+  recurrencePattern: RecurrencePattern | null;
   status: BookingStatus;
   startTime: string;
   endTime: string;
