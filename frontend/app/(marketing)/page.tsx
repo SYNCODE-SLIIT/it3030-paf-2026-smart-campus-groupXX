@@ -2,6 +2,7 @@ import { ArrowRight, Building2, CalendarDays, ShieldCheck, Wrench } from 'lucide
 import { redirect } from 'next/navigation';
 
 import { ButtonLink } from '@/components/marketing/ButtonLink';
+import { HeroDotsBackdrop } from '@/components/marketing/HeroDotsBackdrop';
 import { Reveal } from '@/components/marketing/Reveal';
 import { Card, Chip } from '@/components/ui';
 import { getUserHomePath, needsStudentOnboarding, STUDENT_ONBOARDING_PATH } from '@/lib/auth-routing';
@@ -111,71 +112,94 @@ export default async function HomePage() {
 
   return (
     <div style={{ paddingBottom: 88 }}>
-      <SectionShell topPadding="clamp(32px, 5vw, 48px)" bottomPadding="clamp(72px, 10vw, 112px)">
-        <div
+      <section
+        style={{
+          width: '100%',
+          marginTop: -104,
+        }}
+      >
+        <HeroDotsBackdrop
           style={{
-            minHeight: 'calc(100vh - 180px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px 0',
+            minHeight: '100svh',
+            paddingTop: 'calc(104px + clamp(32px, 5vw, 48px))',
+            paddingBottom: 'clamp(72px, 10vw, 112px)',
+            width: '100%',
           }}
         >
-          <Reveal
+          <div
             style={{
               width: '100%',
-              maxWidth: 896,
+              maxWidth: 1360,
               margin: '0 auto',
-              display: 'grid',
-              gap: 30,
-              justifyItems: 'center',
-              textAlign: 'center',
+              padding: '0 clamp(16px, 2vw, 32px)',
             }}
           >
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
-              <Chip color="glass" dot>University Operations</Chip>
-              <Chip color="blue">Resource Visibility</Chip>
-              <Chip color="yellow">Booking Coordination</Chip>
-            </div>
-
-            <div style={{ display: 'grid', gap: 18, justifyItems: 'center' }}>
-              <h1
+            <div
+              style={{
+                minHeight: 'calc(100svh - (104px + clamp(32px, 5vw, 48px) + clamp(72px, 10vw, 112px)))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 0',
+              }}
+            >
+              <Reveal
                 style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 'clamp(48px, 7vw, 72px)',
-                  lineHeight: 1.08,
-                  fontWeight: 900,
-                  letterSpacing: '-0.06em',
-                  color: 'var(--text-h)',
-                  maxWidth: 820,
+                  width: '100%',
+                  maxWidth: 896,
+                  margin: '0 auto',
+                  display: 'grid',
+                  gap: 30,
+                  justifyItems: 'center',
+                  textAlign: 'center',
                 }}
               >
-                Smart Campus Management Platform
-              </h1>
-              <p
-                style={{
-                  maxWidth: 760,
-                  fontSize: 17,
-                  lineHeight: 1.8,
-                  color: 'var(--text-body)',
-                }}
-              >
-                Discover campus resources, request bookings, report maintenance issues, and manage operations through
-                one connected university platform built for real campus workflows.
-              </p>
-            </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                  <Chip color="glass" dot>University Operations</Chip>
+                  <Chip color="blue">Resource Visibility</Chip>
+                  <Chip color="yellow">Booking Coordination</Chip>
+                </div>
 
-            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <ButtonLink href="/resources" size="lg" variant="glass" iconRight={<ArrowRight size={16} />}>
-                Explore Resources
-              </ButtonLink>
-              <ButtonLink href="/login" size="lg" variant="subtle">
-                Sign In
-              </ButtonLink>
+                <div style={{ display: 'grid', gap: 18, justifyItems: 'center' }}>
+                  <h1
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 'clamp(48px, 7vw, 72px)',
+                      lineHeight: 1.08,
+                      fontWeight: 900,
+                      letterSpacing: '-0.06em',
+                      color: 'var(--text-h)',
+                      maxWidth: 820,
+                    }}
+                  >
+                    Smart Campus Management Platform
+                  </h1>
+                  <p
+                    style={{
+                      maxWidth: 760,
+                      fontSize: 17,
+                      lineHeight: 1.8,
+                      color: 'var(--text-body)',
+                    }}
+                  >
+                    Discover campus resources, request bookings, report maintenance issues, and manage operations through
+                    one connected university platform built for real campus workflows.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <ButtonLink href="/resources" size="lg" variant="glass" iconRight={<ArrowRight size={16} />}>
+                    Explore Resources
+                  </ButtonLink>
+                  <ButtonLink href="/login" size="lg" variant="subtle">
+                    Sign In
+                  </ButtonLink>
+                </div>
+              </Reveal>
             </div>
-          </Reveal>
-        </div>
-      </SectionShell>
+          </div>
+        </HeroDotsBackdrop>
+      </section>
 
       <SectionShell>
         <Reveal>
