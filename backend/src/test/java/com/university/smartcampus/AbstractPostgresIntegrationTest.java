@@ -1,5 +1,7 @@
 package com.university.smartcampus;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -35,9 +37,14 @@ public abstract class AbstractPostgresIntegrationTest {
 
     protected RequestPostProcessor jwtFor(String email) {
         return jwt().jwt(jwt -> jwt
-            .subject(UUID.randomUUID().toString())
+            .subject(authUserIdFor(email).toString())
             .claim("email", email)
         );
+    }
+
+    protected UUID authUserIdFor(String email) {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        return UUID.nameUUIDFromBytes(("test-auth:" + normalizedEmail).getBytes(StandardCharsets.UTF_8));
     }
 
     private static org.testcontainers.containers.PostgreSQLContainer<?> getPostgresql() {

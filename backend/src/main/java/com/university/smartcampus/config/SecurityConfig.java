@@ -36,7 +36,11 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/health", "/api/auth/login-link/request").permitAll()
+                .requestMatchers(
+                    "/api/health",
+                    "/api/auth/login-link/request",
+                    "/api/auth/password-reset/request"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));

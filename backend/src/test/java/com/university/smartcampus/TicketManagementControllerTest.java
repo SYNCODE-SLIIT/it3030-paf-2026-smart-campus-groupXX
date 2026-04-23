@@ -1664,6 +1664,7 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     private void seedAdmin(String email) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
+        user.setAuthUserId(authUserIdFor(email));
         user.setEmail(email);
         user.setUserType(UserType.ADMIN);
         user.setAccountStatus(AccountStatus.ACTIVE);
@@ -1682,6 +1683,7 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     private UserEntity seedFaculty(String email) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
+        user.setAuthUserId(authUserIdFor(email));
         user.setEmail(email);
         user.setUserType(UserType.FACULTY);
         user.setAccountStatus(AccountStatus.ACTIVE);
@@ -1701,6 +1703,7 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     private UserEntity seedStudent(String email) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
+        user.setAuthUserId(authUserIdFor(email));
         user.setEmail(email);
         user.setUserType(UserType.STUDENT);
         user.setAccountStatus(AccountStatus.ACTIVE);
@@ -1722,6 +1725,9 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
     private UserEntity seedManager(String email, ManagerRole role, AccountStatus status) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
+        if (status == AccountStatus.ACTIVE || status == AccountStatus.SUSPENDED) {
+            user.setAuthUserId(authUserIdFor(email));
+        }
         user.setEmail(email);
         user.setUserType(UserType.MANAGER);
         user.setAccountStatus(status);

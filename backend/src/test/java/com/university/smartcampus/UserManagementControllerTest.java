@@ -777,6 +777,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     private void seedAdmin(String email) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
+        user.setAuthUserId(authUserIdFor(email));
         user.setEmail(email);
         user.setUserType(UserType.ADMIN);
         user.setAccountStatus(AccountStatus.ACTIVE);
@@ -786,7 +787,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         AdminEntity admin = new AdminEntity();
         admin.setUser(user);
         admin.setFullName("Admin User");
-        admin.setEmployeeNumber("ADM-001");
+        admin.setEmployeeNumber("ADM-" + UUID.randomUUID().toString().substring(0, 8));
         user.setAdminProfile(admin);
 
         userRepository.save(user);
@@ -795,6 +796,9 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     private UserEntity seedStudent(String email, AccountStatus status, boolean onboardingCompleted) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
+        if (status == AccountStatus.ACTIVE || status == AccountStatus.SUSPENDED) {
+            user.setAuthUserId(authUserIdFor(email));
+        }
         user.setEmail(email);
         user.setUserType(UserType.STUDENT);
         user.setAccountStatus(status);
@@ -820,7 +824,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         faculty.setUser(user);
         faculty.setFirstName("Faculty");
         faculty.setLastName("Member");
-        faculty.setEmployeeNumber("FAC-001");
+        faculty.setEmployeeNumber("FAC-" + UUID.randomUUID().toString().substring(0, 8));
         faculty.setDepartment("Computing");
         faculty.setDesignation("Lecturer");
         user.setFacultyProfile(faculty);
@@ -831,6 +835,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
     private UserEntity seedManager(String email, ManagerRole role) {
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
+        user.setAuthUserId(authUserIdFor(email));
         user.setEmail(email);
         user.setUserType(UserType.MANAGER);
         user.setAccountStatus(AccountStatus.ACTIVE);
@@ -841,7 +846,7 @@ class UserManagementControllerTest extends AbstractPostgresIntegrationTest {
         manager.setUser(user);
         manager.setFirstName("Manager");
         manager.setLastName("User");
-        manager.setEmployeeNumber("MGR-001");
+        manager.setEmployeeNumber("MGR-" + UUID.randomUUID().toString().substring(0, 8));
         manager.setManagerRole(role);
 
         user.setManagerProfile(manager);
