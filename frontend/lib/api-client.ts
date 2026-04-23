@@ -41,7 +41,11 @@ import {
   type RequestModificationRequest,
   type ResourceRemainingRangesResponse,
   type ResourceFeatureOption,
+  type ResourceListPage,
+  type ResourceLookups,
+  type ResourceOption,
   type ResourceResponse,
+  type ResourceStats,
   type ResourceTypeOption,
   type SessionSyncResponse,
   type StudentOnboardingRequest,
@@ -311,6 +315,11 @@ export async function getCurrentUser(accessToken: string) {
   });
 }
 
+function clearResourceReadCaches() {
+  resourceLookupsCache.clear();
+  resourceOptionsCache.clear();
+}
+
 export interface UserFilters {
   email?: string;
   userType?: UserType | '';
@@ -463,14 +472,120 @@ export async function completeStudentOnboarding(accessToken: string, payload: St
   });
 }
 
-export async function listResources(accessToken: string) {
-  return request<ResourceResponse[]>('/api/resources', {
+const resourceLookupsCache = new Map<string, Promise<ResourceLookups>>();
+const resourceOptionsCache = new Map<string, Promise<ResourceOption[]>>();
+
+export interface ResourceListFilters {
+  search?: string;
+  category?: string;
+  status?: string;
+  location?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface ResourceOptionFilters {
+  status?: string;
+  bookable?: boolean;
+}
+
+function buildResourceListQuery(filters: ResourceListFilters) {
+  const params = new URLSearchParams();
+
+  if (filters.search?.trim()) {
+    params.set('search', filters.search.trim());
+  }
+  if (filters.category) {
+    params.set('category', filters.category);
+  }
+  if (filters.status) {
+    params.set('status', filters.status);
+  }
+  if (filters.location?.trim()) {
+    params.set('location', filters.location.trim());
+  }
+  if (filters.page !== undefined) {
+    params.set('page', String(filters.page));
+  }
+  if (filters.size !== undefined) {
+    params.set('size', String(filters.size));
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
+function buildResourceOptionQuery(filters: ResourceOptionFilters) {
+  const params = new URLSearchParams();
+
+  if (filters.status) {
+    params.set('status', filters.status);
+  }
+  if (filters.bookable !== undefined) {
+    params.set('bookable', String(filters.bookable));
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
+export async function listResourcePage(accessToken: string, filters: ResourceListFilters = {}) {
+  return request<ResourceListPage>(`/api/resources${buildResourceListQuery(filters)}`, {
     accessToken,
   });
 }
 
+export async function listResources(accessToken: string, filters: ResourceListFilters = {}) {
+  const page = await listResourcePage(accessToken, { size: 300, ...filters });
+  return page.items;
+}
+
 export async function getResource(accessToken: string, resourceId: string) {
   return request<ResourceResponse>(`/api/resources/${resourceId}`, { accessToken });
+}
+
+export async function listResourceOptions(accessToken: string, filters: ResourceOptionFilters = {}) {
+  const query = buildResourceOptionQuery(filters);
+  const cacheKey = `${accessToken}:${query}`;
+  const cached = resourceOptionsCache.get(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const pending = request<ResourceOption[]>(`/api/resources/options${query}`, {
+    accessToken,
+  }).catch((error) => {
+    resourceOptionsCache.delete(cacheKey);
+    throw error;
+  });
+
+  resourceOptionsCache.set(cacheKey, pending);
+  return pending;
+}
+
+export async function getResourceStats(accessToken: string) {
+  return request<ResourceStats>('/api/resources/stats', {
+    accessToken,
+  });
+}
+
+export async function getResourceLookups(accessToken: string) {
+  const cached = resourceLookupsCache.get(accessToken);
+
+  if (cached) {
+    return cached;
+  }
+
+  const pending = request<ResourceLookups>('/api/resources/lookups', {
+    accessToken,
+  }).catch((error) => {
+    resourceLookupsCache.delete(accessToken);
+    throw error;
+  });
+
+  resourceLookupsCache.set(accessToken, pending);
+  return pending;
 }
 
 export async function listResourceTypeOptions(accessToken: string) {
@@ -498,26 +613,32 @@ export async function listManagedByRoleOptions(accessToken: string) {
 }
 
 export async function createResource(accessToken: string, payload: CreateResourceRequest) {
-  return request<ResourceResponse>('/api/resources', {
+  const resource = await request<ResourceResponse>('/api/resources', {
     method: 'POST',
     accessToken,
     body: payload,
   });
+  clearResourceReadCaches();
+  return resource;
 }
 
 export async function updateResource(accessToken: string, resourceId: string, payload: UpdateResourceRequest) {
-  return request<ResourceResponse>(`/api/resources/${resourceId}`, {
+  const resource = await request<ResourceResponse>(`/api/resources/${resourceId}`, {
     method: 'PATCH',
     accessToken,
     body: payload,
   });
+  clearResourceReadCaches();
+  return resource;
 }
 
 export async function deleteResource(accessToken: string, resourceId: string) {
-  return request<MessageResponse>(`/api/resources/${resourceId}`, {
+  const response = await request<MessageResponse>(`/api/resources/${resourceId}`, {
     method: 'DELETE',
     accessToken,
   });
+  clearResourceReadCaches();
+  return response;
 }
 
 export async function listBuildings(accessToken: string) {

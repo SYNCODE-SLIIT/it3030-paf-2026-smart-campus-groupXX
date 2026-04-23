@@ -9,12 +9,11 @@ import { Alert, Button, Card, Chip, IconButton, Input, Select, Table, TableBody,
 import {
   createResource,
   deleteResource,
+  getResource,
   getErrorMessage,
-  listLocationOptions,
-  listManagedByRoleOptions,
-  listResourceFeatureOptions,
-  listResources,
-  listResourceTypeOptions,
+  getResourceLookups,
+  getResourceStats,
+  listResourcePage,
   updateResource,
 } from '@/lib/api-client';
 import type {
@@ -22,7 +21,10 @@ import type {
   LocationOption,
   ManagedByRoleOption,
   ResourceFeatureOption,
+  ResourceListItem,
+  ResourceListPage,
   ResourceResponse,
+  ResourceStats,
   ResourceTypeOption,
   UpdateResourceRequest,
 } from '@/lib/api-types';
@@ -37,20 +39,26 @@ import {
 } from '@/lib/resource-display';
 import { ResourceFormModal } from '@/components/screens/admin/resources/ResourceFormModal';
 
+const RESOURCE_PAGE_SIZE = 50;
+
 export function AdminResourcesScreen({
   embedded = false,
   addOpen,
   onAddOpenChange,
+  onResourcesChanged,
 }: {
   embedded?: boolean;
   addOpen?: boolean;
   onAddOpenChange?: (open: boolean) => void;
+  onResourcesChanged?: () => void;
 }) {
   const { session } = useAuth();
   const { showToast } = useToast();
   const accessToken = session?.access_token ?? null;
 
-  const [resources, setResources] = React.useState<ResourceResponse[]>([]);
+  const [resources, setResources] = React.useState<ResourceListItem[]>([]);
+  const [resourcePage, setResourcePage] = React.useState<ResourceListPage | null>(null);
+  const [stats, setStats] = React.useState<ResourceStats | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [lookupLoading, setLookupLoading] = React.useState(true);
@@ -72,8 +80,14 @@ export function AdminResourcesScreen({
   }
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [page, setPage] = React.useState(0);
 
   const deferredSearch = React.useDeferredValue(searchText);
+
+  React.useEffect(() => {
+    setPage(0);
+  }, [categoryFilter, deferredSearch, statusFilter]);
 
   const reloadResources = React.useCallback(async () => {
     if (!accessToken) {
@@ -86,15 +100,35 @@ export function AdminResourcesScreen({
     setLoadError(null);
 
     try {
-      const nextResources = await listResources(accessToken);
-      setResources(nextResources);
+      const nextPage = await listResourcePage(accessToken, {
+        search: deferredSearch,
+        category: categoryFilter,
+        status: statusFilter,
+        page,
+        size: RESOURCE_PAGE_SIZE,
+      });
+      setResourcePage(nextPage);
+      setResources(nextPage.items);
     } catch (error) {
       setResources([]);
+      setResourcePage(null);
       setLoadError(getErrorMessage(error, 'We could not load resources.'));
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, categoryFilter, deferredSearch, page, statusFilter]);
+
+  const loadStats = React.useCallback(async () => {
+    if (!accessToken || embedded) {
+      return;
+    }
+
+    try {
+      setStats(await getResourceStats(accessToken));
+    } catch {
+      setStats(null);
+    }
+  }, [accessToken, embedded]);
 
   const loadLookups = React.useCallback(async () => {
     if (!accessToken) {
@@ -107,17 +141,12 @@ export function AdminResourcesScreen({
     setLookupError(null);
 
     try {
-      const [types, locations, features, managedRoles] = await Promise.all([
-        listResourceTypeOptions(accessToken),
-        listLocationOptions(accessToken),
-        listResourceFeatureOptions(accessToken),
-        listManagedByRoleOptions(accessToken),
-      ]);
+      const lookups = await getResourceLookups(accessToken);
 
-      setResourceTypeOptions(types);
-      setLocationOptions(locations);
-      setFeatureOptions(features);
-      setManagedByRoleOptions(managedRoles);
+      setResourceTypeOptions(lookups.types);
+      setLocationOptions(lookups.locations);
+      setFeatureOptions(lookups.features);
+      setManagedByRoleOptions(lookups.managedRoles);
     } catch (error) {
       setLookupError(getErrorMessage(error, 'We could not load catalogue lookup data.'));
       setResourceTypeOptions([]);
@@ -134,37 +163,12 @@ export function AdminResourcesScreen({
   }, [reloadResources]);
 
   React.useEffect(() => {
+    void loadStats();
+  }, [loadStats]);
+
+  React.useEffect(() => {
     void loadLookups();
   }, [loadLookups]);
-
-  const filteredResources = React.useMemo(() => {
-    const needle = deferredSearch.trim().toLowerCase();
-    return resources.filter((resource) => {
-      const normalizedCategory = resource.resourceType?.category ?? resource.category;
-      const normalizedLocation = resource.locationDetails?.locationName ?? resource.location;
-
-      if (needle) {
-        const haystack = [
-          resource.code,
-          resource.name,
-          resource.description,
-          normalizedLocation,
-          resource.subcategory,
-          resource.resourceType?.name,
-          ...(resource.features ?? []).map((feature) => feature.name),
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-
-        if (!haystack.includes(needle)) return false;
-      }
-
-      if (categoryFilter && normalizedCategory !== categoryFilter) return false;
-      if (statusFilter && resource.status !== statusFilter) return false;
-      return true;
-    });
-  }, [categoryFilter, deferredSearch, resources, statusFilter]);
 
   async function handleSave(payload: CreateResourceRequest | UpdateResourceRequest) {
     if (!accessToken) {
@@ -184,7 +188,8 @@ export function AdminResourcesScreen({
 
       setFormOpen(false);
       setEditingResource(null);
-      await reloadResources();
+      await Promise.all([reloadResources(), loadStats()]);
+      onResourcesChanged?.();
     } catch (error) {
       showToast('error', 'Save failed', getErrorMessage(error, 'We could not save the resource.'));
     } finally {
@@ -192,7 +197,7 @@ export function AdminResourcesScreen({
     }
   }
 
-  async function handleDelete(resource: ResourceResponse) {
+  async function handleDelete(resource: ResourceListItem) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
@@ -205,13 +210,42 @@ export function AdminResourcesScreen({
     try {
       await deleteResource(accessToken, resource.id);
       showToast('success', 'Resource removed', `${resource.code} is now inactive.`);
-      await reloadResources();
+      await Promise.all([reloadResources(), loadStats()]);
+      onResourcesChanged?.();
     } catch (error) {
       showToast('error', 'Delete failed', getErrorMessage(error, 'We could not remove the resource.'));
     } finally {
       setDeletingId(null);
     }
   }
+
+  async function handleEdit(resource: ResourceListItem) {
+    if (!accessToken) {
+      showToast('error', 'Session unavailable', 'Please sign in again.');
+      return;
+    }
+
+    setEditingId(resource.id);
+    try {
+      setEditingResource(await getResource(accessToken, resource.id));
+      setFormOpen(true);
+    } catch (error) {
+      showToast('error', 'Load failed', getErrorMessage(error, 'We could not load this resource.'));
+    } finally {
+      setEditingId(null);
+    }
+  }
+
+  const totalResources = stats?.totalResources ?? resourcePage?.totalItems ?? resources.length;
+  const activeResources = stats?.activeResources ?? 0;
+  const maintenanceResources = stats?.maintenanceResources ?? 0;
+  const outOfServiceResources = stats?.outOfServiceResources ?? 0;
+  const pageStart = resourcePage && resourcePage.totalItems > 0
+    ? resourcePage.page * resourcePage.size + 1
+    : 0;
+  const pageEnd = resourcePage
+    ? Math.min((resourcePage.page + 1) * resourcePage.size, resourcePage.totalItems)
+    : resources.length;
 
   return (
     <div style={{ display: 'grid', gap: embedded ? 16 : 28 }}>
@@ -231,19 +265,19 @@ export function AdminResourcesScreen({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
             <Card hoverable>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{resources.length}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{totalResources}</div>
               <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Total resources</div>
             </Card>
             <Card hoverable>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{resources.filter((item) => item.status === 'ACTIVE').length}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{activeResources}</div>
               <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Active resources</div>
             </Card>
             <Card hoverable>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{resources.filter((item) => item.status === 'MAINTENANCE').length}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{maintenanceResources}</div>
               <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>In maintenance</div>
             </Card>
             <Card hoverable>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{resources.filter((item) => item.status === 'OUT_OF_SERVICE').length}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{outOfServiceResources}</div>
               <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Out of service</div>
             </Card>
           </div>
@@ -342,15 +376,15 @@ export function AdminResourcesScreen({
                   <TableRow>
                     <TableCell colSpan={7}>Loading resources…</TableCell>
                   </TableRow>
-                ) : filteredResources.length === 0 ? (
+                ) : resources.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>No resources match the current filters.</TableCell>
                   </TableRow>
                 ) : (
-                  filteredResources.map((resource) => {
-                    const category = resource.resourceType?.category ?? resource.category;
-                    const location = resource.locationDetails?.locationName ?? resource.location;
-                    const resourceTypeName = resource.resourceType?.name ?? resource.subcategory;
+                  resources.map((resource) => {
+                    const category = resource.category;
+                    const location = resource.locationName ?? resource.location;
+                    const resourceTypeName = resource.resourceTypeName ?? resource.subcategory;
 
                     return (
                       <TableRow key={resource.id}>
@@ -373,10 +407,8 @@ export function AdminResourcesScreen({
                               icon={<Pencil size={13} />}
                               title="Edit resource"
                               aria-label={`Edit ${resource.code}`}
-                              onClick={() => {
-                                setEditingResource(resource);
-                                setFormOpen(true);
-                              }}
+                              loading={editingId === resource.id}
+                              onClick={() => void handleEdit(resource)}
                             />
                             <IconButton
                               variant="warning"
@@ -395,6 +427,32 @@ export function AdminResourcesScreen({
               </TableBody>
             </Table>
           </div>
+
+          {resourcePage && resourcePage.totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                Showing {pageStart}-{pageEnd} of {resourcePage.totalItems}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  disabled={resourcePage.page <= 0 || loading}
+                  onClick={() => setPage((current) => Math.max(current - 1, 0))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  disabled={resourcePage.page >= resourcePage.totalPages - 1 || loading}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
     </div>

@@ -5,8 +5,6 @@ import {
   CheckCircle2,
   Shield,
   User,
-  Mail,
-  MessageSquare,
   ZoomIn,
   ImageUp,
   Crop,
@@ -14,7 +12,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Chip, Dialog, Input, Select, Skeleton, Toggle } from '@/components/ui';
+import { Alert, Button, Card, Chip, Dialog, Input, Select, Skeleton } from '@/components/ui';
 import {
   completeStudentOnboarding,
   getErrorMessage,
@@ -674,7 +672,12 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
       return null;
     }
 
-    return { facultyName, programName, academicYear, semester };
+    return {
+      facultyName: facultyName as StudentFaculty,
+      programName: programName as StudentProgram,
+      academicYear: academicYear as AcademicYear,
+      semester: semester as Semester,
+    };
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -780,9 +783,6 @@ export function StudentOnboardingScreen({ user }: { user?: UserResponse }) {
     : portraitPreviewUrl
       ? { color: 'blue', label: 'Portrait Added' }
       : { color: 'neutral', label: 'Portrait Optional' };
-  const profileInitials =
-    `${formState.firstName?.[0] ?? resolvedUser.email[0] ?? 'S'}${formState.lastName?.[0] ?? ''}`.toUpperCase();
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       <style>{`

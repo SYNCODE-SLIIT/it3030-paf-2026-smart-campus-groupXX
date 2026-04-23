@@ -29,7 +29,7 @@ import {
   getErrorMessage,
   listAllBookings,
   listPendingModifications,
-  listResources,
+  listResourceOptions,
   markBookingAsNoShow,
   rejectBooking,
   rejectModification,
@@ -122,7 +122,7 @@ export function ManagerBookingsScreenEnhanced() {
 
   const [bookings, setBookings] = React.useState<BookingResponse[]>([]);
   const [modifications, setModifications] = React.useState<BookingModificationResponse[]>([]);
-  const [resources, setResources] = React.useState<ResourceResponse[]>([]);
+  const [resources, setResources] = React.useState<ResourceOption[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [activeBookingId, setActiveBookingId] = React.useState<string | null>(null);
@@ -156,7 +156,7 @@ export function ManagerBookingsScreenEnhanced() {
       const [allBookings, pendingMods, availableResources] = await Promise.all([
         listAllBookings(accessToken),
         listPendingModifications(accessToken),
-        listResources(accessToken),
+        listResourceOptions(accessToken, { status: 'ACTIVE' }),
       ]);
 
       setBookings(allBookings);

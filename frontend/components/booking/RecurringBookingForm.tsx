@@ -8,7 +8,7 @@ import type { CreateRecurringBookingRequest, RecurrencePattern, ResourceResponse
 import { getResourceCategoryLabel } from '@/lib/resource-display';
 
 interface RecurringBookingFormProps {
-  resources: ResourceResponse[];
+  resources: ResourceOption[];
   onSubmit: (data: CreateRecurringBookingRequest) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;

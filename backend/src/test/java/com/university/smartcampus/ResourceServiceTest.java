@@ -15,6 +15,7 @@ import com.university.smartcampus.AppEnums.ResourceCategory;
 import com.university.smartcampus.AppEnums.ResourceStatus;
 import com.university.smartcampus.resource.ResourceDtos.AvailabilityWindowRequest;
 import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
+import com.university.smartcampus.resource.ResourceDtos.ResourceListPage;
 import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
 import com.university.smartcampus.resource.ResourceEntity;
@@ -112,15 +113,17 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         seedResource("BUS-01", "Campus Shuttle", transportType, ResourceStatus.MAINTENANCE, seedLocation("North Gate"));
         seedResource("MIC-01", "Wireless Microphone", eventType, ResourceStatus.ACTIVE, seedLocation("Auditorium"));
 
-        List<ResourceResponse> filtered = resourceService.getResources(
+        ResourceListPage filtered = resourceService.getResources(
             "shuttle",
             ResourceCategory.TRANSPORT_AND_LOGISTICS,
             ResourceStatus.MAINTENANCE,
-            "north"
+            "north",
+            0,
+            50
         );
 
-        assertThat(filtered).hasSize(1);
-        assertThat(filtered.get(0).code()).isEqualTo("BUS-01");
+        assertThat(filtered.items()).hasSize(1);
+        assertThat(filtered.items().get(0).code()).isEqualTo("BUS-01");
     }
 
     @Test
@@ -219,6 +222,17 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         boolean movableDefault
     ) {
         return resourceTypeRepository.findByCodeIgnoreCase(code)
+            .map(resourceType -> {
+                resourceType.setName(name);
+                resourceType.setCategory(category);
+                resourceType.setDescription(name + " type");
+                resourceType.setBookableDefault(bookableDefault);
+                resourceType.setMovableDefault(movableDefault);
+                resourceType.setFeaturesEnabled(true);
+                resourceType.setAvailabilityEnabled(true);
+                resourceType.setQuantityEnabled(true);
+                return resourceTypeRepository.save(resourceType);
+            })
             .orElseGet(() -> {
                 ResourceType resourceType = new ResourceType();
                 resourceType.setCode(code);

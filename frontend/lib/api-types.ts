@@ -164,6 +164,63 @@ export interface ResourceResponse {
   images: ResourceImageDetails[];
 }
 
+export interface ResourceListItem {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  subcategory: string | null;
+  description: string | null;
+  location: string | null;
+  capacity: number | null;
+  quantity: number | null;
+  status: ResourceStatus;
+  bookable: boolean;
+  movable: boolean;
+  availableFrom: string | null;
+  availableTo: string | null;
+  resourceTypeName: string | null;
+  locationName: string | null;
+  buildingName: string | null;
+  managedByRole: ResourceManagedByRole | null;
+}
+
+export interface ResourceListPage {
+  items: ResourceListItem[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface ResourceOption {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  subcategory: string | null;
+  locationName: string | null;
+  status: ResourceStatus;
+  bookable: boolean;
+}
+
+export interface ResourceStats {
+  totalResources: number;
+  activeResources: number;
+  bookableResources: number;
+  maintenanceResources: number;
+  outOfServiceResources: number;
+  inactiveResources: number;
+  locationCount: number;
+}
+
+export interface ResourceLookups {
+  types: ResourceTypeOption[];
+  locations: LocationOption[];
+  features: ResourceFeatureOption[];
+  managedRoles: ManagedByRoleOption[];
+}
+
 export interface CreateResourceRequest {
   code: string;
   name: string;

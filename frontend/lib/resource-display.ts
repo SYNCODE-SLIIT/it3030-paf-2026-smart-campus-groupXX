@@ -1,7 +1,6 @@
 import type {
   LocationOption,
   ResourceCategory,
-  ResourceResponse,
   ResourceStatus,
   ResourceTypeOption,
 } from '@/lib/api-types';
@@ -87,7 +86,7 @@ export function getResourceStatusChipColor(status: ResourceStatus) {
   }
 }
 
-export function resourceAvailabilityLabel(resource: Pick<ResourceResponse, 'availableFrom' | 'availableTo'>) {
+export function resourceAvailabilityLabel(resource: { availableFrom: string | null; availableTo: string | null }) {
   if (!resource.availableFrom && !resource.availableTo) {
     return 'Any time';
   }

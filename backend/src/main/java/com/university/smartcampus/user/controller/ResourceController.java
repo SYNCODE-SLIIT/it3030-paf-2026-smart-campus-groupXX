@@ -24,7 +24,11 @@ import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
 import com.university.smartcampus.resource.ResourceDtos.LocationOption;
 import com.university.smartcampus.resource.ResourceDtos.ManagedByRoleOption;
 import com.university.smartcampus.resource.ResourceDtos.ResourceFeatureOption;
+import com.university.smartcampus.resource.ResourceDtos.ResourceListPage;
+import com.university.smartcampus.resource.ResourceDtos.ResourceLookups;
+import com.university.smartcampus.resource.ResourceDtos.ResourceOption;
 import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
+import com.university.smartcampus.resource.ResourceDtos.ResourceStats;
 import com.university.smartcampus.resource.ResourceDtos.ResourceTypeOption;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
 import com.university.smartcampus.resource.ResourceService;
@@ -45,21 +49,39 @@ public class ResourceController {
     }
 
     @GetMapping
-    public List<ResourceResponse> listResources(
+    public ResourceListPage listResources(
         @RequestParam(required = false) String search,
         @RequestParam(required = false) ResourceCategory category,
         @RequestParam(required = false) ResourceStatus status,
         @RequestParam(required = false) String location,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "50") int size,
         Authentication authentication
     ) {
         currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
-        return resourceService.getResources(search, category, status, location);
+        return resourceService.getResources(search, category, status, location, page, size);
     }
 
-    @GetMapping("/{id}")
-    public ResourceResponse getResource(@PathVariable UUID id, Authentication authentication) {
+    @GetMapping("/options")
+    public List<ResourceOption> listResourceOptions(
+        @RequestParam(required = false) ResourceStatus status,
+        @RequestParam(required = false) Boolean bookable,
+        Authentication authentication
+    ) {
         currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
-        return resourceService.getResourceById(id);
+        return resourceService.getResourceOptions(status, bookable);
+    }
+
+    @GetMapping("/stats")
+    public ResourceStats getResourceStats(Authentication authentication) {
+        currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return resourceService.getResourceStats();
+    }
+
+    @GetMapping("/lookups")
+    public ResourceLookups getResourceLookups(Authentication authentication) {
+        currentUserService.requireCurrentUser(authentication);
+        return resourceService.getResourceLookups();
     }
 
     @GetMapping("/lookups/types")
@@ -84,6 +106,12 @@ public class ResourceController {
     public List<ManagedByRoleOption> listManagedByRoleOptions(Authentication authentication) {
         currentUserService.requireCurrentUser(authentication);
         return resourceService.getManagedByRoleOptions();
+    }
+
+    @GetMapping("/{id}")
+    public ResourceResponse getResource(@PathVariable UUID id, Authentication authentication) {
+        currentUserService.requireCurrentUserWithCompletedOnboarding(authentication);
+        return resourceService.getResourceById(id);
     }
 
     @PostMapping

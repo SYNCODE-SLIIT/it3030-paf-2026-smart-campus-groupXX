@@ -10,8 +10,9 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
+import org.hibernate.Hibernate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -28,7 +29,12 @@ import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
 import com.university.smartcampus.resource.ResourceDtos.LocationOption;
 import com.university.smartcampus.resource.ResourceDtos.ManagedByRoleOption;
 import com.university.smartcampus.resource.ResourceDtos.ResourceFeatureOption;
+import com.university.smartcampus.resource.ResourceDtos.ResourceListItem;
+import com.university.smartcampus.resource.ResourceDtos.ResourceListPage;
+import com.university.smartcampus.resource.ResourceDtos.ResourceLookups;
+import com.university.smartcampus.resource.ResourceDtos.ResourceOption;
 import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
+import com.university.smartcampus.resource.ResourceDtos.ResourceStats;
 import com.university.smartcampus.resource.ResourceDtos.ResourceSummary;
 import com.university.smartcampus.resource.ResourceDtos.ResourceTypeOption;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
@@ -46,6 +52,9 @@ public class ResourceService {
         DayOfWeek.SATURDAY,
         DayOfWeek.SUNDAY
     );
+
+    private static final int DEFAULT_RESOURCE_PAGE_SIZE = 50;
+    private static final int MAX_RESOURCE_PAGE_SIZE = 300;
 
     private static final Set<String> ALLOWED_MANAGED_BY_ROLES = Set.of(
         "CATALOG_MANAGER",
@@ -130,40 +139,69 @@ public class ResourceService {
     }
 
     @Transactional(readOnly = true)
-    public List<ResourceResponse> getResources(String search, ResourceCategory category, ResourceStatus status, String location) {
-        Specification<ResourceEntity> specification = (root, query, cb) -> cb.conjunction();
+    public ResourceListPage getResources(
+        String search,
+        ResourceCategory category,
+        ResourceStatus status,
+        String location,
+        int page,
+        int size
+    ) {
+        int safePage = Math.max(page, 0);
+        int safeSize = normalizePageSize(size);
+        Page<ResourceListItem> result = resourceRepository.findResourceListItems(
+            likeValueOrNull(search),
+            category,
+            status,
+            likeValueOrNull(location),
+            PageRequest.of(safePage, safeSize)
+        );
 
-        if (StringUtils.hasText(search)) {
-            String normalizedSearch = likeValue(search);
-            specification = specification.and((root, query, cb) -> cb.or(
-                cb.like(cb.lower(root.get("code")), normalizedSearch),
-                cb.like(cb.lower(root.get("name")), normalizedSearch),
-                cb.like(cb.lower(root.get("description")), normalizedSearch),
-                cb.like(cb.lower(root.get("subcategory")), normalizedSearch)
-            ));
-        }
+        return new ResourceListPage(
+            result.getContent(),
+            result.getNumber(),
+            result.getSize(),
+            result.getTotalElements(),
+            result.getTotalPages()
+        );
+    }
 
-        if (category != null) {
-            specification = specification.and((root, query, cb) -> cb.equal(root.get("category"), category));
-        }
+    @Transactional(readOnly = true)
+    public List<ResourceOption> getResourceOptions(ResourceStatus status, Boolean bookable) {
+        return resourceRepository.findResourceOptions(status, bookable);
+    }
 
-        if (status != null) {
-            specification = specification.and((root, query, cb) -> cb.equal(root.get("status"), status));
-        }
-
-        if (StringUtils.hasText(location)) {
-            String normalizedLocation = likeValue(location);
-            specification = specification.and((root, query, cb) -> cb.like(cb.lower(root.get("location")), normalizedLocation));
-        }
-
-        return resourceRepository.findAll(specification, Sort.by(Sort.Direction.ASC, "code")).stream()
-            .map(resourceMapper::toResourceResponse)
-            .toList();
+    @Transactional(readOnly = true)
+    public ResourceStats getResourceStats() {
+        return new ResourceStats(
+            resourceRepository.count(),
+            resourceRepository.countByStatus(ResourceStatus.ACTIVE),
+            resourceRepository.countByBookableTrue(),
+            resourceRepository.countByStatus(ResourceStatus.MAINTENANCE),
+            resourceRepository.countByStatus(ResourceStatus.OUT_OF_SERVICE),
+            resourceRepository.countByStatus(ResourceStatus.INACTIVE),
+            resourceRepository.countDistinctResourceLocations()
+        );
     }
 
     @Transactional(readOnly = true)
     public ResourceResponse getResourceById(UUID id) {
-        return resourceMapper.toResourceResponse(getResourceEntity(id));
+        ResourceEntity resource = resourceRepository.findByIdWithTypeAndLocation(id)
+            .orElseThrow(() -> new NotFoundException("Resource not found."));
+        Hibernate.initialize(resource.getFeatures());
+        Hibernate.initialize(resource.getAvailabilityWindows());
+        Hibernate.initialize(resource.getImages());
+        return resourceMapper.toResourceResponse(resource);
+    }
+
+    @Transactional(readOnly = true)
+    public ResourceLookups getResourceLookups() {
+        return new ResourceLookups(
+            getResourceTypeOptions(),
+            getLocationOptions(),
+            getResourceFeatureOptions(),
+            getManagedByRoleOptions()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -559,6 +597,18 @@ public class ResourceService {
 
     private String likeValue(String value) {
         return "%" + value.trim().toLowerCase(Locale.ROOT) + "%";
+    }
+
+    private String likeValueOrNull(String value) {
+        return StringUtils.hasText(value) ? likeValue(value) : null;
+    }
+
+    private int normalizePageSize(int size) {
+        if (size <= 0) {
+            return DEFAULT_RESOURCE_PAGE_SIZE;
+        }
+
+        return Math.min(size, MAX_RESOURCE_PAGE_SIZE);
     }
 
     private String toManagedByRoleLabel(String role) {

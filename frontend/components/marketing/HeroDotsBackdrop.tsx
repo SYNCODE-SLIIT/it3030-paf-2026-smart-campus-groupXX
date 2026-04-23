@@ -169,10 +169,15 @@ function bindMediaQuery(query: MediaQueryList, listener: () => void) {
     };
   }
 
-  query.addListener(listener);
+  const legacyQuery = query as MediaQueryList & {
+    addListener: (listener: () => void) => void;
+    removeListener: (listener: () => void) => void;
+  };
+
+  legacyQuery.addListener(listener);
 
   return () => {
-    query.removeListener(listener);
+    legacyQuery.removeListener(listener);
   };
 }
 

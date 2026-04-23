@@ -3,8 +3,32 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { getSupabasePublicEnv } from '@/lib/supabase/env';
 
+const SESSION_REFRESH_PREFIXES = [
+  '/account',
+  '/admin',
+  '/auth',
+  '/booking-managers',
+  '/catalog-managers',
+  '/faculty',
+  '/managers',
+  '/portal',
+  '/student',
+  '/students',
+  '/ticket-managers',
+];
+
+function needsSessionRefresh(pathname: string) {
+  return SESSION_REFRESH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 export async function updateSession(request: NextRequest) {
   const env = getSupabasePublicEnv();
+
+  if (!needsSessionRefresh(request.nextUrl.pathname)) {
+    return NextResponse.next({
+      request,
+    });
+  }
 
   if (!env) {
     return NextResponse.next({

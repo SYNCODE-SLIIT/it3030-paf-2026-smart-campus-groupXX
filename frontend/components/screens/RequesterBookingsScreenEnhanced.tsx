@@ -47,7 +47,7 @@ import type {
   RecurringBookingResponse,
   RequestModificationRequest,
   ResourceRemainingRangesResponse,
-  ResourceResponse,
+  ResourceOption,
 } from '@/lib/api-types';
 import { getLocationTypeLabel, getWingLabel } from '@/lib/location-display';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
@@ -271,7 +271,7 @@ export function RequesterBookingsScreenEnhanced({
 
     try {
       const [resourceList, myBookings, recurring, notifs] = await Promise.all([
-        listResources(accessToken),
+        listResourceOptions(accessToken, { status: 'ACTIVE', bookable: true }),
         listMyBookings(accessToken),
         listMyRecurringBookings(accessToken),
         listNotifications(accessToken, { domain: 'BOOKING', limit: 40 }),

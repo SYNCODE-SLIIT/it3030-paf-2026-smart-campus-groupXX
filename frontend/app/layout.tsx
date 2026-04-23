@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Open_Sans, Poppins, JetBrains_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { AuthHashRedirector } from '@/components/auth/AuthHashRedirector';
@@ -43,7 +44,9 @@ export default async function RootLayout({
         suppressHydrationWarning
         className={`${openSans.variable} ${poppins.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <RouteProgressBar />
+        <Suspense fallback={null}>
+          <RouteProgressBar />
+        </Suspense>
         <AuthProvider initialAppUser={initialAppUser}>
           <ToastProvider>
             <AuthHashRedirector />

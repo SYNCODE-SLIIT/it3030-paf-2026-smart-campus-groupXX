@@ -27,6 +27,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.persistence.criteria.JoinType;
+
 import com.university.smartcampus.auth.identity.AuthIdentityClient;
 import com.university.smartcampus.auth.provider.AuthProviderClient;
 import com.university.smartcampus.auth.service.CurrentUserService;
@@ -238,8 +240,12 @@ public class UserManagementService {
             specification = specification.and((root, query, cb) -> cb.equal(root.get("accountStatus"), accountStatus));
         }
 
+        if (managerRole != null) {
+            specification = specification.and((root, query, cb) ->
+                    cb.equal(root.join("managerProfile", JoinType.INNER).get("managerRole"), managerRole));
+        }
+
         return userRepository.findAll(specification, Sort.by(Sort.Direction.ASC, "email")).stream()
-                .filter(user -> managerRole == null || hasManagerRole(user, managerRole))
                 .map(userMapper::toUserResponse)
                 .toList();
     }
@@ -902,10 +908,6 @@ public class UserManagementService {
         return user.getUserType() == UserType.STUDENT && !user.isOnboardingCompleted()
                 ? NEXT_STEP_ONBOARDING
                 : NEXT_STEP_DASHBOARD;
-    }
-
-    private boolean hasManagerRole(UserEntity user, ManagerRole managerRole) {
-        return user.getManagerProfile() != null && user.getManagerProfile().hasManagerRole(managerRole);
     }
 
     private void logAuditAction(AdminAction action, UserEntity performedByAdmin, UserEntity targetUser, Map<String, Object> details) {

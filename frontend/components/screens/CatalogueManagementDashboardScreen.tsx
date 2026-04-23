@@ -9,8 +9,8 @@ import { Alert, Button, Card, Chip, Tabs } from '@/components/ui';
 import { AdminResourcesScreen } from '@/components/screens/AdminResourcesScreen';
 import { CatalogueLocationsScreen } from '@/components/screens/catalogue/CatalogueLocationsScreen';
 import { CatalogueResourceTypesScreen } from '@/components/screens/catalogue/CatalogueResourceTypesScreen';
-import { getErrorMessage, listResources } from '@/lib/api-client';
-import type { ResourceResponse } from '@/lib/api-types';
+import { getErrorMessage, getResourceStats } from '@/lib/api-client';
+import type { ResourceStats } from '@/lib/api-types';
 
 function SummaryCard({
   label,
@@ -66,7 +66,7 @@ export function CatalogueManagementDashboardScreen({
   const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
-  const [resources, setResources] = React.useState<ResourceResponse[]>([]);
+  const [stats, setStats] = React.useState<ResourceStats | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [activeSection, setActiveSection] = React.useState<'resources' | 'locations' | 'resource-types'>('resources');
   const [resourceAddOpen, setResourceAddOpen] = React.useState(false);
@@ -92,7 +92,7 @@ export function CatalogueManagementDashboardScreen({
     else setResourceTypeAddOpen(true);
   }
 
-  const loadResources = React.useCallback(async () => {
+  const loadStats = React.useCallback(async () => {
     if (!accessToken) {
       setLoadError('Your session is unavailable. Please sign in again.');
       return;
@@ -101,25 +101,21 @@ export function CatalogueManagementDashboardScreen({
     setLoadError(null);
 
     try {
-      const nextResources = await listResources(accessToken);
-      setResources(nextResources);
+      setStats(await getResourceStats(accessToken));
     } catch (error) {
-      setResources([]);
+      setStats(null);
       setLoadError(getErrorMessage(error, 'We could not load catalogue data.'));
     }
   }, [accessToken]);
 
   React.useEffect(() => {
-    void loadResources();
-  }, [loadResources]);
+    void loadStats();
+  }, [loadStats]);
 
-  const activeCount = resources.filter((resource) => resource.status === 'ACTIVE').length;
-  const bookableCount = resources.filter((resource) => resource.bookable).length;
-  const locationCount = new Set(
-    resources
-      .map((resource) => resource.locationDetails?.locationName ?? resource.location)
-      .filter(Boolean),
-  ).size;
+  const totalCount = stats?.totalResources ?? 0;
+  const activeCount = stats?.activeResources ?? 0;
+  const bookableCount = stats?.bookableResources ?? 0;
+  const locationCount = stats?.locationCount ?? 0;
   const isManagerWorkspace = workspaceLabel === 'Manager Workspace';
 
   return (
@@ -148,7 +144,7 @@ export function CatalogueManagementDashboardScreen({
 
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16 }}>
-        <SummaryCard label="Total Resources" value={resources.length} caption="Catalogue entries currently available in the system." icon={FolderOpen} />
+        <SummaryCard label="Total Resources" value={totalCount} caption="Catalogue entries currently available in the system." icon={FolderOpen} />
         <SummaryCard label="Active" value={activeCount} caption="Resources currently available for downstream booking or operational use." icon={ShieldCheck} />
         <SummaryCard label="Bookable" value={bookableCount} caption="Entries flagged as bookable in the current compatibility model." icon={Boxes} />
         <SummaryCard label="Locations" value={locationCount} caption="Distinct legacy location labels currently mirrored on resource records." icon={MapPinned} />
@@ -177,6 +173,7 @@ export function CatalogueManagementDashboardScreen({
           embedded
           addOpen={resourceAddOpen}
           onAddOpenChange={setResourceAddOpen}
+          onResourcesChanged={() => void loadStats()}
         />
       )}
       {activeSection === 'locations' && (

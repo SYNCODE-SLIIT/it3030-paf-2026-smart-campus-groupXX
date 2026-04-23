@@ -88,6 +88,68 @@ public final class ResourceDtos {
     ) {
     }
 
+    public record ResourceListPage(
+        List<ResourceListItem> items,
+        int page,
+        int size,
+        long totalItems,
+        int totalPages
+    ) {
+    }
+
+    public record ResourceListItem(
+        UUID id,
+        String code,
+        String name,
+        ResourceCategory category,
+        String subcategory,
+        String description,
+        String location,
+        Integer capacity,
+        Integer quantity,
+        ResourceStatus status,
+        boolean bookable,
+        boolean movable,
+        LocalTime availableFrom,
+        LocalTime availableTo,
+        String resourceTypeName,
+        String locationName,
+        String buildingName,
+        String managedByRole
+    ) {
+    }
+
+    public record ResourceOption(
+        UUID id,
+        String code,
+        String name,
+        ResourceCategory category,
+        String subcategory,
+        String locationName,
+        ResourceStatus status,
+        boolean bookable
+    ) {
+    }
+
+    public record ResourceStats(
+        long totalResources,
+        long activeResources,
+        long bookableResources,
+        long maintenanceResources,
+        long outOfServiceResources,
+        long inactiveResources,
+        long locationCount
+    ) {
+    }
+
+    public record ResourceLookups(
+        List<ResourceTypeOption> types,
+        List<LocationOption> locations,
+        List<ResourceFeatureOption> features,
+        List<ManagedByRoleOption> managedRoles
+    ) {
+    }
+
     public record AvailabilityWindowRequest(
         String dayOfWeek,
         LocalTime startTime,

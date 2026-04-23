@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -90,9 +91,9 @@ public class NotificationService {
         Objects.requireNonNull(user, "User is required.");
         boolean unreadOnly = "unread".equalsIgnoreCase(status);
         int resolvedLimit = normalizeLimit(limit);
-        return recipientRepository.findForUser(user.getId(), unreadOnly, domain, PageRequest.of(0, resolvedLimit)).stream()
-            .map(this::toNotificationResponse)
-            .toList();
+        List<NotificationRecipientEntity> recipients = recipientRepository
+            .findForUser(user.getId(), unreadOnly, domain, PageRequest.of(0, resolvedLimit));
+        return toNotificationResponses(recipients);
     }
 
     @Transactional(readOnly = true)
@@ -834,7 +835,55 @@ public class NotificationService {
             .findFirstByRecipientIdAndChannel(recipient.getId(), NotificationDeliveryChannel.EMAIL)
             .map(NotificationDeliveryAttemptEntity::getStatus)
             .orElse(null);
+        List<NotificationLinkResponse> links = linkRepository.findByEventId(event.getId()).stream()
+            .map(this::toLinkResponse)
+            .toList();
 
+        return toNotificationResponse(recipient, emailStatus, links);
+    }
+
+    private List<NotificationResponse> toNotificationResponses(List<NotificationRecipientEntity> recipients) {
+        if (recipients.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> recipientIds = recipients.stream()
+            .map(NotificationRecipientEntity::getId)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<UUID> eventIds = recipients.stream()
+            .map(NotificationRecipientEntity::getEvent)
+            .map(NotificationEventEntity::getId)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<UUID, NotificationDeliveryStatus> emailStatusByRecipientId = deliveryAttemptRepository
+            .findByRecipientIdInAndChannel(recipientIds, NotificationDeliveryChannel.EMAIL)
+            .stream()
+            .collect(Collectors.toMap(
+                attempt -> attempt.getRecipient().getId(),
+                NotificationDeliveryAttemptEntity::getStatus,
+                (existing, ignored) -> existing
+            ));
+        Map<UUID, List<NotificationLinkResponse>> linksByEventId = linkRepository.findByEventIdIn(eventIds)
+            .stream()
+            .collect(Collectors.groupingBy(
+                link -> link.getEvent().getId(),
+                Collectors.mapping(this::toLinkResponse, Collectors.toList())
+            ));
+
+        return recipients.stream()
+            .map(recipient -> toNotificationResponse(
+                recipient,
+                emailStatusByRecipientId.get(recipient.getId()),
+                linksByEventId.getOrDefault(recipient.getEvent().getId(), List.of())
+            ))
+            .toList();
+    }
+
+    private NotificationResponse toNotificationResponse(
+        NotificationRecipientEntity recipient,
+        NotificationDeliveryStatus emailStatus,
+        List<NotificationLinkResponse> links
+    ) {
+        NotificationEventEntity event = recipient.getEvent();
         return new NotificationResponse(
             recipient.getId(),
             event.getId(),
@@ -850,9 +899,7 @@ public class NotificationService {
             recipient.getReadAt(),
             recipient.getArchivedAt(),
             emailStatus,
-            linkRepository.findByEventId(event.getId()).stream()
-                .map(this::toLinkResponse)
-                .toList()
+            links
         );
     }
 

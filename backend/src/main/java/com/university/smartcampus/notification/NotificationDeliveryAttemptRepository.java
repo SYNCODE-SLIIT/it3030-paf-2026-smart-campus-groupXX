@@ -19,6 +19,11 @@ public interface NotificationDeliveryAttemptRepository extends JpaRepository<Not
 
     Optional<NotificationDeliveryAttemptEntity> findFirstByRecipientIdAndChannel(UUID recipientId, NotificationDeliveryChannel channel);
 
+    List<NotificationDeliveryAttemptEntity> findByRecipientIdInAndChannel(
+        Collection<UUID> recipientIds,
+        NotificationDeliveryChannel channel
+    );
+
     @EntityGraph(attributePaths = {
         "recipient",
         "recipient.event",
