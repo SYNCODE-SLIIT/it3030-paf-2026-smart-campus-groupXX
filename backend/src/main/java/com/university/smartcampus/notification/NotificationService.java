@@ -162,6 +162,9 @@ public class NotificationService {
             preference.setEmailEnabled(Boolean.TRUE.equals(categoryRequest.emailEnabled()));
         }
 
+        // Persist explicitly to handle detached instances created via repository merge semantics.
+        preferenceRepository.saveAll(preferences.values());
+
         return toPreferencesResponse(preferences);
     }
 
