@@ -1,6 +1,7 @@
 package com.university.smartcampus.booking;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -145,9 +146,69 @@ public class BookingCheckInService {
         );
     }
 
+    @Transactional
+    public void reconcileEndedSpaceBookings() {
+        Instant now = bookingValidator.currentInstant();
+        autoMarkEndedApprovedSpaceBookingsAsNoShow(now);
+        autoCompleteEndedCheckedInSpaceBookings(now);
+    }
+
+    private void autoMarkEndedApprovedSpaceBookingsAsNoShow(Instant now) {
+        List<BookingEntity> bookings = bookingRepository.findAllByStatusAndEndTimeLessThanEqualOrderByEndTimeAsc(
+            BookingStatus.APPROVED,
+            now
+        );
+        for (BookingEntity booking : bookings) {
+            if (!isEligibleForAutoNoShow(booking, now)) {
+                continue;
+            }
+
+            booking.setCheckInStatus(CheckInStatus.NO_SHOW);
+            booking.setStatus(BookingStatus.NO_SHOW);
+
+            BookingEntity saved = bookingRepository.save(booking);
+            notificationService.notifyBookingNoShow(saved);
+        }
+    }
+
+    private void autoCompleteEndedCheckedInSpaceBookings(Instant now) {
+        List<BookingEntity> bookings = bookingRepository.findAllByStatusAndEndTimeLessThanEqualOrderByEndTimeAsc(
+            BookingStatus.CHECKED_IN,
+            now
+        );
+        for (BookingEntity booking : bookings) {
+            if (!isEligibleForAutoCompletion(booking, now)) {
+                continue;
+            }
+
+            booking.setStatus(BookingStatus.COMPLETED);
+
+            BookingEntity saved = bookingRepository.save(booking);
+            notificationService.notifyBookingCompleted(saved);
+        }
+    }
+
     private void requireSpaceBooking(BookingEntity booking) {
         if (booking.getResource() == null || booking.getResource().getCategory() != ResourceCategory.SPACES) {
             throw new BadRequestException("Check-in is only available for space bookings.");
         }
+    }
+
+    private boolean isEligibleForAutoNoShow(BookingEntity booking, Instant now) {
+        return booking != null
+            && booking.getStatus() == BookingStatus.APPROVED
+            && booking.getEndTime() != null
+            && !booking.getEndTime().isAfter(now)
+            && booking.getResource() != null
+            && booking.getResource().getCategory() == ResourceCategory.SPACES;
+    }
+
+    private boolean isEligibleForAutoCompletion(BookingEntity booking, Instant now) {
+        return booking != null
+            && booking.getStatus() == BookingStatus.CHECKED_IN
+            && booking.getEndTime() != null
+            && !booking.getEndTime().isAfter(now)
+            && booking.getResource() != null
+            && booking.getResource().getCategory() == ResourceCategory.SPACES;
     }
 }
