@@ -50,6 +50,11 @@ public class ResourceTypeService {
         ResourceType resourceType = resourceTypeMapper.toEntity(request);
         resourceType.setCode(normalizedCode);
         resourceType.setName(normalizedName);
+        validateAndNormalizeRuleFlags(
+            resourceType,
+            request.capacityEnabled(),
+            request.capacityRequired()
+        );
 
         return resourceTypeMapper.toResponse(resourceTypeRepository.save(resourceType));
     }
@@ -76,6 +81,11 @@ public class ResourceTypeService {
         if (normalizedName != null) {
             resourceType.setName(normalizedName);
         }
+        validateAndNormalizeRuleFlags(
+            resourceType,
+            request.capacityEnabled(),
+            request.capacityRequired()
+        );
 
         return resourceTypeMapper.toResponse(resourceType);
     }
@@ -125,6 +135,23 @@ public class ResourceTypeService {
             : resourceTypeRepository.existsByNameIgnoreCaseAndIdNot(name, currentResourceTypeId);
         if (exists) {
             throw new ConflictException("A resource type with this name already exists.");
+        }
+    }
+
+    private void validateAndNormalizeRuleFlags(
+        ResourceType resourceType,
+        Boolean requestedCapacityEnabled,
+        Boolean requestedCapacityRequired
+    ) {
+        if (requestedCapacityEnabled != null && !requestedCapacityEnabled && requestedCapacityRequired == null) {
+            resourceType.setCapacityRequired(false);
+        }
+
+        if (!resourceType.isCapacityEnabled()) {
+            if (Boolean.TRUE.equals(requestedCapacityRequired)) {
+                throw new BadRequestException("Capacity is required only when capacity is enabled.");
+            }
+            resourceType.setCapacityRequired(false);
         }
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.university.smartcampus.AppEnums.ResourceCategory;
 import com.university.smartcampus.AppEnums.ResourceStatus;
+import com.university.smartcampus.resource.ResourceDtos.AvailabilityWindowRequest;
 import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
 import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
@@ -64,8 +65,14 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
             ResourceStatus.ACTIVE,
             true,
             false,
+            null,
+            null,
             "technical_manager",
-            List.of("wifi", "projector")
+            List.of("wifi", "projector"),
+            List.of(
+                new AvailabilityWindowRequest("MONDAY", java.time.LocalTime.of(8, 0), java.time.LocalTime.of(12, 0)),
+                new AvailabilityWindowRequest("WEDNESDAY", java.time.LocalTime.of(10, 0), java.time.LocalTime.of(18, 0))
+            )
         ));
 
         assertThat(response.code()).isEqualTo("LAB-01");
@@ -78,6 +85,7 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         assertThat(response.locationDetails().id()).isEqualTo(location.getId());
         assertThat(response.locationDetails().locationName()).isEqualTo("Test Location");
         assertThat(response.features()).extracting(feature -> feature.code()).containsExactly("PROJECTOR", "WIFI");
+        assertThat(response.availabilityWindows()).hasSize(2);
         assertThat(response.createdAt()).isNotNull();
         assertThat(response.updatedAt()).isNotNull();
 
@@ -88,6 +96,7 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         assertThat(persisted.getLocationEntity().getId()).isEqualTo(location.getId());
         assertThat(persisted.getManagedByRole()).isEqualTo("TECHNICAL_MANAGER");
         assertThat(persisted.getFeatures()).extracting(ResourceFeature::getCode).containsExactlyInAnyOrder("PROJECTOR", "WIFI");
+        assertThat(persisted.getAvailabilityWindows()).hasSize(2);
         assertThat(persisted.getCategory()).isEqualTo(ResourceCategory.GENERAL_UTILITY);
         assertThat(persisted.getSubcategory()).isEqualTo("General Resource");
         assertThat(persisted.getLocation()).isEqualTo("Test Location");
@@ -118,7 +127,7 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
     void updateResourceReplacesNormalizedRelationshipsAndMirrorsLegacyFields() {
         ResourceType originalType = seedResourceType("GENERAL_RESOURCE", "General Resource", ResourceCategory.GENERAL_UTILITY);
         Location originalLocation = seedLocation("Old Location");
-        ResourceType replacementType = seedResourceType("LECTURE_HALL", "Lecture Hall", ResourceCategory.SPACES);
+        ResourceType replacementType = seedResourceType("LECTURE_HALL", "Lecture Hall", ResourceCategory.SPACES, false, true);
         Location replacementLocation = seedLocation("New Location");
         seedFeature("AIR_CONDITIONING", "Air Conditioning");
         seedFeature("MICROPHONE", "Microphone");
@@ -135,8 +144,11 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
             ResourceStatus.MAINTENANCE,
             false,
             true,
+            null,
+            null,
             "facilities_manager",
-            List.of("air_conditioning", "microphone")
+            List.of("air_conditioning", "microphone"),
+            List.of(new AvailabilityWindowRequest("FRIDAY", java.time.LocalTime.of(9, 0), java.time.LocalTime.of(17, 0)))
         ));
 
         assertThat(response.name()).isEqualTo("Updated Room 2");
@@ -149,6 +161,7 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         assertThat(response.locationDetails()).isNotNull();
         assertThat(response.locationDetails().id()).isEqualTo(replacementLocation.getId());
         assertThat(response.features()).extracting(feature -> feature.code()).containsExactly("AIR_CONDITIONING", "MICROPHONE");
+        assertThat(response.availabilityWindows()).hasSize(1);
 
         ResourceEntity persisted = resourceRepository.findById(resource.getId()).orElseThrow();
         assertThat(persisted.getName()).isEqualTo("Updated Room 2");
@@ -157,6 +170,7 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
         assertThat(persisted.getLocationEntity().getId()).isEqualTo(replacementLocation.getId());
         assertThat(persisted.getManagedByRole()).isEqualTo("FACILITIES_MANAGER");
         assertThat(persisted.getFeatures()).extracting(ResourceFeature::getCode).containsExactlyInAnyOrder("AIR_CONDITIONING", "MICROPHONE");
+        assertThat(persisted.getAvailabilityWindows()).hasSize(1);
         assertThat(persisted.getCategory()).isEqualTo(ResourceCategory.SPACES);
         assertThat(persisted.getSubcategory()).isEqualTo("Lecture Hall");
         assertThat(persisted.getLocation()).isEqualTo("New Location");
@@ -194,6 +208,16 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
     }
 
     private ResourceType seedResourceType(String code, String name, ResourceCategory category) {
+        return seedResourceType(code, name, category, true, false);
+    }
+
+    private ResourceType seedResourceType(
+        String code,
+        String name,
+        ResourceCategory category,
+        boolean bookableDefault,
+        boolean movableDefault
+    ) {
         return resourceTypeRepository.findByCodeIgnoreCase(code)
             .orElseGet(() -> {
                 ResourceType resourceType = new ResourceType();
@@ -201,8 +225,11 @@ class ResourceServiceTest extends AbstractPostgresIntegrationTest {
                 resourceType.setName(name);
                 resourceType.setCategory(category);
                 resourceType.setDescription(name + " type");
-                resourceType.setBookableDefault(true);
-                resourceType.setMovableDefault(false);
+                resourceType.setBookableDefault(bookableDefault);
+                resourceType.setMovableDefault(movableDefault);
+                resourceType.setFeaturesEnabled(true);
+                resourceType.setAvailabilityEnabled(true);
+                resourceType.setQuantityEnabled(true);
                 return resourceTypeRepository.save(resourceType);
             });
     }

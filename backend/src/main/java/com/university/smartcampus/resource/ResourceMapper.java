@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
 import com.university.smartcampus.resource.ResourceDtos.LocationDetails;
+import com.university.smartcampus.resource.ResourceDtos.ResourceAvailabilityWindowDetails;
 import com.university.smartcampus.resource.ResourceDtos.ResourceFeatureDetails;
 import com.university.smartcampus.resource.ResourceDtos.ResourceImageDetails;
 import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
@@ -27,6 +28,8 @@ public class ResourceMapper {
         resource.setStatus(request.status());
         resource.setBookable(request.bookable());
         resource.setMovable(request.movable());
+        resource.setAvailableFrom(request.availableFrom());
+        resource.setAvailableTo(request.availableTo());
         resource.setManagedByRole(trimToNull(request.managedByRole()));
         return resource;
     }
@@ -52,6 +55,10 @@ public class ResourceMapper {
         }
         if (request.movable() != null) {
             resource.setMovable(request.movable());
+        }
+        if (request.availableFrom() != null || request.availableTo() != null) {
+            resource.setAvailableFrom(request.availableFrom());
+            resource.setAvailableTo(request.availableTo());
         }
         if (request.managedByRole() != null) {
             resource.setManagedByRole(trimToNull(request.managedByRole()));
@@ -79,6 +86,7 @@ public class ResourceMapper {
             toResourceTypeDetails(resource.getResourceType()),
             toLocationDetails(resource.getLocationEntity()),
             toFeatureDetails(resource),
+            toAvailabilityWindowDetails(resource),
             toImageDetails(resource)
         );
     }
@@ -136,6 +144,27 @@ public class ResourceMapper {
         return resource.getFeatures().stream()
             .sorted(Comparator.comparing(ResourceFeature::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
             .map(feature -> new ResourceFeatureDetails(feature.getCode(), feature.getName()))
+            .toList();
+    }
+
+    private List<ResourceAvailabilityWindowDetails> toAvailabilityWindowDetails(ResourceEntity resource) {
+        if (resource.getAvailabilityWindows() == null || resource.getAvailabilityWindows().isEmpty()) {
+            return List.of();
+        }
+
+        return resource.getAvailabilityWindows().stream()
+            .filter(ResourceAvailabilityWindow::isActive)
+            .sorted(
+                Comparator.comparing((ResourceAvailabilityWindow availabilityWindow) -> availabilityWindow.getDayOfWeek().getValue())
+                    .thenComparing(ResourceAvailabilityWindow::getStartTime)
+                    .thenComparing(ResourceAvailabilityWindow::getEndTime)
+            )
+            .map(availabilityWindow -> new ResourceAvailabilityWindowDetails(
+                availabilityWindow.getId(),
+                availabilityWindow.getDayOfWeek(),
+                availabilityWindow.getStartTime(),
+                availabilityWindow.getEndTime()
+            ))
             .toList();
     }
 

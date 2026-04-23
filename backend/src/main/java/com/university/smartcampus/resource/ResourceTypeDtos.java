@@ -18,7 +18,13 @@ public final class ResourceTypeDtos {
         @NotNull ResourceCategory category,
         String description,
         boolean isBookableDefault,
-        boolean isMovableDefault
+        boolean isMovableDefault,
+        boolean locationRequired,
+        boolean capacityEnabled,
+        boolean capacityRequired,
+        boolean quantityEnabled,
+        boolean availabilityEnabled,
+        boolean featuresEnabled
     ) {
     }
 
@@ -28,7 +34,13 @@ public final class ResourceTypeDtos {
         ResourceCategory category,
         String description,
         Boolean isBookableDefault,
-        Boolean isMovableDefault
+        Boolean isMovableDefault,
+        Boolean locationRequired,
+        Boolean capacityEnabled,
+        Boolean capacityRequired,
+        Boolean quantityEnabled,
+        Boolean availabilityEnabled,
+        Boolean featuresEnabled
     ) {
     }
 
@@ -39,7 +51,13 @@ public final class ResourceTypeDtos {
         String category,
         String description,
         boolean isBookableDefault,
-        boolean isMovableDefault
+        boolean isMovableDefault,
+        boolean locationRequired,
+        boolean capacityEnabled,
+        boolean capacityRequired,
+        boolean quantityEnabled,
+        boolean availabilityEnabled,
+        boolean featuresEnabled
     ) {
     }
 }

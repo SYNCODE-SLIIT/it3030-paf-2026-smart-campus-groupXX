@@ -22,6 +22,42 @@ import type {
 } from '@/lib/api-types';
 import { getResourceCategoryChipColor, getResourceCategoryLabel, resourceCategoryOptions } from '@/lib/resource-display';
 
+type FlagChip = {
+  label: string;
+  color: 'yellow' | 'red' | 'green' | 'blue' | 'orange' | 'neutral' | 'glass';
+};
+
+function getResourceTypeFlagChips(resourceType: CatalogueResourceTypeResponse): FlagChip[] {
+  const chips: FlagChip[] = [
+    {
+      label: resourceType.isBookableDefault ? 'Bookable default' : 'Not bookable',
+      color: resourceType.isBookableDefault ? 'green' : 'neutral',
+    },
+    {
+      label: resourceType.isMovableDefault ? 'Movable default' : 'Fixed default',
+      color: resourceType.isMovableDefault ? 'blue' : 'neutral',
+    },
+    {
+      label: resourceType.capacityRequired
+        ? 'Capacity required'
+        : resourceType.capacityEnabled
+          ? 'Capacity enabled'
+          : 'No capacity',
+      color: resourceType.capacityRequired ? 'orange' : resourceType.capacityEnabled ? 'blue' : 'neutral',
+    },
+  ];
+
+  if (resourceType.locationRequired) {
+    chips.push({ label: 'Location required', color: 'yellow' });
+  }
+
+  if (resourceType.featuresEnabled) {
+    chips.push({ label: 'Features', color: 'glass' });
+  }
+
+  return chips;
+}
+
 export function CatalogueResourceTypesScreen({
   embedded = false,
   addOpen,
@@ -231,25 +267,31 @@ export function CatalogueResourceTypesScreen({
                   <TableHeader>Code</TableHeader>
                   <TableHeader>Name</TableHeader>
                   <TableHeader>Category</TableHeader>
-                  <TableHeader>Defaults</TableHeader>
-                  <TableHeader>Description</TableHeader>
+                  <TableHeader>Flags</TableHeader>
                   <TableHeader style={{ textAlign: 'right' }}>Actions</TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6}>Loading resource types…</TableCell>
+                    <TableCell colSpan={5}>Loading resource types…</TableCell>
                   </TableRow>
                 ) : filteredResourceTypes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>No resource types match the current filters.</TableCell>
+                    <TableCell colSpan={5}>No resource types match the current filters.</TableCell>
                   </TableRow>
                 ) : (
                   filteredResourceTypes.map((resourceType) => (
                     <TableRow key={resourceType.id}>
                       <TableCell><strong>{resourceType.code}</strong></TableCell>
-                      <TableCell>{resourceType.name}</TableCell>
+                      <TableCell>
+                        <div style={{ display: 'grid', gap: 4 }}>
+                          <span>{resourceType.name}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            {resourceType.description ?? 'No description'}
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Chip color={getResourceCategoryChipColor(resourceType.category as ResourceCategory)}>
                           {getResourceCategoryLabel(resourceType.category as ResourceCategory)}
@@ -257,15 +299,13 @@ export function CatalogueResourceTypesScreen({
                       </TableCell>
                       <TableCell>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          <Chip color={resourceType.isBookableDefault ? 'green' : 'neutral'}>
-                            {resourceType.isBookableDefault ? 'Bookable' : 'Not bookable'}
-                          </Chip>
-                          <Chip color={resourceType.isMovableDefault ? 'blue' : 'neutral'}>
-                            {resourceType.isMovableDefault ? 'Movable' : 'Fixed'}
-                          </Chip>
+                          {getResourceTypeFlagChips(resourceType).map((chip) => (
+                            <Chip key={`${resourceType.id}-${chip.label}`} color={chip.color}>
+                              {chip.label}
+                            </Chip>
+                          ))}
                         </div>
                       </TableCell>
-                      <TableCell>{resourceType.description ?? '—'}</TableCell>
                       <TableCell style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
                           <IconButton

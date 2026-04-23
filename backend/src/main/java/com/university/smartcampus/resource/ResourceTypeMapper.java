@@ -17,6 +17,12 @@ public class ResourceTypeMapper {
         resourceType.setDescription(trimToNull(request.description()));
         resourceType.setBookableDefault(request.isBookableDefault());
         resourceType.setMovableDefault(request.isMovableDefault());
+        resourceType.setLocationRequired(request.locationRequired());
+        resourceType.setCapacityEnabled(request.capacityEnabled());
+        resourceType.setCapacityRequired(request.capacityRequired());
+        resourceType.setQuantityEnabled(request.quantityEnabled());
+        resourceType.setAvailabilityEnabled(request.availabilityEnabled());
+        resourceType.setFeaturesEnabled(request.featuresEnabled());
         return resourceType;
     }
 
@@ -39,6 +45,24 @@ public class ResourceTypeMapper {
         if (request.isMovableDefault() != null) {
             resourceType.setMovableDefault(request.isMovableDefault());
         }
+        if (request.locationRequired() != null) {
+            resourceType.setLocationRequired(request.locationRequired());
+        }
+        if (request.capacityEnabled() != null) {
+            resourceType.setCapacityEnabled(request.capacityEnabled());
+        }
+        if (request.capacityRequired() != null) {
+            resourceType.setCapacityRequired(request.capacityRequired());
+        }
+        if (request.quantityEnabled() != null) {
+            resourceType.setQuantityEnabled(request.quantityEnabled());
+        }
+        if (request.availabilityEnabled() != null) {
+            resourceType.setAvailabilityEnabled(request.availabilityEnabled());
+        }
+        if (request.featuresEnabled() != null) {
+            resourceType.setFeaturesEnabled(request.featuresEnabled());
+        }
     }
 
     public ResourceTypeResponse toResponse(ResourceType resourceType) {
@@ -49,7 +73,13 @@ public class ResourceTypeMapper {
             resourceType.getCategory() == null ? null : resourceType.getCategory().name(),
             resourceType.getDescription(),
             resourceType.isBookableDefault(),
-            resourceType.isMovableDefault()
+            resourceType.isMovableDefault(),
+            resourceType.isLocationRequired(),
+            resourceType.isCapacityEnabled(),
+            resourceType.isCapacityRequired(),
+            resourceType.isQuantityEnabled(),
+            resourceType.isAvailabilityEnabled(),
+            resourceType.isFeaturesEnabled()
         );
     }
 

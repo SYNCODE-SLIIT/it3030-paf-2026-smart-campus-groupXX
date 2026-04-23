@@ -85,6 +85,9 @@ public class ResourceEntity extends TimestampedEntity {
     @OneToMany(mappedBy = "resource", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ResourceImage> images = new ArrayList<>();
 
+    @OneToMany(mappedBy = "resource", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ResourceAvailabilityWindow> availabilityWindows = new ArrayList<>();
+
     @ManyToMany
     @JoinTable(
         name = "resource_feature_map",
@@ -235,6 +238,30 @@ public class ResourceEntity extends TimestampedEntity {
 
     public void setImages(List<ResourceImage> images) {
         this.images = images;
+    }
+
+    public List<ResourceAvailabilityWindow> getAvailabilityWindows() {
+        return availabilityWindows;
+    }
+
+    public void setAvailabilityWindows(List<ResourceAvailabilityWindow> availabilityWindows) {
+        this.availabilityWindows.clear();
+        if (availabilityWindows == null) {
+            return;
+        }
+
+        for (ResourceAvailabilityWindow availabilityWindow : availabilityWindows) {
+            addAvailabilityWindow(availabilityWindow);
+        }
+    }
+
+    public void addAvailabilityWindow(ResourceAvailabilityWindow availabilityWindow) {
+        if (availabilityWindow == null) {
+            return;
+        }
+
+        availabilityWindow.setResource(this);
+        this.availabilityWindows.add(availabilityWindow);
     }
 
     public Set<ResourceFeature> getFeatures() {

@@ -23,8 +23,9 @@ export function MarketingNavbar() {
     const baseItems: NavItem[] = [
       { label: 'Home', href: '/' },
       { label: 'About', href: '/about' },
+      { label: 'Features', href: '/features' },
+      { label: 'Resources', href: '/resources' },
       { label: 'Contact', href: '/contact' },
-      { label: 'Components', href: '/components' },
     ];
 
     if (!appUser) {

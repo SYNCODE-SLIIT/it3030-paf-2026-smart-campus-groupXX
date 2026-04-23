@@ -43,7 +43,7 @@ export function Navbar({ items, currentPath, user, onLogin, onLogout, onNavigate
           left: 0,
           width: '100%',
           zIndex: 50,
-          padding: '0 24px',
+          padding: '0 clamp(16px, 2.2vw, 32px)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',

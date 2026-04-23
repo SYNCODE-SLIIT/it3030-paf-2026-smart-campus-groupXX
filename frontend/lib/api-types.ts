@@ -40,6 +40,8 @@ export type ResourceCategory =
 
 export type ResourceStatus = 'ACTIVE' | 'OUT_OF_SERVICE' | 'MAINTENANCE' | 'INACTIVE';
 
+export type DayOfWeek = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+
 export type ResourceManagedByRole =
   | 'CATALOG_MANAGER'
   | 'LIBRARY_MANAGER'
@@ -158,6 +160,7 @@ export interface ResourceResponse {
   resourceType: ResourceTypeDetails | null;
   locationDetails: LocationDetails | null;
   features: ResourceFeatureDetails[];
+  availabilityWindows: ResourceAvailabilityWindow[];
   images: ResourceImageDetails[];
 }
 
@@ -166,28 +169,34 @@ export interface CreateResourceRequest {
   name: string;
   description?: string | null;
   resourceTypeId: string;
-  locationId: string;
+  locationId: string | null;
   capacity?: number | null;
   quantity?: number | null;
   status: ResourceStatus;
   bookable: boolean;
   movable: boolean;
+  availableFrom?: string | null;
+  availableTo?: string | null;
   managedByRole?: ResourceManagedByRole | null;
   featureCodes?: string[] | null;
+  availabilityWindows?: AvailabilityWindowInput[] | null;
 }
 
 export interface UpdateResourceRequest {
   name?: string;
   description?: string | null;
   resourceTypeId?: string;
-  locationId?: string;
+  locationId?: string | null;
   capacity?: number | null;
   quantity?: number | null;
   status?: ResourceStatus;
   bookable?: boolean;
   movable?: boolean;
+  availableFrom?: string | null;
+  availableTo?: string | null;
   managedByRole?: ResourceManagedByRole | null;
   featureCodes?: string[] | null;
+  availabilityWindows?: AvailabilityWindowInput[] | null;
 }
 
 export interface ResourceTypeDetails {
@@ -214,6 +223,19 @@ export interface ResourceFeatureDetails {
   name: string;
 }
 
+export interface AvailabilityWindowInput {
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+}
+
+export interface ResourceAvailabilityWindow {
+  id: string;
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+}
+
 export interface ResourceImageDetails {
   imageUrl: string;
   isPrimary: boolean;
@@ -227,6 +249,12 @@ export interface ResourceTypeOption {
   category: ResourceCategory;
   isBookableDefault: boolean;
   isMovableDefault: boolean;
+  locationRequired: boolean;
+  capacityEnabled: boolean;
+  capacityRequired: boolean;
+  quantityEnabled: boolean;
+  availabilityEnabled: boolean;
+  featuresEnabled: boolean;
 }
 
 export interface CatalogueResourceTypeResponse {
@@ -237,6 +265,12 @@ export interface CatalogueResourceTypeResponse {
   description: string | null;
   isBookableDefault: boolean;
   isMovableDefault: boolean;
+  locationRequired: boolean;
+  capacityEnabled: boolean;
+  capacityRequired: boolean;
+  quantityEnabled: boolean;
+  availabilityEnabled: boolean;
+  featuresEnabled: boolean;
 }
 
 export interface CreateResourceTypeRequest {
@@ -246,6 +280,12 @@ export interface CreateResourceTypeRequest {
   description?: string | null;
   isBookableDefault: boolean;
   isMovableDefault: boolean;
+  locationRequired: boolean;
+  capacityEnabled: boolean;
+  capacityRequired: boolean;
+  quantityEnabled: boolean;
+  availabilityEnabled: boolean;
+  featuresEnabled: boolean;
 }
 
 export interface UpdateResourceTypeRequest {
@@ -255,6 +295,12 @@ export interface UpdateResourceTypeRequest {
   description?: string | null;
   isBookableDefault?: boolean;
   isMovableDefault?: boolean;
+  locationRequired?: boolean;
+  capacityEnabled?: boolean;
+  capacityRequired?: boolean;
+  quantityEnabled?: boolean;
+  availabilityEnabled?: boolean;
+  featuresEnabled?: boolean;
 }
 
 export interface LocationOption {

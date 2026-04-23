@@ -29,7 +29,7 @@ export default function ComponentsPage() {
   const [tab3, setTab3] = React.useState('active');
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px 80px' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px clamp(20px, 2.4vw, 36px) 80px' }}>
 
       {/* Header */}
       <div style={{ marginBottom: 56 }}>
