@@ -158,6 +158,7 @@ export interface ResourceResponse {
   createdAt: string;
   updatedAt: string;
   resourceType: ResourceTypeDetails | null;
+  locationName?: string | null;
   locationDetails: LocationDetails | null;
   features: ResourceFeatureDetails[];
   availabilityWindows: ResourceAvailabilityWindow[];
@@ -200,6 +201,8 @@ export interface ResourceOption {
   category: ResourceCategory;
   subcategory: string | null;
   locationName: string | null;
+  location?: string | null;
+  locationDetails?: LocationDetails | null;
   status: ResourceStatus;
   bookable: boolean;
 }

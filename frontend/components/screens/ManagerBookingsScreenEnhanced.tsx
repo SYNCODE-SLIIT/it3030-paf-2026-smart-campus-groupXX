@@ -26,6 +26,7 @@ import {
   approveModification,
   cancelApprovedBookingAsManager,
   completeBooking,
+  getResource,
   getErrorMessage,
   listAllBookings,
   listPendingModifications,
@@ -39,7 +40,9 @@ import type {
   BookingResponse,
   BookingStatus,
   ResourceOption,
+  ResourceResponse,
 } from '@/lib/api-types';
+import { getLocationTypeLabel, getWingLabel } from '@/lib/location-display';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
 
 type TabType = 'bookings' | 'modifications' | 'checkins';
@@ -89,8 +92,14 @@ function isCheckInWindow(booking: BookingResponse) {
   return startTime <= now && endTime > now;
 }
 
-function isSpaceResource(resource?: ResourceOption | null) {
+type BookingScreenResource = ResourceOption | ResourceResponse;
+
+function isSpaceResource(resource?: BookingScreenResource | null) {
   return resource?.category === 'SPACES';
+}
+
+function resolveResourceLocationLabel(resource?: BookingScreenResource | null) {
+  return resource?.locationDetails?.locationName ?? resource?.location ?? resource?.locationName ?? '';
 }
 
 function ManagerBookingSectionsSkeleton() {
@@ -140,6 +149,7 @@ export function ManagerBookingsScreenEnhanced() {
   } | null>(null);
   const [bookingDecisionReason, setBookingDecisionReason] = React.useState('');
   const [locationBooking, setLocationBooking] = React.useState<BookingResponse | null>(null);
+  const [resourceDetailsById, setResourceDetailsById] = React.useState<Record<string, ResourceResponse>>({});
 
   const reload = React.useCallback(async () => {
     if (!accessToken) {
@@ -157,15 +167,34 @@ export function ManagerBookingsScreenEnhanced() {
         listPendingModifications(accessToken),
         listResourceOptions(accessToken, { status: 'ACTIVE' }),
       ]);
+      const bookingResourceIds = Array.from(new Set(allBookings.map((booking) => booking.resource.id)));
+      const detailedResources = await Promise.all(
+        bookingResourceIds.map(async (resourceId) => {
+          try {
+            return await getResource(accessToken, resourceId);
+          } catch {
+            return null;
+          }
+        }),
+      );
 
       setBookings(allBookings);
       setModifications(pendingMods);
       setResources(availableResources);
+      setResourceDetailsById(
+        detailedResources.reduce<Record<string, ResourceResponse>>((accumulator, resource) => {
+          if (resource) {
+            accumulator[resource.id] = resource;
+          }
+          return accumulator;
+        }, {}),
+      );
     } catch (error) {
       setLoadError(getErrorMessage(error, 'We could not load bookings.'));
       setBookings([]);
       setModifications([]);
       setResources([]);
+      setResourceDetailsById({});
     } finally {
       setLoading(false);
     }
@@ -178,6 +207,10 @@ export function ManagerBookingsScreenEnhanced() {
   const resourceById = React.useMemo(
     () => new Map(resources.map((resource) => [resource.id, resource])),
     [resources],
+  );
+  const detailedResourceById = React.useMemo(
+    () => new Map(Object.entries(resourceDetailsById)),
+    [resourceDetailsById],
   );
 
   const categoryOptions = React.useMemo(
@@ -232,7 +265,7 @@ export function ManagerBookingsScreenEnhanced() {
     const needle = deferredSearch.trim().toLowerCase();
 
     return bookings.filter((booking) => {
-      const resource = resourceById.get(booking.resource.id);
+      const resource = detailedResourceById.get(booking.resource.id) ?? resourceById.get(booking.resource.id);
 
       if (statusFilter !== 'ALL' && booking.status !== statusFilter) {
         return false;
@@ -263,10 +296,10 @@ export function ManagerBookingsScreenEnhanced() {
         || (booking.purpose ?? '').toLowerCase().includes(needle)
         || (booking.requesterRegistrationNumber ?? '').toLowerCase().includes(needle)
         || booking.requesterId.toLowerCase().includes(needle)
-        || (resource?.locationName ?? '').toLowerCase().includes(needle)
+        || resolveResourceLocationLabel(resource).toLowerCase().includes(needle)
       );
     });
-  }, [bookings, categoryFilter, deferredSearch, resourceById, resourceFilter, statusFilter, subcategoryFilter]);
+  }, [bookings, categoryFilter, deferredSearch, detailedResourceById, resourceById, resourceFilter, statusFilter, subcategoryFilter]);
 
   const groupedBookings = React.useMemo(
     () => BOOKING_SECTIONS.map((section) => ({
@@ -278,14 +311,20 @@ export function ManagerBookingsScreenEnhanced() {
 
   const checkInBookings = React.useMemo(
     () => bookings.filter((booking) => {
-      const resource = resourceById.get(booking.resource.id);
+      const resource = detailedResourceById.get(booking.resource.id) ?? resourceById.get(booking.resource.id);
       return isSpaceResource(resource) && (booking.status === 'APPROVED' || booking.checkInStatus);
     }),
-    [bookings, resourceById],
+    [bookings, detailedResourceById, resourceById],
   );
 
-  const selectedLocationResource = locationBooking ? resourceById.get(locationBooking.resource.id) ?? null : null;
-  const selectedLocationName = selectedLocationResource?.locationName ?? null;
+  const selectedLocationResource = locationBooking
+    ? detailedResourceById.get(locationBooking.resource.id) ?? null
+    : null;
+  const selectedLocationDetails = selectedLocationResource?.locationDetails ?? null;
+  const selectedLocationName = selectedLocationDetails?.locationName ?? selectedLocationResource?.location ?? null;
+  const selectedLocationBuildingLabel = selectedLocationDetails?.buildingName
+    ? `${selectedLocationDetails.buildingName}${selectedLocationDetails.buildingCode ? ` (${selectedLocationDetails.buildingCode})` : ''}`
+    : 'N/A';
 
   const pendingBookings = bookings.filter((booking) => booking.status === 'PENDING').length;
   const approvedBookings = bookings.filter((booking) => booking.status === 'APPROVED').length;
@@ -620,7 +659,7 @@ export function ManagerBookingsScreenEnhanced() {
                           <div key={booking.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
                             <BookingCard
                               booking={booking}
-                              resource={resourceById.get(booking.resource.id)}
+                              resource={detailedResourceById.get(booking.resource.id) ?? resourceById.get(booking.resource.id)}
                               showRequester
                               onLocation={() => setLocationBooking(booking)}
                               actions={
@@ -688,7 +727,9 @@ export function ManagerBookingsScreenEnhanced() {
                 {modifications.map((modification) => {
                   const booking = bookings.find((entry) => entry.id === modification.bookingId);
                   const actionBusy = activeBookingId === modification.id;
-                  const resource = booking ? resourceById.get(booking.resource.id) : null;
+                  const resource = booking
+                    ? detailedResourceById.get(booking.resource.id) ?? resourceById.get(booking.resource.id)
+                    : null;
 
                   return (
                     <Card
@@ -786,7 +827,7 @@ export function ManagerBookingsScreenEnhanced() {
                     <div key={booking.id} style={{ minWidth: 320, maxWidth: 340, flexShrink: 0 }}>
                       <BookingCard
                         booking={booking}
-                        resource={resourceById.get(booking.resource.id)}
+                        resource={detailedResourceById.get(booking.resource.id) ?? resourceById.get(booking.resource.id)}
                         showRequester
                         onLocation={() => setLocationBooking(booking)}
                         actions={
@@ -972,7 +1013,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Type
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  N/A
+                  {selectedLocationDetails ? getLocationTypeLabel(selectedLocationDetails.locationType) : 'N/A'}
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -980,7 +1021,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Building
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  N/A
+                  {selectedLocationBuildingLabel}
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -988,7 +1029,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Wing
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  N/A
+                  {selectedLocationDetails ? getWingLabel(selectedLocationDetails.wing) : 'N/A'}
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -996,7 +1037,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Floor
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  N/A
+                  {selectedLocationDetails?.floor ?? 'N/A'}
                 </span>
               </div>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -1004,7 +1045,7 @@ export function ManagerBookingsScreenEnhanced() {
                   Room Code
                 </span>
                 <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>
-                  N/A
+                  {selectedLocationDetails?.roomCode ?? 'N/A'}
                 </span>
               </div>
             </div>
