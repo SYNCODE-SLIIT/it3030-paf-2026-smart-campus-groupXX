@@ -24,22 +24,13 @@ type AlertState = {
 
 export function LoginScreen({ reason }: { reason: string | null }) {
   const router = useRouter();
-  const { authConfigured, appUser, refreshMe, signInWithGoogle, signInWithMicrosoft, signInWithPassword } = useAuth();
+  const { authConfigured, refreshMe, signInWithGoogle, signInWithMicrosoft, signInWithPassword } = useAuth();
   const initialAlert = React.useMemo(() => getLoginReasonAlert(reason), [reason]);
   const [alert, setAlert] = React.useState<AlertState>(initialAlert);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const [isMicrosoftLoading, setIsMicrosoftLoading] = React.useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = React.useState(false);
   const [isPasswordResetLoading, setIsPasswordResetLoading] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!appUser) return;
-    if (needsStudentOnboarding(appUser)) {
-      router.replace(STUDENT_ONBOARDING_PATH);
-      return;
-    }
-    router.replace(getUserHomePath(appUser));
-  }, [appUser, router]);
 
   async function handleGoogleSignIn() {
     setAlert(null);

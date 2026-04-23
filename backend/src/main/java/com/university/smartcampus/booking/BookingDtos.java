@@ -40,6 +40,8 @@ public final class BookingDtos {
         ResourceDtos.ResourceSummary resource,
         UUID requesterId,
         String requesterRegistrationNumber,
+        UUID recurringBookingId,
+        RecurrencePattern recurrencePattern,
         BookingStatus status,
         Instant startTime,
         Instant endTime,

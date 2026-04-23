@@ -4,7 +4,7 @@ import React from 'react';
 import { Mail, RefreshCw } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Alert, Button, Card, Chip, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { Alert, Button, Card, Chip, Table, TableBody, TableCell, TableHead, TableRow } from '@/components/ui';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { useNotifications } from '@/components/notifications/useNotifications';
 import { getErrorMessage, listNotificationDeliveries } from '@/lib/api-client';
@@ -41,6 +41,7 @@ export function AdminNotificationsScreen() {
   const { session } = useAuth();
   const accessToken = session?.access_token ?? null;
   const notifications = useNotifications(accessToken);
+  const refreshNotifications = notifications.refreshNotifications;
   const [activeTab, setActiveTab] = React.useState<TabKey>('inbox');
   const [deliveries, setDeliveries] = React.useState<NotificationDeliveryResponse[]>([]);
   const [deliveryStatus, setDeliveryStatus] = React.useState<NotificationDeliveryStatus | ''>('');
@@ -70,8 +71,8 @@ export function AdminNotificationsScreen() {
   }, [accessToken, deliveryStatus]);
 
   React.useEffect(() => {
-    void notifications.refreshNotifications('all');
-  }, [notifications.refreshNotifications]);
+    void refreshNotifications('all');
+  }, [refreshNotifications]);
 
   React.useEffect(() => {
     if (activeTab === 'deliveries') {
