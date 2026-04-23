@@ -22,6 +22,8 @@ import type {
 } from '@/lib/api-types';
 import { getResourceCategoryChipColor, getResourceCategoryLabel, resourceCategoryOptions } from '@/lib/resource-display';
 
+const RESOURCE_TYPE_PAGE_SIZE = 10;
+
 type FlagChip = {
   label: string;
   color: 'yellow' | 'red' | 'green' | 'blue' | 'orange' | 'neutral' | 'glass';
@@ -80,8 +82,13 @@ export function CatalogueResourceTypesScreen({
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [searchText, setSearchText] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
+  const [page, setPage] = React.useState(0);
 
   const deferredSearch = React.useDeferredValue(searchText);
+
+  React.useEffect(() => {
+    setPage(0);
+  }, [deferredSearch, categoryFilter]);
   const isControlled = onAddOpenChange !== undefined;
   const formOpen = isControlled ? (addOpen ?? false) : internalFormOpen;
 
@@ -135,6 +142,16 @@ export function CatalogueResourceTypesScreen({
       return true;
     });
   }, [categoryFilter, deferredSearch, resourceTypes]);
+
+  const totalFiltered = filteredResourceTypes.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / RESOURCE_TYPE_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pageStart = totalFiltered === 0 ? 0 : currentPage * RESOURCE_TYPE_PAGE_SIZE + 1;
+  const pageEnd = Math.min((currentPage + 1) * RESOURCE_TYPE_PAGE_SIZE, totalFiltered);
+  const pagedResourceTypes = React.useMemo(
+    () => filteredResourceTypes.slice(currentPage * RESOURCE_TYPE_PAGE_SIZE, currentPage * RESOURCE_TYPE_PAGE_SIZE + RESOURCE_TYPE_PAGE_SIZE),
+    [currentPage, filteredResourceTypes],
+  );
 
   async function handleSave(payload: CreateResourceTypeRequest | UpdateResourceTypeRequest) {
     if (!accessToken) {
@@ -276,12 +293,12 @@ export function CatalogueResourceTypesScreen({
                   <TableRow>
                     <TableCell colSpan={5}>Loading resource types…</TableCell>
                   </TableRow>
-                ) : filteredResourceTypes.length === 0 ? (
+                ) : pagedResourceTypes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5}>No resource types match the current filters.</TableCell>
                   </TableRow>
                 ) : (
-                  filteredResourceTypes.map((resourceType) => (
+                  pagedResourceTypes.map((resourceType) => (
                     <TableRow key={resourceType.id}>
                       <TableCell><strong>{resourceType.code}</strong></TableCell>
                       <TableCell>
@@ -334,6 +351,32 @@ export function CatalogueResourceTypesScreen({
               </TableBody>
             </Table>
           </div>
+
+          {!loading && totalFiltered > RESOURCE_TYPE_PAGE_SIZE && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                Showing {pageStart}-{pageEnd} of {totalFiltered}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  disabled={currentPage <= 0}
+                  onClick={() => setPage((current) => Math.max(current - 1, 0))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  disabled={currentPage >= totalPages - 1}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
     </div>

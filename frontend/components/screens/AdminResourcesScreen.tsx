@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { CircleSlash, FolderOpen, Pencil, Plus, Search } from 'lucide-react';
+import { CircleSlash, FolderOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
@@ -14,6 +14,7 @@ import {
   getResourceLookups,
   getResourceStats,
   listResourcePage,
+  permanentlyDeleteResource,
   updateResource,
 } from '@/lib/api-client';
 import type {
@@ -80,6 +81,7 @@ export function AdminResourcesScreen({
   }
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [permanentDeletingId, setPermanentDeletingId] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [page, setPage] = React.useState(0);
 
@@ -216,6 +218,30 @@ export function AdminResourcesScreen({
       showToast('error', 'Delete failed', getErrorMessage(error, 'We could not remove the resource.'));
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handlePermanentDelete(resource: ResourceListItem) {
+    if (!accessToken) {
+      showToast('error', 'Session unavailable', 'Please sign in again.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Permanently delete ${resource.code}?\n\nThis cannot be undone. Historical bookings, recurring bookings, and catalogue links for this resource will also be removed. Tickets that reference this resource will be kept but detached.\n\nIf active or upcoming bookings exist, the delete will be blocked — cancel those bookings or use Deactivate instead.`
+    );
+    if (!confirmed) return;
+
+    setPermanentDeletingId(resource.id);
+    try {
+      await permanentlyDeleteResource(accessToken, resource.id);
+      showToast('success', 'Resource deleted', `${resource.code} was permanently removed.`);
+      await Promise.all([reloadResources(), loadStats()]);
+      onResourcesChanged?.();
+    } catch (error) {
+      showToast('error', 'Delete failed', getErrorMessage(error, 'We could not permanently delete the resource.'));
+    } finally {
+      setPermanentDeletingId(null);
     }
   }
 
@@ -417,6 +443,14 @@ export function AdminResourcesScreen({
                               aria-label={`Deactivate ${resource.code}`}
                               loading={deletingId === resource.id}
                               onClick={() => void handleDelete(resource)}
+                            />
+                            <IconButton
+                              variant="danger"
+                              icon={<Trash2 size={13} />}
+                              title="Permanently delete resource"
+                              aria-label={`Permanently delete ${resource.code}`}
+                              loading={permanentDeletingId === resource.id}
+                              onClick={() => void handlePermanentDelete(resource)}
                             />
                           </div>
                         </TableCell>

@@ -24,6 +24,8 @@ import type {
 } from '@/lib/api-types';
 import { formatBuildingOptionLabel, getLocationTypeLabel, getWingLabel, locationTypeOptions } from '@/lib/location-display';
 
+const LOCATION_PAGE_SIZE = 50;
+
 export function CatalogueLocationsScreen({
   embedded = false,
   addOpen,
@@ -48,8 +50,13 @@ export function CatalogueLocationsScreen({
   const [searchText, setSearchText] = React.useState('');
   const [buildingFilter, setBuildingFilter] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState('');
+  const [page, setPage] = React.useState(0);
 
   const deferredSearch = React.useDeferredValue(searchText);
+
+  React.useEffect(() => {
+    setPage(0);
+  }, [deferredSearch, buildingFilter, typeFilter]);
   const isControlled = onAddOpenChange !== undefined;
   const formOpen = isControlled ? (addOpen ?? false) : internalFormOpen;
 
@@ -113,6 +120,16 @@ export function CatalogueLocationsScreen({
       return true;
     });
   }, [buildingFilter, deferredSearch, locations, typeFilter]);
+
+  const totalFiltered = filteredLocations.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / LOCATION_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pageStart = totalFiltered === 0 ? 0 : currentPage * LOCATION_PAGE_SIZE + 1;
+  const pageEnd = Math.min((currentPage + 1) * LOCATION_PAGE_SIZE, totalFiltered);
+  const pagedLocations = React.useMemo(
+    () => filteredLocations.slice(currentPage * LOCATION_PAGE_SIZE, currentPage * LOCATION_PAGE_SIZE + LOCATION_PAGE_SIZE),
+    [currentPage, filteredLocations],
+  );
 
   async function handleSave(payload: CreateLocationRequest | UpdateLocationRequest) {
     if (!accessToken) {
@@ -270,12 +287,12 @@ export function CatalogueLocationsScreen({
                   <TableRow>
                     <TableCell colSpan={7}>Loading locations…</TableCell>
                   </TableRow>
-                ) : filteredLocations.length === 0 ? (
+                ) : pagedLocations.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>No locations match the current filters.</TableCell>
                   </TableRow>
                 ) : (
-                  filteredLocations.map((location) => (
+                  pagedLocations.map((location) => (
                     <TableRow key={location.id}>
                       <TableCell>
                         <div style={{ display: 'grid', gap: 2 }}>
@@ -320,6 +337,32 @@ export function CatalogueLocationsScreen({
               </TableBody>
             </Table>
           </div>
+
+          {!loading && totalFiltered > LOCATION_PAGE_SIZE && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                Showing {pageStart}-{pageEnd} of {totalFiltered}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  disabled={currentPage <= 0}
+                  onClick={() => setPage((current) => Math.max(current - 1, 0))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  disabled={currentPage >= totalPages - 1}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
     </div>

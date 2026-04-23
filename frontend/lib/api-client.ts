@@ -636,6 +636,15 @@ export async function deleteResource(accessToken: string, resourceId: string) {
   return response;
 }
 
+export async function permanentlyDeleteResource(accessToken: string, resourceId: string) {
+  const response = await request<MessageResponse>(`/api/resources/${resourceId}/permanent`, {
+    method: 'DELETE',
+    accessToken,
+  });
+  clearResourceReadCaches();
+  return response;
+}
+
 export async function listBuildings(accessToken: string) {
   return request<BuildingResponse[]>('/api/admin/buildings', {
     accessToken,

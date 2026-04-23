@@ -136,4 +136,10 @@ public class ResourceController {
         UserEntity actor = currentUserService.requireAdminOrCatalogManager(authentication);
         return resourceService.deleteResource(id, actor);
     }
+
+    @DeleteMapping("/{id}/permanent")
+    public MessageResponse permanentlyDeleteResource(@PathVariable UUID id, Authentication authentication) {
+        UserEntity actor = currentUserService.requireAdminOrCatalogManager(authentication);
+        return resourceService.permanentlyDeleteResource(id, actor);
+    }
 }

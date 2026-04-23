@@ -35,6 +35,10 @@ public interface TicketRepository extends JpaRepository<TicketEntity, UUID>, Jpa
 
     List<TicketEntity> findByStatusIn(List<TicketStatus> statuses);
 
+    boolean existsByResourceIdAndStatusIn(UUID resourceId, List<TicketStatus> statuses);
+
+    List<TicketEntity> findAllByResourceId(UUID resourceId);
+
     @Query(value = "SELECT nextval('public.ticket_code_seq')", nativeQuery = true)
     Long nextTicketCodeSequence();
 }
