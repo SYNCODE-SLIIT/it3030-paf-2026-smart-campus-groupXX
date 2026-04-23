@@ -11,10 +11,13 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.AppEnums.RecurrencePattern;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.resource.ResourceEntity;
 import com.university.smartcampus.resource.ResourceService;
 import com.university.smartcampus.user.entity.UserEntity;
@@ -26,17 +29,23 @@ public class RecurringBookingService {
     private final BookingRepository bookingRepository;
     private final ResourceService resourceService;
     private final BookingValidator bookingValidator;
+    private final BookingDecisionService bookingDecisionService;
+    private final NotificationService notificationService;
 
     public RecurringBookingService(
         RecurringBookingRepository recurringBookingRepository,
         BookingRepository bookingRepository,
         ResourceService resourceService,
-        BookingValidator bookingValidator
+        BookingValidator bookingValidator,
+        BookingDecisionService bookingDecisionService,
+        NotificationService notificationService
     ) {
         this.recurringBookingRepository = recurringBookingRepository;
         this.bookingRepository = bookingRepository;
         this.resourceService = resourceService;
         this.bookingValidator = bookingValidator;
+        this.bookingDecisionService = bookingDecisionService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -200,6 +209,72 @@ public class RecurringBookingService {
         return toRecurringResponse(saved);
     }
 
+    @Transactional
+    public BookingDtos.RecurringBookingResponse approvePendingOccurrences(UUID recurringBookingId, UserEntity actor) {
+        Objects.requireNonNull(actor, "Actor is required.");
+
+        RecurringBookingEntity recurring = requireRecurringBooking(recurringBookingId);
+        List<BookingEntity> seriesBookings = bookingRepository.findAllByRecurringBookingIdOrderByStartTimeAsc(recurringBookingId);
+
+        List<BookingEntity> pendingBookings = seriesBookings.stream()
+            .filter(booking -> booking.getStatus() == BookingStatus.PENDING)
+            .toList();
+
+        if (pendingBookings.isEmpty()) {
+            throw new BadRequestException("No pending bookings were found for this recurring series.");
+        }
+
+        for (BookingEntity booking : pendingBookings) {
+            bookingDecisionService.approveBooking(booking.getId(), actor);
+        }
+
+        return toRecurringResponse(recurring);
+    }
+
+    @Transactional
+    public BookingDtos.RecurringBookingResponse cancelFutureOccurrences(
+        UUID recurringBookingId,
+        UserEntity actor,
+        BookingDtos.CancelBookingRequest request
+    ) {
+        Objects.requireNonNull(actor, "Actor is required.");
+
+        RecurringBookingEntity recurring = requireRecurringBooking(recurringBookingId);
+        List<BookingEntity> seriesBookings = bookingRepository.findAllByRecurringBookingIdOrderByStartTimeAsc(recurringBookingId);
+        Instant now = bookingValidator.currentInstant();
+        String reason = normalizeReason(request == null ? null : request.reason());
+
+        List<BookingEntity> bookingsToCancel = seriesBookings.stream()
+            .filter(booking -> booking.getStartTime().isAfter(now))
+            .filter(booking -> booking.getStatus() == BookingStatus.PENDING || booking.getStatus() == BookingStatus.APPROVED)
+            .toList();
+
+        boolean wasActive = recurring.isActive();
+        if (wasActive) {
+            recurring.setActive(false);
+        }
+
+        if (bookingsToCancel.isEmpty() && !wasActive) {
+            throw new BadRequestException("No future bookings were found to cancel for this recurring series.");
+        }
+
+        for (BookingEntity booking : bookingsToCancel) {
+            booking.setStatus(BookingStatus.CANCELLED);
+            booking.setCancellationReason(reason);
+            booking.setCancelledAt(now);
+        }
+
+        if (!bookingsToCancel.isEmpty()) {
+            bookingRepository.saveAll(bookingsToCancel);
+            for (BookingEntity booking : bookingsToCancel) {
+                notificationService.notifyBookingCancelledByStaff(booking, actor);
+            }
+        }
+
+        RecurringBookingEntity saved = recurringBookingRepository.save(recurring);
+        return toRecurringResponse(saved);
+    }
+
     private BookingDtos.RecurringBookingResponse toRecurringResponse(RecurringBookingEntity recurring) {
         return new BookingDtos.RecurringBookingResponse(
             recurring.getId(),
@@ -215,6 +290,16 @@ public class RecurringBookingService {
             recurring.isActive(),
             recurring.getCreatedAt()
         );
+    }
+
+    private RecurringBookingEntity requireRecurringBooking(UUID recurringBookingId) {
+        Objects.requireNonNull(recurringBookingId, "Recurring booking id is required.");
+        return recurringBookingRepository.findById(recurringBookingId)
+            .orElseThrow(() -> new NotFoundException("Recurring booking not found."));
+    }
+
+    private String normalizeReason(String reason) {
+        return StringUtils.hasText(reason) ? reason.trim() : null;
     }
 
     private BookingWindow buildBookingWindow(Instant baseDate, LocalTime startTime, LocalTime endTime) {

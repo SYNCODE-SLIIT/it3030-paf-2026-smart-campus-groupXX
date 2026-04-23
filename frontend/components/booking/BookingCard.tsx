@@ -132,6 +132,25 @@ function isSpaceResource(resource?: BookingCardResource | null) {
   return resource?.category === 'SPACES';
 }
 
+function recurrenceLabel(booking: BookingResponse) {
+  if (!booking.recurringBookingId || !booking.recurrencePattern || booking.recurrencePattern === 'NONE') {
+    return null;
+  }
+
+  switch (booking.recurrencePattern) {
+    case 'DAILY':
+      return 'Daily Series';
+    case 'WEEKLY':
+      return 'Weekly Series';
+    case 'BIWEEKLY':
+      return 'Biweekly Series';
+    case 'MONTHLY':
+      return 'Monthly Series';
+    default:
+      return 'Recurring Series';
+  }
+}
+
 export function BookingCardSkeleton() {
   return (
     <div
@@ -187,6 +206,7 @@ export function BookingCard({
   const locationLabel = summarizeLocation(resource);
   const note = statusNote(booking);
   const showCheckInStatus = isSpaceResource(resource) && booking.checkInStatus;
+  const recurringLabel = recurrenceLabel(booking);
 
   return (
     <div
@@ -229,6 +249,11 @@ export function BookingCard({
             {resource?.category && (
               <Chip size="sm" color="neutral">
                 {getResourceCategoryLabel(resource.category)}
+              </Chip>
+            )}
+            {recurringLabel && (
+              <Chip size="sm" color="blue">
+                {recurringLabel}
               </Chip>
             )}
           </div>
