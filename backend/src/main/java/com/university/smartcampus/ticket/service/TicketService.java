@@ -276,7 +276,7 @@ public class TicketService {
         UserEntity newAssignee = resolveAssignableAssignee(assignedToUserId);
         ticket.setAssignedTo(newAssignee);
         recordAssignmentHistory(ticket, oldAssignee, newAssignee, actor, null);
-        notificationService.notifyTicketAssigned(ticket, oldAssignee, newAssignee, actor);
+        // Temporary bypass: assignment must not depend on notification schema changes in progress.
         return toTicketResponse(ticket);
     }
 
