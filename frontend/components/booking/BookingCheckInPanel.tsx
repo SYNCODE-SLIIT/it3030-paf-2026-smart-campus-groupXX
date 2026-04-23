@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { CheckCircle2, Clock, AlertCircle, User } from 'lucide-react';
+import { CheckCircle2, Clock3, UserRound, XCircle } from 'lucide-react';
+
 import { Alert, Button, Card, Chip } from '@/components/ui';
 import type { BookingResponse, CheckInStatus } from '@/lib/api-types';
 
@@ -14,7 +15,7 @@ interface BookingCheckInPanelProps {
   isLoading?: boolean;
 }
 
-function formatDateTime(dateString: string): string {
+function formatDateTime(dateString: string) {
   const date = new Date(dateString);
   return new Intl.DateTimeFormat('en-LK', {
     year: 'numeric',
@@ -36,7 +37,7 @@ function getCheckInStatusColor(status: CheckInStatus | null | undefined): 'yello
   }
 }
 
-function getCheckInStatusLabel(status: CheckInStatus | null | undefined): string {
+function getCheckInStatusLabel(status: CheckInStatus | null | undefined) {
   switch (status) {
     case 'CHECKED_IN':
       return 'Checked In';
@@ -66,141 +67,107 @@ export function BookingCheckInPanel({
   const canComplete = booking.checkInStatus === 'CHECKED_IN' && hasEnded;
 
   return (
-    <Card style={{ padding: 16 }}>
-      <div style={{ display: 'grid', gap: 16 }}>
-        {/* Booking Details */}
+    <Card style={{ padding: 20, display: 'grid', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Check-in Status</h3>
-            <Chip color={getCheckInStatusColor(booking.checkInStatus)}>
-              {getCheckInStatusLabel(booking.checkInStatus)}
-            </Chip>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 800, color: 'var(--text-h)' }}>
+            {booking.resource.name}
           </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 12,
-              fontSize: 13,
-              color: 'var(--text-secondary)',
-            }}
-          >
-            <div>
-              <div style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 4 }}>
-                Start
-              </div>
-              <div>{formatDateTime(booking.startTime)}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 4 }}>
-                End
-              </div>
-              <div>{formatDateTime(booking.endTime)}</div>
-            </div>
+          <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+            {booking.resource.code}
           </div>
         </div>
+        <Chip color={getCheckInStatusColor(booking.checkInStatus)} size="sm" dot>
+          {getCheckInStatusLabel(booking.checkInStatus)}
+        </Chip>
+      </div>
 
-        {/* Check-in Info */}
-        {booking.checkedInAt && (
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              padding: 12,
-              backgroundColor: 'var(--bg-success)',
-              borderRadius: 6,
-              alignItems: 'flex-start',
-            }}
-          >
-            <CheckCircle2 size={18} style={{ color: 'var(--text-success)', flexShrink: 0, marginTop: 2 }} />
-            <div style={{ fontSize: 12 }}>
-              <strong style={{ color: 'var(--text-success)' }}>Checked in</strong>
-              <br />
-              <span style={{ color: 'var(--text-secondary)' }}>{formatDateTime(booking.checkedInAt)}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+        <div style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface-2)', display: 'grid', gap: 5 }}>
+          <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--text-muted)' }}>
+            Start
+          </span>
+          <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>{formatDateTime(booking.startTime)}</span>
+        </div>
+        <div style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface-2)', display: 'grid', gap: 5 }}>
+          <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--text-muted)' }}>
+            End
+          </span>
+          <span style={{ color: 'var(--text-body)', fontWeight: 600 }}>{formatDateTime(booking.endTime)}</span>
+        </div>
+      </div>
+
+      {booking.checkedInAt && (
+        <Alert variant="success" title="Checked in">
+          Booking was checked in at {formatDateTime(booking.checkedInAt)}.
+        </Alert>
+      )}
+
+      <div style={{ display: 'grid', gap: 8 }}>
+        {hasStarted && !hasEnded && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-body)' }}>
+            <Clock3 size={15} style={{ color: 'var(--blue-500)' }} />
+            <span>Booking is currently in progress.</span>
+          </div>
+        )}
+        {hasEnded && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-body)' }}>
+            <Clock3 size={15} style={{ color: 'var(--text-muted)' }} />
+            <span>Booking time has ended.</span>
+          </div>
+        )}
+        {!hasStarted && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-body)' }}>
+            <UserRound size={15} style={{ color: 'var(--text-muted)' }} />
+            <span>Booking starts later. Check-in opens at the start time.</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gap: 10 }}>
+        {canCheckIn && onCheckIn && (
+          <Alert variant="info" title="Check-in available">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13 }}>Check in now to mark attendance for this booking.</span>
+              <Button variant="primary" onClick={onCheckIn} loading={isLoading} iconLeft={<CheckCircle2 size={14} />}>
+                Check In
+              </Button>
             </div>
+          </Alert>
+        )}
+
+        {!isManager && booking.status === 'APPROVED' && !canCheckIn && !hasEnded && (
+          <Alert variant="info" title="Awaiting booking time">
+            Check-in will be available when the booking window starts.
+          </Alert>
+        )}
+
+        {isManager && (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {canMarkNoShow && onMarkNoShow && (
+              <Button variant="ghost-danger" onClick={onMarkNoShow} loading={isLoading} iconLeft={<XCircle size={14} />}>
+                Mark No-Show
+              </Button>
+            )}
+            {canComplete && onComplete && (
+              <Button variant="primary" onClick={onComplete} loading={isLoading} iconLeft={<CheckCircle2 size={14} />}>
+                Complete Booking
+              </Button>
+            )}
           </div>
         )}
 
-        {/* Time Status */}
-        <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-          {hasStarted && !hasEnded && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-info)' }}>
-              <Clock size={16} />
-              <span>Booking is currently ongoing</span>
-            </div>
-          )}
-          {hasEnded && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-muted)' }}>
-              <Clock size={16} />
-              <span>Booking time has ended</span>
-            </div>
-          )}
-          {!hasStarted && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-muted)' }}>
-              <Clock size={16} />
-              <span>Booking starts in {Math.round((bookingStart.getTime() - now.getTime()) / 60000)} minutes</span>
-            </div>
-          )}
-        </div>
+        {booking.status === 'COMPLETED' && (
+          <Alert variant="success" title="Booking completed">
+            This booking has already been marked as completed.
+          </Alert>
+        )}
 
-        {/* Actions */}
-        <div style={{ display: 'grid', gap: 8 }}>
-          {/* User Check-in */}
-          {canCheckIn && onCheckIn && (
-            <Alert variant="info" title="Check-in Available">
-              <div style={{ display: 'grid', gap: 8 }}>
-                <p style={{ margin: 0, fontSize: 13 }}>Click below to mark yourself as checked in.</p>
-                <Button
-                  variant="primary"
-                  onClick={onCheckIn}
-                  disabled={isLoading}
-                  style={{ justifySelf: 'flex-start' }}
-                >
-                  {isLoading ? 'Checking in...' : 'Check In Now'}
-                </Button>
-              </div>
-            </Alert>
-          )}
-
-          {/* Manager Actions */}
-          {isManager && (
-            <div style={{ display: 'grid', gap: 8 }}>
-              {canMarkNoShow && onMarkNoShow && (
-                <Button variant="ghost-danger" onClick={onMarkNoShow} disabled={isLoading} style={{ justifyContent: 'flex-start' }}>
-                  {isLoading ? 'Processing...' : '❌ Mark as No Show'}
-                </Button>
-              )}
-
-              {canComplete && onComplete && (
-                <Button variant="primary" onClick={onComplete} disabled={isLoading} style={{ justifyContent: 'flex-start' }}>
-                  {isLoading ? 'Completing...' : '✓ Complete Booking'}
-                </Button>
-              )}
-
-              {booking.status === 'COMPLETED' && (
-                <Alert variant="success" title="Booking Completed">
-                  <p style={{ margin: 0, fontSize: 13 }}>This booking has been marked as completed.</p>
-                </Alert>
-              )}
-
-              {booking.status === 'NO_SHOW' && (
-                <Alert variant="error" title="No Show">
-                  <p style={{ margin: 0, fontSize: 13 }}>User did not check in or use this booking.</p>
-                </Alert>
-              )}
-            </div>
-          )}
-
-          {/* User Waiting for Status */}
-          {!isManager && booking.status === 'APPROVED' && !canCheckIn && !hasEnded && (
-            <Alert variant="info" title="Awaiting Booking Time">
-              <p style={{ margin: 0, fontSize: 13 }}>
-                Check-in will be available when the booking time starts ({formatDateTime(booking.startTime)}).
-              </p>
-            </Alert>
-          )}
-        </div>
+        {booking.status === 'NO_SHOW' && (
+          <Alert variant="error" title="No show">
+            This booking was recorded as a no-show.
+          </Alert>
+        )}
       </div>
     </Card>
   );

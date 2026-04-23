@@ -351,7 +351,7 @@ export function BookingCard({
 
 export function BookingSection({ label, color, count, children }: BookingSectionProps) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
         <div style={{ width: 3, height: 16, borderRadius: 2, background: color, flexShrink: 0 }} />
         <span
@@ -372,18 +372,23 @@ export function BookingSection({ label, color, count, children }: BookingSection
           </span>
         )}
       </div>
-      <div
-        style={{
-          display: 'flex',
-          gap: 16,
-          overflowX: 'auto',
-          padding: '18px 24px 36px',
-          margin: '-18px -24px -24px',
-          scrollPaddingInline: 24,
-          scrollbarWidth: 'thin',
-        }}
-      >
-        {children}
+      <div style={{ minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 16,
+            width: '100%',
+            maxWidth: '100%',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            padding: '18px 0 18px',
+            scrollPaddingInline: 0,
+            scrollbarWidth: 'thin',
+            overscrollBehaviorX: 'contain',
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

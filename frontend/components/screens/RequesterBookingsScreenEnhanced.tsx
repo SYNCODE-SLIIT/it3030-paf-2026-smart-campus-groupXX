@@ -26,7 +26,6 @@ import { RecurringBookingForm } from '@/components/booking/RecurringBookingForm'
 import { BookingModificationModal } from '@/components/booking/BookingModificationModal';
 import { BookingCheckInPanel } from '@/components/booking/BookingCheckInPanel';
 import { BookingCalendar } from '@/components/booking/BookingCalendar';
-import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import {
   cancelMyBooking,
   checkInBooking,
@@ -38,7 +37,6 @@ import {
   listMyRecurringBookings,
   listNotifications,
   listResources,
-  markNotificationAsRead,
   requestBookingModification,
 } from '@/lib/api-client';
 import type {
@@ -54,7 +52,7 @@ import type {
 import { getLocationTypeLabel, getWingLabel } from '@/lib/location-display';
 import { getResourceCategoryLabel } from '@/lib/resource-display';
 
-type TabType = 'bookings' | 'recurring' | 'calendar' | 'notifications';
+type TabType = 'bookings' | 'recurring' | 'calendar';
 
 const DURATION_HINTS: Record<string, string> = {
   SPACES: 'Max 3 hours',
@@ -439,19 +437,6 @@ export function RequesterBookingsScreenEnhanced({
     }
   }
 
-  async function handleMarkNotificationAsRead(notification: NotificationResponse) {
-    if (!accessToken) {
-      return;
-    }
-
-    try {
-      await markNotificationAsRead(accessToken, notification.id);
-      await reload();
-    } catch (error) {
-      console.error('Failed to mark notification as read', error);
-    }
-  }
-
   const resourceById = React.useMemo(
     () => new Map(resources.map((resource) => [resource.id, resource])),
     [resources],
@@ -540,7 +525,7 @@ export function RequesterBookingsScreenEnhanced({
   const unreadNotificationCount = notifications.filter((notification) => !notification.readAt).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0, width: '100%', overflowX: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <p
@@ -626,7 +611,6 @@ export function RequesterBookingsScreenEnhanced({
           { label: 'My Bookings', value: 'bookings', badge: bookings.length },
           { label: 'Recurring', value: 'recurring', badge: recurringBookings.length },
           { label: 'Calendar', value: 'calendar' },
-          { label: 'Notifications', value: 'notifications', badge: unreadNotificationCount },
         ]}
         value={activeTab}
         onChange={(value) => setActiveTab(value as TabType)}
@@ -663,8 +647,8 @@ export function RequesterBookingsScreenEnhanced({
       ) : (
         <>
           {activeTab === 'bookings' && (
-            <div style={{ display: 'grid', gap: 20 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.45fr) minmax(300px, 0.95fr)', gap: 16 }}>
+            <div style={{ display: 'grid', gap: 20, minWidth: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.45fr) minmax(300px, 0.95fr)', gap: 16, minWidth: 0 }}>
                 <Card style={{ padding: 20 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
                     <div>
@@ -776,7 +760,7 @@ export function RequesterBookingsScreenEnhanced({
                   )}
                 </Card>
 
-                <Card style={{ padding: 20 }}>
+                <Card style={{ padding: 20, minWidth: 0 }}>
                   <div style={{ display: 'grid', gap: 14 }}>
                     <div>
                       <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
@@ -820,8 +804,8 @@ export function RequesterBookingsScreenEnhanced({
                 </Card>
               </div>
 
-              <Card style={{ padding: 18 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'end' }}>
+              <Card style={{ padding: 18, minWidth: 0 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'end', minWidth: 0 }}>
                   <Input
                     id="requester-booking-search"
                     label="Search bookings"
@@ -845,7 +829,7 @@ export function RequesterBookingsScreenEnhanced({
                   No bookings match the current search text.
                 </Alert>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 32, minWidth: 0 }}>
                   {groupedBookings.map((section) => (
                     <BookingSection
                       key={section.status}
@@ -908,7 +892,7 @@ export function RequesterBookingsScreenEnhanced({
           )}
 
           {activeTab === 'recurring' && (
-            <div style={{ display: 'grid', gap: 18 }}>
+            <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
@@ -952,15 +936,6 @@ export function RequesterBookingsScreenEnhanced({
           )}
 
           {activeTab === 'calendar' && <BookingCalendar bookings={bookings} />}
-
-          {activeTab === 'notifications' && (
-            <NotificationCenter
-              notifications={notifications}
-              loading={submitting}
-              onRefresh={reload}
-              onMarkAsRead={handleMarkNotificationAsRead}
-            />
-          )}
         </>
       )}
 

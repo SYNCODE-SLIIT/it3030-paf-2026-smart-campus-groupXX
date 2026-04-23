@@ -430,7 +430,7 @@ export function ManagerBookingsScreenEnhanced() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0, width: '100%', overflowX: 'hidden' }}>
       <div>
         <p
           style={{
@@ -528,8 +528,8 @@ export function ManagerBookingsScreenEnhanced() {
       ) : (
         <>
           {activeTab === 'bookings' && (
-            <div style={{ display: 'grid', gap: 18 }}>
-              <Card style={{ padding: 18, display: 'grid', gap: 14 }}>
+            <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+              <Card style={{ padding: 18, display: 'grid', gap: 14, minWidth: 0 }}>
                 <Tabs
                   variant="pill"
                   tabs={[
@@ -546,7 +546,7 @@ export function ManagerBookingsScreenEnhanced() {
                   onChange={(value) => setStatusFilter(value as StatusFilter)}
                 />
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, minWidth: 0 }}>
                   <Input
                     id="manager-booking-search"
                     label="Search"
@@ -602,7 +602,7 @@ export function ManagerBookingsScreenEnhanced() {
                   No bookings match the current filters.
                 </Alert>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 32, minWidth: 0 }}>
                   {groupedBookings.map((section) => (
                     <BookingSection
                       key={section.status}
