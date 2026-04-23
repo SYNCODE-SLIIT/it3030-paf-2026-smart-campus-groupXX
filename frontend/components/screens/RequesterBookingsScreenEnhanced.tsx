@@ -56,14 +56,7 @@ import { getResourceCategoryLabel } from '@/lib/resource-display';
 
 type TabType = 'bookings' | 'recurring' | 'calendar';
 
-const DURATION_HINTS: Record<string, string> = {
-  SPACES: 'Max 3 hours',
-  LECTURE_HALL: 'Max 3 hours',
-  LABORATORY: 'Max 3 hours',
-  LIBRARY_SPACE: 'Max 3 hours',
-  MEETING_ROOM: 'Max 3 hours',
-  EVENT_SPACE: 'Max 3 hours',
-};
+const SPACES_DURATION_HINT = 'Max 3 hours';
 
 const NEW_BOOKING_INITIAL = {
   category: '',
@@ -542,7 +535,7 @@ export function RequesterBookingsScreenEnhanced({
     [categoryFilteredResources, form.subcategory],
   );
 
-  const selectedSubcategoryHint = DURATION_HINTS[normalizeSubcategory(form.subcategory)] ?? null;
+  const selectedCategoryHint = form.category === 'SPACES' ? SPACES_DURATION_HINT : null;
 
   const filteredBookings = React.useMemo(() => {
     const needle = deferredSearch.trim().toLowerCase();
@@ -779,9 +772,9 @@ export function RequesterBookingsScreenEnhanced({
                         />
                       </div>
 
-                      {selectedSubcategoryHint && (
+                      {selectedCategoryHint && (
                         <Alert variant="info" title="Duration Guidance">
-                          {selectedSubcategoryHint}
+                          {selectedCategoryHint}
                         </Alert>
                       )}
 
