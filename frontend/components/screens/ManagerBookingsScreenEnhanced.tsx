@@ -3,10 +3,10 @@
 import React from 'react';
 import { Check, Search, X } from 'lucide-react';
 
+import { BookingAlert as Alert } from '@/components/booking/BookingAlert';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import {
-  Alert,
   Button,
   Card,
   Chip,

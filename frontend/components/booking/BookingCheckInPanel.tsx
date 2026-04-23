@@ -3,7 +3,8 @@
 import React from 'react';
 import { CheckCircle2, Clock3, UserRound, XCircle } from 'lucide-react';
 
-import { Alert, Button, Card, Chip } from '@/components/ui';
+import { BookingAlert as Alert } from '@/components/booking/BookingAlert';
+import { Button, Card, Chip } from '@/components/ui';
 import type { BookingResponse, CheckInStatus } from '@/lib/api-types';
 
 interface BookingCheckInPanelProps {

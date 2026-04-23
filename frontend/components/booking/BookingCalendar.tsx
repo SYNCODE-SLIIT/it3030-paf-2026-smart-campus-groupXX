@@ -3,7 +3,8 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, Clock3, MapPin } from 'lucide-react';
 
-import { Alert, Button, Card, Chip } from '@/components/ui';
+import { BookingAlert as Alert } from '@/components/booking/BookingAlert';
+import { Button, Card, Chip } from '@/components/ui';
 import type { BookingResponse } from '@/lib/api-types';
 
 interface BookingCalendarProps {
