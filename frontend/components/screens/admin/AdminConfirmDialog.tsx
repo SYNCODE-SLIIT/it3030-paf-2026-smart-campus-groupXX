@@ -3,7 +3,7 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
-import { Alert, Button, Dialog } from '@/components/ui';
+import { Button, Dialog } from '@/components/ui';
 
 type ButtonVariant = 'primary' | 'danger' | 'glass' | 'subtle' | 'success' | 'info';
 type AlertVariant = 'error' | 'success' | 'warning' | 'info' | 'neutral';
@@ -17,7 +17,8 @@ export function AdminConfirmDialog({
   confirmIcon,
   loading = false,
   disabled = false,
-  alertVariant = 'warning',
+  alertVariant,
+  errorMessage,
   children,
   onClose,
   onConfirm,
@@ -31,6 +32,7 @@ export function AdminConfirmDialog({
   loading?: boolean;
   disabled?: boolean;
   alertVariant?: AlertVariant;
+  errorMessage?: string | null;
   children?: React.ReactNode;
   onClose: () => void;
   onConfirm: () => void;
@@ -43,12 +45,26 @@ export function AdminConfirmDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} title={title} size="sm" closeOnBackdropClick={!loading}>
-      <div style={{ display: 'grid', gap: 16, padding: 20 }}>
-        <Alert variant={alertVariant} title={title} icon={<AlertTriangle size={16} />}>
-          {description}
-        </Alert>
+      <div style={{ display: 'grid', gap: 16, padding: '20px 24px' }}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--orange-400)' }}>
+            <AlertTriangle size={16} />
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, color: 'var(--text-h)' }}>
+              Confirm Action
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-body)', lineHeight: 1.65 }}>
+            {description}
+          </p>
+        </div>
 
         {children}
+
+        {errorMessage && (
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: 'var(--red-500)' }}>
+            {errorMessage}
+          </p>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
           <Button variant="ghost" size="sm" disabled={loading} onClick={handleClose}>

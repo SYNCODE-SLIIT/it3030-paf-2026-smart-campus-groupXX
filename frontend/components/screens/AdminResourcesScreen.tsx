@@ -89,6 +89,7 @@ export function AdminResourcesScreen({
     type: 'activate' | 'deactivate' | 'delete';
     resource: ResourceListItem;
   } | null>(null);
+  const [confirmError, setConfirmError] = React.useState<string | null>(null);
   const [page, setPage] = React.useState(0);
 
   const deferredSearch = React.useDeferredValue(searchText);
@@ -241,8 +242,9 @@ export function AdminResourcesScreen({
       await Promise.all([reloadResources(), loadStats()]);
       onResourcesChanged?.();
       setConfirmAction(null);
+      setConfirmError(null);
     } catch (error) {
-      showToast('error', 'Delete failed', getErrorMessage(error, 'We could not remove the resource.'));
+      setConfirmError(getErrorMessage(error, 'We could not remove the resource.'));
     } finally {
       setDeletingId(null);
     }
@@ -261,8 +263,9 @@ export function AdminResourcesScreen({
       await Promise.all([reloadResources(), loadStats()]);
       onResourcesChanged?.();
       setConfirmAction(null);
+      setConfirmError(null);
     } catch (error) {
-      showToast('error', 'Activate failed', getErrorMessage(error, 'We could not activate the resource.'));
+      setConfirmError(getErrorMessage(error, 'We could not activate the resource.'));
     } finally {
       setActivatingId(null);
     }
@@ -281,8 +284,9 @@ export function AdminResourcesScreen({
       await Promise.all([reloadResources(), loadStats()]);
       onResourcesChanged?.();
       setConfirmAction(null);
+      setConfirmError(null);
     } catch (error) {
-      showToast('error', 'Delete failed', getErrorMessage(error, 'We could not permanently delete the resource.'));
+      setConfirmError(getErrorMessage(error, 'We could not permanently delete the resource.'));
     } finally {
       setPermanentDeletingId(null);
     }
@@ -494,7 +498,10 @@ export function AdminResourcesScreen({
                                 title="Activate resource"
                                 aria-label={`Activate ${resource.code}`}
                                 loading={activatingId === resource.id}
-                                onClick={() => setConfirmAction({ type: 'activate', resource })}
+                                onClick={() => {
+                                  setConfirmError(null);
+                                  setConfirmAction({ type: 'activate', resource });
+                                }}
                               />
                             ) : (
                               <IconButton
@@ -503,7 +510,10 @@ export function AdminResourcesScreen({
                                 title="Deactivate resource"
                                 aria-label={`Deactivate ${resource.code}`}
                                 loading={deletingId === resource.id}
-                                onClick={() => setConfirmAction({ type: 'deactivate', resource })}
+                                onClick={() => {
+                                  setConfirmError(null);
+                                  setConfirmAction({ type: 'deactivate', resource });
+                                }}
                               />
                             )}
                             <IconButton
@@ -512,7 +522,10 @@ export function AdminResourcesScreen({
                               title="Permanently delete resource"
                               aria-label={`Permanently delete ${resource.code}`}
                               loading={permanentDeletingId === resource.id}
-                              onClick={() => setConfirmAction({ type: 'delete', resource })}
+                              onClick={() => {
+                                setConfirmError(null);
+                                setConfirmAction({ type: 'delete', resource });
+                              }}
                             />
                           </div>
                         </TableCell>
@@ -579,7 +592,11 @@ export function AdminResourcesScreen({
         }
         confirmVariant={confirmAction?.type === 'delete' ? 'danger' : 'info'}
         loading={confirmLoading}
-        onClose={() => setConfirmAction(null)}
+        errorMessage={confirmError}
+        onClose={() => {
+          setConfirmAction(null);
+          setConfirmError(null);
+        }}
         onConfirm={() => {
           if (!confirmAction) return;
           if (confirmAction.type === 'activate') {

@@ -443,6 +443,7 @@ public class ResourceService {
                 ticket.setResource(null);
             }
             ticketRepository.saveAll(ticketsReferencingResource);
+            ticketRepository.flush();
         }
 
         notificationEventLinkRepository.clearResourceReferences(resource.getId());
@@ -450,10 +451,12 @@ public class ResourceService {
         resource.getFeatures().clear();
         resource.getImages().clear();
         resource.getAvailabilityWindows().clear();
+        resourceRepository.saveAndFlush(resource);
 
         notificationService.notifyResourceDeleted(resource, actor);
 
         resourceRepository.delete(resource);
+        resourceRepository.flush();
 
         return new MessageResponse("Resource permanently deleted.");
     }
