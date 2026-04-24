@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Paperclip,
   RotateCcw,
+  Search,
   ShieldCheck,
   Tag,
   UserPlus,
@@ -40,6 +41,7 @@ import { getAccountStatusChipColor, getAccountStatusLabel, getUserDisplayName, g
 
 type AnalyticsTab = 'tickets' | 'users';
 type TicketAnalyticsScope = 'ALL' | 'UNASSIGNED' | string;
+type UserAnalyticsJoinedScope = 'ALL' | '7_DAYS' | '30_DAYS';
 
 type TicketAnalyticsFilterState = {
   from: string;
@@ -48,6 +50,13 @@ type TicketAnalyticsFilterState = {
   scope: TicketAnalyticsScope;
   category: '' | TicketCategory;
   priority: '' | TicketPriority;
+};
+
+type UserAnalyticsFilterState = {
+  search: string;
+  userType: '' | UserType;
+  accountStatus: '' | AccountStatus;
+  joinedScope: UserAnalyticsJoinedScope;
 };
 
 const roleOrder: UserType[] = ['STUDENT', 'FACULTY', 'MANAGER', 'ADMIN'];
@@ -59,6 +68,13 @@ const defaultTicketFilters: TicketAnalyticsFilterState = {
   scope: 'ALL',
   category: '',
   priority: '',
+};
+
+const defaultUserFilters: UserAnalyticsFilterState = {
+  search: '',
+  userType: '',
+  accountStatus: '',
+  joinedScope: 'ALL',
 };
 
 const bucketOptions = [
@@ -85,6 +101,27 @@ const priorityOptions: Array<{ value: '' | TicketPriority; label: string }> = [
   { value: 'HIGH', label: 'High' },
   { value: 'MEDIUM', label: 'Medium' },
   { value: 'LOW', label: 'Low' },
+];
+
+const userTypeOptions: Array<{ value: '' | UserType; label: string }> = [
+  { value: '', label: 'All roles' },
+  { value: 'STUDENT', label: 'Student' },
+  { value: 'FACULTY', label: 'Faculty' },
+  { value: 'MANAGER', label: 'Manager' },
+  { value: 'ADMIN', label: 'Admin' },
+];
+
+const userStatusOptions: Array<{ value: '' | AccountStatus; label: string }> = [
+  { value: '', label: 'All statuses' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'INVITED', label: 'Invited' },
+  { value: 'SUSPENDED', label: 'Suspended' },
+];
+
+const joinedScopeOptions: Array<{ value: UserAnalyticsJoinedScope; label: string }> = [
+  { value: 'ALL', label: 'All users' },
+  { value: '7_DAYS', label: 'Joined last 7 days' },
+  { value: '30_DAYS', label: 'Joined last 30 days' },
 ];
 
 function startOfDate(value: string) {
@@ -133,6 +170,42 @@ function formatDateTime(value: string) {
 function formatOptionalDateTime(value: string | null) {
   if (!value) return 'Never';
   return formatDateTime(value);
+}
+
+function matchesJoinedScope(user: UserResponse, scope: UserAnalyticsJoinedScope, now: number) {
+  if (scope === 'ALL') return true;
+
+  const invitedAt = new Date(user.invitedAt).getTime();
+  if (Number.isNaN(invitedAt)) return false;
+
+  const days = scope === '7_DAYS' ? 7 : 30;
+  return now - invitedAt <= days * 24 * 60 * 60 * 1000;
+}
+
+function applyUserAnalyticsFilters(users: UserResponse[], filters: UserAnalyticsFilterState) {
+  const now = Date.now();
+  const normalizedSearch = filters.search.trim().toLowerCase();
+
+  return users.filter((user) => {
+    if (filters.userType && user.userType !== filters.userType) {
+      return false;
+    }
+
+    if (filters.accountStatus && user.accountStatus !== filters.accountStatus) {
+      return false;
+    }
+
+    if (!matchesJoinedScope(user, filters.joinedScope, now)) {
+      return false;
+    }
+
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    const displayName = getUserDisplayName(user).toLowerCase();
+    return user.email.toLowerCase().includes(normalizedSearch) || displayName.includes(normalizedSearch);
+  });
 }
 
 function CountCard({
@@ -230,7 +303,69 @@ function TicketBreakdownCard({ title, rows }: { title: string; rows: TicketAnaly
   );
 }
 
-function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
+function UserAnalyticsControls({
+  filters,
+  loading,
+  onChange,
+}: {
+  filters: UserAnalyticsFilterState;
+  loading: boolean;
+  onChange: (filters: UserAnalyticsFilterState) => void;
+}) {
+  return (
+    <Card>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, alignItems: 'end' }}>
+        <Input
+          label="Search"
+          value={filters.search}
+          disabled={loading}
+          placeholder="Email or name"
+          iconLeft={<Search size={14} />}
+          onChange={(event) => onChange({ ...filters, search: event.target.value })}
+        />
+        <Select
+          label="Role"
+          value={filters.userType}
+          disabled={loading}
+          options={userTypeOptions}
+          onChange={(event) => onChange({ ...filters, userType: event.target.value as '' | UserType })}
+        />
+        <Select
+          label="Status"
+          value={filters.accountStatus}
+          disabled={loading}
+          options={userStatusOptions}
+          onChange={(event) => onChange({ ...filters, accountStatus: event.target.value as '' | AccountStatus })}
+        />
+        <Select
+          label="Joined"
+          value={filters.joinedScope}
+          disabled={loading}
+          options={joinedScopeOptions}
+          onChange={(event) => onChange({ ...filters, joinedScope: event.target.value as UserAnalyticsJoinedScope })}
+        />
+        <Button
+          type="button"
+          variant="subtle"
+          size="md"
+          disabled={loading}
+          iconLeft={<RotateCcw size={14} />}
+          onClick={() => onChange(defaultUserFilters)}
+        >
+          Reset
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function UserAnalyticsContent({
+  users,
+  totalUsersBeforeFilter,
+}: {
+  users: UserResponse[];
+  totalUsersBeforeFilter: number;
+}) {
   const totalUsers = users.length;
   const activeUsers = users.filter((user) => user.accountStatus === 'ACTIVE').length;
   const pendingInvites = users.filter((user) => user.accountStatus === 'INVITED').length;
@@ -254,7 +389,49 @@ function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+      <style>{`
+        .user-analytics-summary-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+        }
+        .user-analytics-main-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 18px;
+        }
+        .user-analytics-feed-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 18px;
+        }
+        @media (max-width: 1180px) {
+          .user-analytics-summary-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 900px) {
+          .user-analytics-main-grid,
+          .user-analytics-feed-grid,
+          .user-analytics-summary-grid {
+            grid-template-columns: minmax(0, 1fr);
+          }
+        }
+      `}</style>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Chip color="yellow" dot>
+          Showing {totalUsers} of {totalUsersBeforeFilter} users
+        </Chip>
+      </div>
+
+      {totalUsers === 0 ? (
+        <Alert variant="warning" title="No matching users">
+          Adjust the user analytics filters to see data.
+        </Alert>
+      ) : (
+        <>
+      <div className="user-analytics-summary-grid">
         <CountCard label="Total Users" value={totalUsers} caption="Across all roles" icon={Users} />
         <CountCard label="Active Users" value={activeUsers} caption={`${percent(activeUsers, totalUsers)} active`} icon={Activity} />
         <CountCard label="Pending Invites" value={pendingInvites} caption="Awaiting access setup" icon={Clock} />
@@ -263,8 +440,8 @@ function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
         <CountCard label="Active Last 30 Days" value={activeLast30Days} caption="Users with recent sign-ins" icon={ShieldCheck} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18 }}>
-        <Card>
+      <div className="user-analytics-main-grid">
+        <Card style={{ height: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
             <BarChart2 size={18} color="var(--yellow-600)" />
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
@@ -283,7 +460,7 @@ function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
           </div>
         </Card>
 
-        <Card>
+        <Card style={{ height: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
             <ShieldCheck size={18} color="var(--yellow-600)" />
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
@@ -302,7 +479,7 @@ function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
           </div>
         </Card>
 
-        <Card>
+        <Card style={{ height: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
             <Activity size={18} color="var(--yellow-600)" />
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
@@ -315,7 +492,7 @@ function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
           </div>
         </Card>
 
-        <Card>
+        <Card style={{ height: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
             <AlertTriangle size={18} color="var(--orange-400)" />
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
@@ -330,8 +507,8 @@ function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
-        <Card>
+      <div className="user-analytics-feed-grid">
+        <Card style={{ height: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
             <UserPlus size={18} color="var(--yellow-600)" />
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
@@ -365,7 +542,7 @@ function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
           )}
         </Card>
 
-        <Card>
+        <Card style={{ height: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
             <Activity size={18} color="var(--yellow-600)" />
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text-h)' }}>
@@ -394,6 +571,8 @@ function UserAnalyticsContent({ users }: { users: UserResponse[] }) {
           )}
         </Card>
       </div>
+        </>
+      )}
     </>
   );
 }
@@ -746,6 +925,7 @@ export function AdminAnalyticsScreen() {
   const [ticketAnalytics, setTicketAnalytics] = React.useState<TicketAnalyticsResponse | null>(null);
   const [activeTab, setActiveTab] = React.useState<AnalyticsTab>('tickets');
   const [ticketFilters, setTicketFilters] = React.useState<TicketAnalyticsFilterState>(defaultTicketFilters);
+  const [userFilters, setUserFilters] = React.useState<UserAnalyticsFilterState>(defaultUserFilters);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -786,6 +966,7 @@ export function AdminAnalyticsScreen() {
   }, [accessToken, ticketFilters]);
 
   const ticketManagers = users.filter((user) => user.userType === 'MANAGER' && user.managerRole === 'TICKET_MANAGER');
+  const filteredUsers = React.useMemo(() => applyUserAnalyticsFilters(users, userFilters), [users, userFilters]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
@@ -825,6 +1006,14 @@ export function AdminAnalyticsScreen() {
         />
       )}
 
+      {activeTab === 'users' && (
+        <UserAnalyticsControls
+          filters={userFilters}
+          loading={loading}
+          onChange={setUserFilters}
+        />
+      )}
+
       {error && (
         <Alert variant="error" title="Analytics unavailable">
           {error}
@@ -839,7 +1028,7 @@ export function AdminAnalyticsScreen() {
       ) : activeTab === 'tickets' && ticketAnalytics ? (
         <TicketAnalyticsContent analytics={ticketAnalytics} />
       ) : activeTab === 'users' ? (
-        <UserAnalyticsContent users={users} />
+        <UserAnalyticsContent users={filteredUsers} totalUsersBeforeFilter={users.length} />
       ) : null}
     </div>
   );
