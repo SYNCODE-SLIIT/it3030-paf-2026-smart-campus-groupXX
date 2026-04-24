@@ -42,6 +42,7 @@ public class SecurityConfig {
                     "/api/auth/password-reset/request"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/public/catalog/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/contact").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));

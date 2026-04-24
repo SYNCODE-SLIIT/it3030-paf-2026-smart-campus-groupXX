@@ -13,6 +13,8 @@ interface CardProps {
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   className?: string;
   style?: React.CSSProperties;
+  /** Inner content padding (default 24). */
+  contentPadding?: number | string;
 }
 
 export function Card({
@@ -25,6 +27,7 @@ export function Card({
   onClick,
   className = '',
   style,
+  contentPadding = 24,
 }: CardProps) {
   const isDark = variant === 'dark';
 
@@ -74,7 +77,7 @@ export function Card({
           }}
         />
       )}
-      <div style={{ padding: 24 }}>{children}</div>
+      <div style={{ padding: contentPadding }}>{children}</div>
       {footer && (
         <div
           style={{

@@ -226,6 +226,38 @@ export interface PublicCatalogResourcePage {
 /** Query `filter` for public catalogue search (backend). */
 export type PublicCatalogFilterMode = 'ALL' | 'RESOURCE_TYPES' | 'RESOURCES';
 
+export interface SubmitContactMessagePayload {
+  fullName: string;
+  email: string;
+  phone?: string;
+  title: string;
+  message: string;
+}
+
+export interface ContactSubmissionResponse {
+  id: string;
+  acknowledgement: string;
+}
+
+export interface ContactMessageResponse {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  title: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface ContactMessagePageResponse {
+  items: ContactMessageResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
+}
+
 export interface ResourceOption {
   id: string;
   code: string;

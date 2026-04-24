@@ -44,9 +44,12 @@ import {
   type RequestModificationRequest,
   type ResourceRemainingRangesResponse,
   type ResourceFeatureOption,
+  type ContactMessagePageResponse,
+  type ContactSubmissionResponse,
   type PublicCatalogFilterMode,
   type PublicCatalogResourcePage,
   type PublicCatalogTypeSummary,
+  type SubmitContactMessagePayload,
   type ResourceListPage,
   type ResourceLookups,
   type ResourceOption,
@@ -567,7 +570,8 @@ export async function listResourcePage(accessToken: string, filters: ResourceLis
  * that proxy to the backend (avoids calling :8080 from the client and supports Docker internal URLs).
  * On the server, call the backend directly.
  */
-function buildPublicCatalogRequestUrl(pathWithLeadingSlash: string) {
+/** Same-origin Next proxy in the browser; direct backend URL on the server (e.g. Docker INTERNAL_API_URL). */
+function buildPublicMarketingProxyUrl(pathWithLeadingSlash: string) {
   const path = pathWithLeadingSlash.startsWith('/') ? pathWithLeadingSlash : `/${pathWithLeadingSlash}`;
   if (typeof window === 'undefined') {
     const base = getServerApiBaseUrl() ?? requireApiBaseUrl();
@@ -577,7 +581,7 @@ function buildPublicCatalogRequestUrl(pathWithLeadingSlash: string) {
 }
 
 async function publicCatalogFetch<T>(pathWithLeadingSlash: string): Promise<T> {
-  const url = buildPublicCatalogRequestUrl(pathWithLeadingSlash);
+  const url = buildPublicMarketingProxyUrl(pathWithLeadingSlash);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
 
@@ -659,6 +663,61 @@ export async function fetchPublicCatalogResourcesByType(
   return publicCatalogFetch<PublicCatalogResourcePage>(
     `/api/public/catalog/types/${encodeURIComponent(resourceTypeId)}/resources?${params.toString()}`,
   );
+}
+
+/** Public contact form (no JWT); uses Next `/api/public/contact` in the browser. */
+export async function submitPublicContactMessage(
+  body: SubmitContactMessagePayload,
+): Promise<ContactSubmissionResponse> {
+  const url = buildPublicMarketingProxyUrl('/api/public/contact');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+      credentials: 'omit',
+      signal: controller.signal,
+    });
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError(504, 'The contact request timed out.');
+    }
+    if (error instanceof TypeError) {
+      throw new ApiError(
+        0,
+        'Cannot reach the contact service. If you use Docker, ensure the frontend can proxy to the backend (INTERNAL_API_URL / NEXT_PUBLIC_API_URL).',
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    let details: ErrorResponse | null = null;
+    try {
+      details = await response.json();
+    } catch {
+      details = null;
+    }
+    throw new ApiError(
+      response.status,
+      details?.message ?? `Contact request failed with status ${response.status}.`,
+      details,
+    );
+  }
+
+  return parseResponse<ContactSubmissionResponse>(response);
+}
+
+export async function listAdminContactMessages(accessToken: string, page = 0, size = 20) {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  return request<ContactMessagePageResponse>(`/api/admin/contact-messages?${params.toString()}`, { accessToken });
 }
 
 export async function listResources(accessToken: string, filters: ResourceListFilters = {}) {
