@@ -1,18 +1,18 @@
 import { ResourceDetailScreen } from '@/components/screens/admin/resources/ResourceDetailScreen';
-import { requireAdminUser } from '@/lib/server-auth';
+import { requireManagerRole } from '@/lib/server-auth';
 
-export default async function AdminResourceDetailPage({
+export default async function ManagerCatalogResourceDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdminUser();
+  await requireManagerRole(['CATALOG_MANAGER']);
   const { id } = await params;
 
   return (
     <ResourceDetailScreen
       resourceId={id}
-      backHref="/admin/resources"
+      backHref="/managers/catalog"
       backLabel="Back to Catalogue"
     />
   );

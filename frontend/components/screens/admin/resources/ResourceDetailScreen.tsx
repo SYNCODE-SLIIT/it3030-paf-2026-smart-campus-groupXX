@@ -33,6 +33,9 @@ import {
 
 interface ResourceDetailScreenProps {
   resourceId: string;
+  /** List page to return to (catalogue managers use a different path than admins). */
+  backHref?: string;
+  backLabel?: string;
 }
 
 function formatTime(value: string | null) {
@@ -103,7 +106,11 @@ function DetailBlock({
   );
 }
 
-export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) {
+export function ResourceDetailScreen({
+  resourceId,
+  backHref = '/admin/resources',
+  backLabel = 'Back to Catalogue',
+}: ResourceDetailScreenProps) {
   const router = useRouter();
   const { session } = useAuth();
   const accessToken = session?.access_token ?? null;
@@ -252,9 +259,9 @@ export function ResourceDetailScreen({ resourceId }: ResourceDetailScreenProps) 
           variant="glass"
           size="sm"
           iconLeft={<ArrowLeft size={14} />}
-          onClick={() => router.push('/admin/resources')}
+          onClick={() => router.push(backHref)}
         >
-          Back to Catalogue
+          {backLabel}
         </Button>
       </div>
 

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import {
+  ArrowLeft,
   BarChart2,
   Bell,
   BookOpen,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
+import { Button } from '@/components/ui';
 import { Navbar, type NavItem } from '@/components/layout/Navbar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useNotifications } from '@/components/notifications/useNotifications';
@@ -32,6 +34,19 @@ import { filterSectionsByRole } from '@/lib/nav-rbac';
 import { triggerRouteProgress } from '@/lib/route-progress';
 import { getUserDisplayName, getUserInitials, getUserTypeLabel } from '@/lib/user-display';
 import type { WorkspaceKind } from '@/lib/workspace';
+
+/** Shown next to the sidebar on detail routes: prefers browser back when the referrer is same-origin. */
+function getWorkspaceBackMetadata(pathname: string): { fallbackHref: string } | null {
+  const normalized =
+    pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+  if (/^\/managers\/catalog\/resources\/[^/]+$/.test(normalized)) {
+    return { fallbackHref: '/managers/catalog' };
+  }
+  if (/^\/admin\/resources\/[^/]+$/.test(normalized)) {
+    return { fallbackHref: '/admin/resources' };
+  }
+  return null;
+}
 
 function getWorkspaceForUser(user: UserResponse): Exclude<WorkspaceKind, 'auto'> {
   switch (user.userType) {
@@ -186,7 +201,7 @@ function getDefaultSections(workspace: Exclude<WorkspaceKind, 'auto'>, user?: Us
               allowedUserTypes: ['MANAGER'],
             },
             {
-              label: 'Catalogue Management',
+              label: 'Catalogue',
               icon: BookOpen,
               href: '/managers/catalog',
               allowedUserTypes: ['MANAGER'],
@@ -344,6 +359,29 @@ export function ProtectedShell({
     triggerRouteProgress();
     router.push(href);
   }, [router]);
+
+  const workspaceBack = React.useMemo(() => getWorkspaceBackMetadata(pathname), [pathname]);
+
+  function handleWorkspaceBack() {
+    if (!workspaceBack) {
+      return;
+    }
+    if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+      try {
+        const ref = document.referrer;
+        if (ref) {
+          const refOrigin = new URL(ref).origin;
+          if (refOrigin === window.location.origin) {
+            router.back();
+            return;
+          }
+        }
+      } catch {
+        // ignore invalid referrer
+      }
+    }
+    navigateTo(workspaceBack.fallbackHref);
+  }
 
   const handleSignOut = React.useCallback(() => {
     void signOut()
@@ -505,6 +543,25 @@ export function ProtectedShell({
           padding: '32px 24px 40px',
         }}
       >
+        {workspaceBack && (
+          <div
+            style={{
+              margin: '-8px 0 20px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              iconLeft={<ArrowLeft size={16} strokeWidth={2.2} />}
+              onClick={handleWorkspaceBack}
+            >
+              Back
+            </Button>
+          </div>
+        )}
         {children}
       </main>
     </div>

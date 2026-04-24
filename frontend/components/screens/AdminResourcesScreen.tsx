@@ -49,11 +49,14 @@ export function AdminResourcesScreen({
   addOpen,
   onAddOpenChange,
   onResourcesChanged,
+  resourceDetailBasePath = '/admin/resources',
 }: {
   embedded?: boolean;
   addOpen?: boolean;
   onAddOpenChange?: (open: boolean) => void;
   onResourcesChanged?: () => void;
+  /** Base path for “view” (no trailing slash). Catalogue managers use `/managers/catalog/resources`. */
+  resourceDetailBasePath?: string;
 }) {
   const { session } = useAuth();
   const { showToast } = useToast();
@@ -490,7 +493,7 @@ export function AdminResourcesScreen({
                               icon={<Eye size={13} />}
                               title="View resource details"
                               aria-label={`View ${resource.code}`}
-                              onClick={() => router.push(`/admin/resources/${resource.id}`)}
+                              onClick={() => router.push(`${resourceDetailBasePath}/${resource.id}`)}
                             />
                             <IconButton
                               variant="neutral"

@@ -128,7 +128,7 @@ export function CatalogueManagementDashboardScreen({
             {workspaceLabel}
           </p>
           <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 900, lineHeight: 1.1, color: 'var(--text-h)' }}>
-            Catalogue Management
+            {isManagerWorkspace ? 'Catalogue' : 'Catalogue Management'}
           </h1>
           <p style={{ margin: '8px 0 0', maxWidth: 760, color: 'var(--text-muted)', fontSize: 14, lineHeight: 1.7 }}>
             Review the current resource catalogue footprint, monitor active inventory coverage, and manage normalized resources, locations, and resource types.
@@ -175,6 +175,7 @@ export function CatalogueManagementDashboardScreen({
           addOpen={resourceAddOpen}
           onAddOpenChange={setResourceAddOpen}
           onResourcesChanged={() => void loadStats()}
+          resourceDetailBasePath={isManagerWorkspace ? '/managers/catalog/resources' : '/admin/resources'}
         />
       )}
       {activeSection === 'locations' && (
