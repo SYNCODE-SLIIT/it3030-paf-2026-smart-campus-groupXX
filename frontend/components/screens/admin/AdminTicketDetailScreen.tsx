@@ -355,6 +355,7 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
           {resource && (
             <TicketResourceCard
               resource={resource}
+              viewResourceHref={`/admin/resources/${resource.id}?returnTo=${encodeURIComponent(`/admin/tickets/${ticketRef}`)}`}
               canDeactivate
               onDeactivate={() => { void handleDeactivateResource(); }}
               deactivating={deactivatingResource}

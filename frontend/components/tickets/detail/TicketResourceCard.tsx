@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye, PowerOff } from 'lucide-react';
 
 import { Button, Chip } from '@/components/ui';
@@ -16,6 +17,8 @@ import { SEC_HD_LABEL } from './ticketDetailHelpers';
 
 interface TicketResourceCardProps {
   resource: ResourceResponse;
+  /** When set, shows an enabled “View” control that navigates here (e.g. `/admin/resources/{id}`). */
+  viewResourceHref?: string;
   canDeactivate?: boolean;
   onDeactivate?: () => void;
   deactivating?: boolean;
@@ -45,10 +48,12 @@ function ResourceRow({ label, children }: { label: string; children: React.React
 
 export function TicketResourceCard({
   resource,
+  viewResourceHref,
   canDeactivate = false,
   onDeactivate,
   deactivating = false,
 }: TicketResourceCardProps) {
+  const router = useRouter();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   const locationLabel =
@@ -116,19 +121,28 @@ export function TicketResourceCard({
             </div>
           </div>
 
-          {canDeactivate && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <Button variant="glass" size="xs" iconLeft={<Eye size={12} />} disabled style={{ flex: 1 }}>
-                View
-              </Button>
-              {resource.status === 'ACTIVE' && (
+          {(viewResourceHref || canDeactivate) && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+              {viewResourceHref && (
+                <Button
+                  type="button"
+                  variant="glass"
+                  size="xs"
+                  iconLeft={<Eye size={12} />}
+                  style={{ flex: '1 1 120px' }}
+                  onClick={() => router.push(viewResourceHref)}
+                >
+                  View
+                </Button>
+              )}
+              {canDeactivate && resource.status === 'ACTIVE' && (
                 <Button
                   variant="danger"
                   size="xs"
                   iconLeft={<PowerOff size={12} />}
                   loading={deactivating}
                   onClick={() => setConfirmOpen(true)}
-                  style={{ flex: 1 }}
+                  style={{ flex: '1 1 120px' }}
                 >
                   Deactivate
                 </Button>

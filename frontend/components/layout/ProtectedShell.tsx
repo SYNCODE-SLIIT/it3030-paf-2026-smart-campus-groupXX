@@ -20,7 +20,7 @@ import {
   Ticket,
   Users,
 } from 'lucide-react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { Button } from '@/components/ui';
 import { Navbar, type NavItem } from '@/components/layout/Navbar';
@@ -29,7 +29,7 @@ import { useNotifications } from '@/components/notifications/useNotifications';
 import { Sidebar, type NavSection } from '@/components/layout/Sidebar';
 import { useAuth } from '@/components/providers/AuthProvider';
 import type { UserResponse } from '@/lib/api-types';
-import { getManagerDashboardPath } from '@/lib/auth-routing';
+import { getManagerDashboardPath, sanitizeRedirectPath } from '@/lib/auth-routing';
 import { filterSectionsByRole } from '@/lib/nav-rbac';
 import { triggerRouteProgress } from '@/lib/route-progress';
 import { getUserDisplayName, getUserInitials, getUserTypeLabel } from '@/lib/user-display';
@@ -349,6 +349,7 @@ export function ProtectedShell({
   userDisplay?: { name?: string; role?: string; initials?: string; src?: string };
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { session, signOut } = useAuth();
   const resolvedWorkspace = workspace === 'auto' ? getWorkspaceForUser(user) : workspace;
@@ -364,6 +365,11 @@ export function ProtectedShell({
 
   function handleWorkspaceBack() {
     if (!workspaceBack) {
+      return;
+    }
+    const returnTo = sanitizeRedirectPath(searchParams.get('returnTo'));
+    if (returnTo) {
+      navigateTo(returnTo);
       return;
     }
     if (typeof document !== 'undefined' && typeof window !== 'undefined') {

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Building2,
@@ -30,6 +30,7 @@ import {
   getResourceStatusLabel,
   resourceAvailabilityLabel,
 } from '@/lib/resource-display';
+import { sanitizeRedirectPath } from '@/lib/auth-routing';
 
 interface ResourceDetailScreenProps {
   resourceId: string;
@@ -112,8 +113,17 @@ export function ResourceDetailScreen({
   backLabel = 'Back to Catalogue',
 }: ResourceDetailScreenProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { session } = useAuth();
   const accessToken = session?.access_token ?? null;
+
+  const returnTo = sanitizeRedirectPath(searchParams.get('returnTo'));
+  const resolvedBackHref = returnTo ?? backHref;
+  const resolvedBackLabel = returnTo
+    ? returnTo.includes('/tickets')
+      ? 'Back to ticket'
+      : 'Back'
+    : backLabel;
 
   const [resource, setResource] = React.useState<ResourceResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -259,9 +269,9 @@ export function ResourceDetailScreen({
           variant="glass"
           size="sm"
           iconLeft={<ArrowLeft size={14} />}
-          onClick={() => router.push(backHref)}
+          onClick={() => router.push(resolvedBackHref)}
         >
-          {backLabel}
+          {resolvedBackLabel}
         </Button>
       </div>
 
