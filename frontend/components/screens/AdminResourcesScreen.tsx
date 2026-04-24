@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { CircleSlash, FolderOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { CircleSlash, FolderOpen, Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
@@ -39,6 +39,7 @@ import {
   resourceStatusOptions,
 } from '@/lib/resource-display';
 import { ResourceFormModal } from '@/components/screens/admin/resources/ResourceFormModal';
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
 
 const RESOURCE_PAGE_SIZE = 50;
 
@@ -81,8 +82,13 @@ export function AdminResourcesScreen({
   }
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [activatingId, setActivatingId] = React.useState<string | null>(null);
   const [permanentDeletingId, setPermanentDeletingId] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    type: 'activate' | 'deactivate' | 'delete';
+    resource: ResourceListItem;
+  } | null>(null);
   const [page, setPage] = React.useState(0);
 
   const deferredSearch = React.useDeferredValue(searchText);
@@ -222,14 +228,11 @@ export function AdminResourcesScreen({
     }
   }, [accessToken]);
 
-  async function handleDelete(resource: ResourceListItem) {
+  async function executeDeactivate(resource: ResourceListItem) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
-
-    const confirmed = window.confirm(`Deactivate ${resource.code}? This keeps the record but marks it inactive.`);
-    if (!confirmed) return;
 
     setDeletingId(resource.id);
     try {
@@ -237,6 +240,7 @@ export function AdminResourcesScreen({
       showToast('success', 'Resource removed', `${resource.code} is now inactive.`);
       await Promise.all([reloadResources(), loadStats()]);
       onResourcesChanged?.();
+      setConfirmAction(null);
     } catch (error) {
       showToast('error', 'Delete failed', getErrorMessage(error, 'We could not remove the resource.'));
     } finally {
@@ -244,16 +248,31 @@ export function AdminResourcesScreen({
     }
   }
 
-  async function handlePermanentDelete(resource: ResourceListItem) {
+  async function executeActivate(resource: ResourceListItem) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
-    const confirmed = window.confirm(
-      `Permanently delete ${resource.code}?\n\nThis cannot be undone. Historical bookings, recurring bookings, and catalogue links for this resource will also be removed. Tickets that reference this resource will be kept but detached.\n\nIf active or upcoming bookings exist, the delete will be blocked — cancel those bookings or use Deactivate instead.`
-    );
-    if (!confirmed) return;
+    setActivatingId(resource.id);
+    try {
+      await updateResource(accessToken, resource.id, { status: 'ACTIVE' });
+      showToast('success', 'Resource activated', `${resource.code} is now active.`);
+      await Promise.all([reloadResources(), loadStats()]);
+      onResourcesChanged?.();
+      setConfirmAction(null);
+    } catch (error) {
+      showToast('error', 'Activate failed', getErrorMessage(error, 'We could not activate the resource.'));
+    } finally {
+      setActivatingId(null);
+    }
+  }
+
+  async function executePermanentDelete(resource: ResourceListItem) {
+    if (!accessToken) {
+      showToast('error', 'Session unavailable', 'Please sign in again.');
+      return;
+    }
 
     setPermanentDeletingId(resource.id);
     try {
@@ -261,6 +280,7 @@ export function AdminResourcesScreen({
       showToast('success', 'Resource deleted', `${resource.code} was permanently removed.`);
       await Promise.all([reloadResources(), loadStats()]);
       onResourcesChanged?.();
+      setConfirmAction(null);
     } catch (error) {
       showToast('error', 'Delete failed', getErrorMessage(error, 'We could not permanently delete the resource.'));
     } finally {
@@ -295,6 +315,13 @@ export function AdminResourcesScreen({
   const pageEnd = resourcePage
     ? Math.min((resourcePage.page + 1) * resourcePage.size, resourcePage.totalItems)
     : resources.length;
+  const confirmLoading = confirmAction?.type === 'deactivate'
+    ? deletingId === confirmAction.resource.id
+    : confirmAction?.type === 'activate'
+      ? activatingId === confirmAction.resource.id
+    : confirmAction?.type === 'delete'
+      ? permanentDeletingId === confirmAction.resource.id
+      : false;
 
   return (
     <div style={{ display: 'grid', gap: embedded ? 16 : 28 }}>
@@ -460,21 +487,32 @@ export function AdminResourcesScreen({
                               loading={editingId === resource.id}
                               onClick={() => void handleEdit(resource)}
                             />
-                            <IconButton
-                              variant="warning"
-                              icon={<CircleSlash size={13} />}
-                              title="Deactivate resource"
-                              aria-label={`Deactivate ${resource.code}`}
-                              loading={deletingId === resource.id}
-                              onClick={() => void handleDelete(resource)}
-                            />
+                            {resource.status === 'INACTIVE' ? (
+                              <IconButton
+                                variant="primary"
+                                icon={<Power size={13} />}
+                                title="Activate resource"
+                                aria-label={`Activate ${resource.code}`}
+                                loading={activatingId === resource.id}
+                                onClick={() => setConfirmAction({ type: 'activate', resource })}
+                              />
+                            ) : (
+                              <IconButton
+                                variant="warning"
+                                icon={<CircleSlash size={13} />}
+                                title="Deactivate resource"
+                                aria-label={`Deactivate ${resource.code}`}
+                                loading={deletingId === resource.id}
+                                onClick={() => setConfirmAction({ type: 'deactivate', resource })}
+                              />
+                            )}
                             <IconButton
                               variant="danger"
                               icon={<Trash2 size={13} />}
                               title="Permanently delete resource"
                               aria-label={`Permanently delete ${resource.code}`}
                               loading={permanentDeletingId === resource.id}
-                              onClick={() => void handlePermanentDelete(resource)}
+                              onClick={() => setConfirmAction({ type: 'delete', resource })}
                             />
                           </div>
                         </TableCell>
@@ -513,6 +551,48 @@ export function AdminResourcesScreen({
           )}
         </div>
       </Card>
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title={
+          confirmAction?.type === 'delete'
+            ? 'Permanently Delete Resource'
+            : confirmAction?.type === 'activate'
+              ? 'Activate Resource'
+              : 'Deactivate Resource'
+        }
+        description={
+          confirmAction?.type === 'delete'
+            ? `Permanently delete ${confirmAction.resource.code}? This cannot be undone. Historical bookings, recurring bookings, and catalogue links are removed, while ticket references are detached. If active/upcoming bookings exist, deletion will be blocked.`
+            : confirmAction?.type === 'activate'
+              ? `Activate ${confirmAction.resource.code}? This makes the resource available again in the catalogue.`
+            : confirmAction
+              ? `Deactivate ${confirmAction.resource.code}? This keeps the record and history, but marks the resource as inactive.`
+              : ''
+        }
+        confirmLabel={
+          confirmAction?.type === 'delete'
+            ? 'Permanently Delete'
+            : confirmAction?.type === 'activate'
+              ? 'Activate'
+              : 'Deactivate'
+        }
+        confirmVariant={confirmAction?.type === 'delete' ? 'danger' : 'info'}
+        loading={confirmLoading}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => {
+          if (!confirmAction) return;
+          if (confirmAction.type === 'activate') {
+            void executeActivate(confirmAction.resource);
+            return;
+          }
+          if (confirmAction.type === 'delete') {
+            void executePermanentDelete(confirmAction.resource);
+            return;
+          }
+          void executeDeactivate(confirmAction.resource);
+        }}
+      />
     </div>
   );
 }
