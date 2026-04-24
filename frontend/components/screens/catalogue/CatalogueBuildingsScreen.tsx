@@ -4,6 +4,7 @@ import React from 'react';
 import { Building2, Search } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
+import { AnimatedCounter } from '@/components/charts';
 import { Alert, Card, Chip, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import { getErrorMessage, listCatalogueBuildings } from '@/lib/api-client';
 import { buildingTypeOptions, getBuildingLayoutLabel, getBuildingTypeChipColor, getBuildingTypeLabel } from '@/lib/building-display';
@@ -90,19 +91,27 @@ export function CatalogueBuildingsScreen() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
         <Card hoverable>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{buildings.length}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>
+            <AnimatedCounter value={buildings.length} />
+          </div>
           <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Total buildings</div>
         </Card>
         <Card hoverable>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{buildings.filter((item) => item.isActive).length}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>
+            <AnimatedCounter value={buildings.filter((item) => item.isActive).length} />
+          </div>
           <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Active buildings</div>
         </Card>
         <Card hoverable>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{buildings.filter((item) => item.hasWings).length}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>
+            <AnimatedCounter value={buildings.filter((item) => item.hasWings).length} />
+          </div>
           <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Wing-based buildings</div>
         </Card>
         <Card hoverable>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>{buildings.filter((item) => item.buildingType === 'OUTDOOR').length}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>
+            <AnimatedCounter value={buildings.filter((item) => item.buildingType === 'OUTDOOR').length} />
+          </div>
           <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Outdoor records</div>
         </Card>
       </div>

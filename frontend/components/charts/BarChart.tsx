@@ -15,7 +15,16 @@ interface BarChartProps {
   emptyLabel?: string;
 }
 
-const PADDING = { top: 16, right: 16, bottom: 30, left: 36 };
+const PADDING = { top: 16, right: 16, bottom: 16, left: 36 };
+const FALLBACK_COLORS = [
+  'var(--blue-400)',
+  'var(--yellow-400)',
+  'var(--orange-400)',
+  'var(--green-400)',
+  'var(--red-400)',
+  'var(--neutral-500)',
+  'var(--blue-700)',
+];
 
 export function BarChart({
   data,
@@ -24,7 +33,8 @@ export function BarChart({
   emptyLabel = 'No data yet',
 }: BarChartProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [width, setWidth] = React.useState(640);
+  const chartId = React.useId();
+  const [width, setWidth] = React.useState(0);
   const [hovered, setHovered] = React.useState<number | null>(null);
 
   React.useEffect(() => {
@@ -34,7 +44,7 @@ export function BarChart({
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
-        setWidth(Math.max(280, Math.floor(entry.contentRect.width)));
+        setWidth(Math.max(120, Math.floor(entry.contentRect.width)));
       }
     });
     observer.observe(node);
@@ -71,22 +81,33 @@ export function BarChart({
   const innerHeight = Math.max(20, height - PADDING.top - PADDING.bottom);
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   const ceiling = Math.ceil(maxValue * 1.1);
+  const resolvedData = data.map((bar, idx) => ({
+    ...bar,
+    resolvedColor: bar.color ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length] ?? defaultColor,
+  }));
 
-  const barCount = data.length;
+  const barCount = resolvedData.length;
   const groupWidth = innerWidth / barCount;
   const barWidth = Math.min(46, groupWidth * 0.72);
+  const total = resolvedData.reduce((sum, bar) => sum + Math.max(0, bar.value), 0);
 
   const yTicks = 4;
   const tickValues = Array.from({ length: yTicks + 1 }, (_, idx) => (ceiling / yTicks) * idx);
 
   return (
-    <div ref={containerRef} style={{ width: '100%' }}>
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img">
+    <div ref={containerRef} style={{ width: '100%', overflow: 'hidden' }}>
+      <svg
+        width={Math.max(120, width)}
+        height={height}
+        viewBox={`0 0 ${Math.max(120, width)} ${height}`}
+        role="img"
+        style={{ display: 'block', maxWidth: '100%' }}
+      >
         <defs>
-          {data.map((bar, idx) => {
-            const color = bar.color ?? defaultColor;
+          {resolvedData.map((bar, idx) => {
+            const color = bar.resolvedColor;
             return (
-              <linearGradient key={`bar-grad-${idx}`} id={`bar-grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
+              <linearGradient key={`bar-grad-${idx}`} id={`${chartId}-bar-grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={color} stopOpacity={1} />
                 <stop offset="100%" stopColor={color} stopOpacity={0.55} />
               </linearGradient>
@@ -122,7 +143,7 @@ export function BarChart({
           );
         })}
 
-        {data.map((bar, idx) => {
+        {resolvedData.map((bar, idx) => {
           const ratio = bar.value / ceiling;
           const barHeight = innerHeight * ratio;
           const groupCenterX = PADDING.left + idx * groupWidth + groupWidth / 2;
@@ -144,11 +165,11 @@ export function BarChart({
                 height={Math.max(0, barHeight)}
                 rx={6}
                 ry={6}
-                fill={`url(#bar-grad-${idx})`}
+                fill={`url(#${chartId}-bar-grad-${idx})`}
                 style={{
                   transition: 'opacity .15s, transform .15s',
                   opacity: hovered === null || isHover ? 1 : 0.55,
-                  filter: isHover ? `drop-shadow(0 6px 14px ${(bar.color ?? defaultColor)}55)` : undefined,
+                  filter: isHover ? `drop-shadow(0 6px 14px ${bar.resolvedColor}55)` : undefined,
                 }}
               >
                 <title>{`${bar.label}: ${bar.value}`}</title>
@@ -165,20 +186,77 @@ export function BarChart({
               >
                 {bar.value}
               </text>
-              <text
-                x={groupCenterX}
-                y={height - 10}
-                textAnchor="middle"
-                fontSize={10}
-                fontFamily="var(--font-mono)"
-                fill="var(--text-muted)"
-              >
-                {bar.label.length > 14 ? `${bar.label.slice(0, 12)}…` : bar.label}
-              </text>
             </g>
           );
         })}
       </svg>
+      <div
+        style={{
+          marginTop: 12,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+          gap: 8,
+        }}
+      >
+        {resolvedData.map((bar, idx) => {
+          const isHover = hovered === idx;
+          const percentage = total > 0 ? (Math.max(0, bar.value) / total) * 100 : 0;
+          const color = bar.resolvedColor;
+
+          return (
+            <div
+              key={`legend-${idx}`}
+              onMouseEnter={() => setHovered(idx)}
+              onMouseLeave={() => setHovered(null)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '8px 10px',
+                borderRadius: 10,
+                background: isHover ? 'var(--surface-2)' : 'transparent',
+                transition: 'background .15s',
+                cursor: 'default',
+              }}
+            >
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 3,
+                  background: color,
+                  flexShrink: 0,
+                  boxShadow: `0 0 0 2px ${color}22`,
+                }}
+              />
+              <div style={{ display: 'grid', minWidth: 0 }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: 'var(--text-h)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {bar.label}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {bar.value} | {percentage.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

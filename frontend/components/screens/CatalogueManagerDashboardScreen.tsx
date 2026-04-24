@@ -112,6 +112,15 @@ const BUILDING_TYPE_COLOR: Record<string, string> = {
   OUTDOOR: 'var(--orange-400)',
   OTHER: 'var(--blue-700)',
 };
+const BAR_PALETTE = [
+  'var(--yellow-400)',
+  'var(--blue-400)',
+  'var(--orange-400)',
+  'var(--green-400)',
+  'var(--red-400)',
+  'var(--blue-700)',
+  'var(--neutral-500)',
+];
 
 const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
   OPEN: 'Open',
@@ -453,10 +462,10 @@ export function CatalogueManagerDashboardScreen({
     return Array.from(counter.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
-      .map(([buildingName, value]) => ({
+      .map(([buildingName, value], index) => ({
         label: buildingName,
         value,
-        color: 'var(--yellow-400)',
+        color: BAR_PALETTE[index % BAR_PALETTE.length],
       }));
   }, [locations]);
 
@@ -471,10 +480,10 @@ export function CatalogueManagerDashboardScreen({
     return Array.from(counter.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
-      .map(([role, value]) => ({
+      .map(([role, value], index) => ({
         label: prettifyEnum(role),
         value,
-        color: 'var(--orange-400)',
+        color: BAR_PALETTE[index % BAR_PALETTE.length],
       }));
   }, [resources]);
 
@@ -548,10 +557,10 @@ export function CatalogueManagerDashboardScreen({
 
     return Array.from(counter.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([category, value]) => ({
+      .map(([category, value], index) => ({
         label: TICKET_CATEGORY_LABEL[category] ?? category,
         value,
-        color: 'var(--blue-400)',
+        color: BAR_PALETTE[index % BAR_PALETTE.length],
       }));
   }, [tickets]);
 

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Alert, Button, Card, Chip, Tabs } from '@/components/ui';
+import { AnimatedCounter } from '@/components/charts';
 import { AdminResourcesScreen } from '@/components/screens/AdminResourcesScreen';
 import { CatalogueLocationsScreen } from '@/components/screens/catalogue/CatalogueLocationsScreen';
 import { CatalogueResourceTypesScreen } from '@/components/screens/catalogue/CatalogueResourceTypesScreen';
@@ -31,7 +32,7 @@ function SummaryCard({
             {label}
           </p>
           <p style={{ margin: '10px 0 0', fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 900, color: 'var(--text-h)' }}>
-            {value}
+            <AnimatedCounter value={value} />
           </p>
           <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: 12 }}>{caption}</p>
         </div>
