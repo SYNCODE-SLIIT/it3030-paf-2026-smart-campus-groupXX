@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { CircleSlash, FolderOpen, Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { CircleSlash, Eye, FolderOpen, Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
@@ -56,6 +57,7 @@ export function AdminResourcesScreen({
 }) {
   const { session } = useAuth();
   const { showToast } = useToast();
+  const router = useRouter();
   const accessToken = session?.access_token ?? null;
 
   const [resources, setResources] = React.useState<ResourceListItem[]>([]);
@@ -483,6 +485,13 @@ export function AdminResourcesScreen({
                         <TableCell>{resourceAvailabilityLabel(resource)}</TableCell>
                         <TableCell style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+                            <IconButton
+                              variant="neutral"
+                              icon={<Eye size={13} />}
+                              title="View resource details"
+                              aria-label={`View ${resource.code}`}
+                              onClick={() => router.push(`/admin/resources/${resource.id}`)}
+                            />
                             <IconButton
                               variant="neutral"
                               icon={<Pencil size={13} />}

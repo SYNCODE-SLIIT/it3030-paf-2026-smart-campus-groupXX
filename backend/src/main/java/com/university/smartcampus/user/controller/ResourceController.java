@@ -3,7 +3,10 @@ package com.university.smartcampus.user.controller;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +34,7 @@ import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
 import com.university.smartcampus.resource.ResourceDtos.ResourceStats;
 import com.university.smartcampus.resource.ResourceDtos.ResourceTypeOption;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
+import com.university.smartcampus.resource.ResourceQrService;
 import com.university.smartcampus.resource.ResourceService;
 import com.university.smartcampus.user.entity.UserEntity;
 
@@ -42,10 +46,16 @@ public class ResourceController {
 
     private final CurrentUserService currentUserService;
     private final ResourceService resourceService;
+    private final ResourceQrService resourceQrService;
 
-    public ResourceController(CurrentUserService currentUserService, ResourceService resourceService) {
+    public ResourceController(
+        CurrentUserService currentUserService,
+        ResourceService resourceService,
+        ResourceQrService resourceQrService
+    ) {
         this.currentUserService = currentUserService;
         this.resourceService = resourceService;
+        this.resourceQrService = resourceQrService;
     }
 
     @GetMapping
@@ -141,5 +151,20 @@ public class ResourceController {
     public MessageResponse permanentlyDeleteResource(@PathVariable UUID id, Authentication authentication) {
         UserEntity actor = currentUserService.requireAdminOrCatalogManager(authentication);
         return resourceService.permanentlyDeleteResource(id, actor);
+    }
+
+    @GetMapping(value = "/{id}/qr", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> getResourceQr(
+        @PathVariable UUID id,
+        @RequestParam(value = "size", required = false) Integer size,
+        Authentication authentication
+    ) {
+        currentUserService.requireAdminOrCatalogManager(authentication);
+        byte[] png = resourceQrService.generateResourceQrPng(id, size);
+        return ResponseEntity.ok()
+            .contentType(MediaType.IMAGE_PNG)
+            .header(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate, max-age=0")
+            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"resource-" + id + ".png\"")
+            .body(png);
     }
 }

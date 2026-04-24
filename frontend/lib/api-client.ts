@@ -672,6 +672,67 @@ export async function permanentlyDeleteResource(accessToken: string, resourceId:
   return response;
 }
 
+export async function fetchResourceQrPngBlob(accessToken: string, resourceId: string, size?: number) {
+  const params = new URLSearchParams();
+  if (size !== undefined) {
+    params.set('size', String(size));
+  }
+  const query = params.toString();
+  const path = `/api/resources/${resourceId}/qr${query ? `?${query}` : ''}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(buildApiUrl(path), {
+      method: 'GET',
+      headers: {
+        Accept: 'image/png',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError(504, 'The QR generation request timed out.');
+    }
+
+    if (error instanceof TypeError) {
+      throw new ApiError(
+        0,
+        'Cannot reach the backend API. Make sure NEXT_PUBLIC_API_URL points to the running backend service.',
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    let details: ErrorResponse | null = null;
+    try {
+      details = await response.json();
+    } catch {
+      details = null;
+    }
+
+    redirectToOnboardingIfRequired(response.status, details);
+
+    throw new ApiError(
+      response.status,
+      details?.message ?? `Request failed with status ${response.status}.`,
+      details,
+    );
+  }
+
+  return response.blob();
+}
+
 export async function listBuildings(accessToken: string) {
   return request<BuildingResponse[]>('/api/admin/buildings', {
     accessToken,
