@@ -108,7 +108,7 @@ interface RequestOptions {
 const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
 const ONBOARDING_REQUIRED_ERROR_CODE = 'ONBOARDING_REQUIRED';
 const STUDENT_ONBOARDING_PATH = '/students/onboarding';
-const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
 const STATUS_MESSAGES: Partial<Record<number, string>> = {
   0: 'Cannot reach the backend service. Please check that the backend is running and try again.',

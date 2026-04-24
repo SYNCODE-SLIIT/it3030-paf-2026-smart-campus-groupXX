@@ -15,6 +15,7 @@ interface DonutChartProps {
   centerLabel?: string;
   centerValue?: string | number;
   emptyLabel?: string;
+  showLegend?: boolean;
 }
 
 const TWO_PI = Math.PI * 2;
@@ -43,7 +44,10 @@ export function DonutChart({
   centerLabel,
   centerValue,
   emptyLabel = 'No data yet',
+  showLegend = true,
 }: DonutChartProps) {
+  const uid = React.useId();
+  const filterId = `donut-shadow-${uid.replace(/:/g, '')}`;
   const total = data.reduce((sum, slice) => sum + Math.max(0, slice.value), 0);
   const radius = (size - thickness) / 2;
   const cx = size / 2;
@@ -98,11 +102,11 @@ export function DonutChart({
   }, []);
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div style={{ display: 'grid', gap: 18, width: showLegend ? undefined : size, flexShrink: 0 }}>
       <div style={{ position: 'relative', width: size, height: size, alignSelf: 'center', margin: '0 auto' }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <defs>
-            <filter id="donut-shadow" x="-30%" y="-30%" width="160%" height="160%">
+            <filter id={filterId} x="-30%" y="-30%" width="160%" height="160%">
               <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
               <feOffset dx="0" dy="2" result="offsetblur" />
               <feComponentTransfer>
@@ -136,7 +140,7 @@ export function DonutChart({
                 transition: 'stroke-width .2s ease, opacity .2s ease',
                 opacity: hovered === null || hovered === seg.index ? 1 : 0.45,
                 cursor: 'pointer',
-                filter: 'url(#donut-shadow)',
+                filter: `url(#${filterId})`,
               }}
               onMouseEnter={() => setHovered(seg.index)}
               onMouseLeave={() => setHovered(null)}
@@ -188,69 +192,71 @@ export function DonutChart({
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-          gap: 8,
-        }}
-      >
-        {data.map((slice, index) => {
-          const fraction = total === 0 ? 0 : Math.max(0, slice.value) / total;
-          return (
-            <div
-              key={slice.label}
-              onMouseEnter={() => setHovered(index)}
-              onMouseLeave={() => setHovered(null)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '6px 8px',
-                borderRadius: 8,
-                background: hovered === index ? 'var(--surface-2)' : 'transparent',
-                transition: 'background .15s',
-                cursor: 'default',
-              }}
-            >
-              <span
+      {showLegend && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: 8,
+          }}
+        >
+          {data.map((slice, index) => {
+            const fraction = total === 0 ? 0 : Math.max(0, slice.value) / total;
+            return (
+              <div
+                key={slice.label}
+                onMouseEnter={() => setHovered(index)}
+                onMouseLeave={() => setHovered(null)}
                 style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 3,
-                  background: slice.color,
-                  flexShrink: 0,
-                  boxShadow: `0 0 0 2px ${slice.color}22`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 8px',
+                  borderRadius: 8,
+                  background: hovered === index ? 'var(--surface-2)' : 'transparent',
+                  transition: 'background .15s',
+                  cursor: 'default',
                 }}
-              />
-              <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+              >
                 <span
                   style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 600,
-                    fontSize: 12,
-                    color: 'var(--text-h)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
+                    width: 10,
+                    height: 10,
+                    borderRadius: 3,
+                    background: slice.color,
+                    flexShrink: 0,
+                    boxShadow: `0 0 0 2px ${slice.color}22`,
                   }}
-                >
-                  {slice.label}
-                </span>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  {slice.value} · {(fraction * 100).toFixed(1)}%
-                </span>
+                />
+                <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: 'var(--text-h)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {slice.label}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    {slice.value} · {(fraction * 100).toFixed(1)}%
+                  </span>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
