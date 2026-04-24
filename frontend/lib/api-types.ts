@@ -195,6 +195,37 @@ export interface ResourceListPage {
   totalPages: number;
 }
 
+/** Public marketing catalogue (no auth). Only active resources are counted or listed. */
+export interface PublicCatalogTypeSummary {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  description: string | null;
+  activeResourceCount: number;
+}
+
+export interface PublicCatalogResourceItem {
+  id: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  locationLabel: string;
+  capacity: number | null;
+  bookable: boolean;
+}
+
+export interface PublicCatalogResourcePage {
+  items: PublicCatalogResourceItem[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+/** Query `filter` for public catalogue search (backend). */
+export type PublicCatalogFilterMode = 'ALL' | 'RESOURCE_TYPES' | 'RESOURCES';
+
 export interface ResourceOption {
   id: string;
   code: string;

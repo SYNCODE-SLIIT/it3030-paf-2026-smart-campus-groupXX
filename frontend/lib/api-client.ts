@@ -44,6 +44,9 @@ import {
   type RequestModificationRequest,
   type ResourceRemainingRangesResponse,
   type ResourceFeatureOption,
+  type PublicCatalogFilterMode,
+  type PublicCatalogResourcePage,
+  type PublicCatalogTypeSummary,
   type ResourceListPage,
   type ResourceLookups,
   type ResourceOption,
@@ -74,7 +77,7 @@ import {
   type UserResponse,
   type UserType,
 } from '@/lib/api-types';
-import { requireApiBaseUrl } from '@/lib/backend-url';
+import { getServerApiBaseUrl, requireApiBaseUrl } from '@/lib/backend-url';
 
 function resolveApiBaseUrl() {
   return requireApiBaseUrl();
@@ -557,6 +560,105 @@ export async function listResourcePage(accessToken: string, filters: ResourceLis
   return request<ResourceListPage>(`/api/resources${buildResourceListQuery(filters)}`, {
     accessToken,
   });
+}
+
+/**
+ * Public catalogue URLs: in the browser, use the Next.js origin so requests hit Route Handlers
+ * that proxy to the backend (avoids calling :8080 from the client and supports Docker internal URLs).
+ * On the server, call the backend directly.
+ */
+function buildPublicCatalogRequestUrl(pathWithLeadingSlash: string) {
+  const path = pathWithLeadingSlash.startsWith('/') ? pathWithLeadingSlash : `/${pathWithLeadingSlash}`;
+  if (typeof window === 'undefined') {
+    const base = getServerApiBaseUrl() ?? requireApiBaseUrl();
+    return `${base}${path}`;
+  }
+  return `${window.location.origin}${path}`;
+}
+
+async function publicCatalogFetch<T>(pathWithLeadingSlash: string): Promise<T> {
+  const url = buildPublicCatalogRequestUrl(pathWithLeadingSlash);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError(504, 'The catalogue request timed out.');
+    }
+
+    if (error instanceof TypeError) {
+      throw new ApiError(
+        0,
+        'Cannot reach the catalogue service. If you use Docker, ensure the frontend can proxy to the backend (INTERNAL_API_URL / NEXT_PUBLIC_API_URL).',
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    let details: ErrorResponse | null = null;
+    try {
+      details = await response.json();
+    } catch {
+      details = null;
+    }
+
+    throw new ApiError(
+      response.status,
+      details?.message ?? `Catalogue request failed with status ${response.status}.`,
+      details,
+    );
+  }
+
+  return parseResponse<T>(response);
+}
+
+/** Public catalogue: resource types that have at least one active resource (no JWT). */
+export async function fetchPublicCatalogTypes(options?: {
+  search?: string;
+  filter?: PublicCatalogFilterMode;
+}) {
+  const params = new URLSearchParams();
+  if (options?.search?.trim()) {
+    params.set('search', options.search.trim());
+  }
+  if (options?.filter && options.filter !== 'ALL') {
+    params.set('filter', options.filter);
+  }
+  const q = params.toString();
+  return publicCatalogFetch<PublicCatalogTypeSummary[]>(`/api/public/catalog/types${q ? `?${q}` : ''}`);
+}
+
+/** Public catalogue: paginated active resources for a type (no JWT). */
+export async function fetchPublicCatalogResourcesByType(
+  resourceTypeId: string,
+  page = 0,
+  size = 5,
+  options?: { search?: string; filter?: PublicCatalogFilterMode },
+) {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  if (options?.search?.trim()) {
+    params.set('search', options.search.trim());
+  }
+  if (options?.filter && options.filter !== 'ALL') {
+    params.set('filter', options.filter);
+  }
+  return publicCatalogFetch<PublicCatalogResourcePage>(
+    `/api/public/catalog/types/${encodeURIComponent(resourceTypeId)}/resources?${params.toString()}`,
+  );
 }
 
 export async function listResources(accessToken: string, filters: ResourceListFilters = {}) {

@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 import com.university.smartcampus.AppEnums.ResourceCategory;
 import com.university.smartcampus.AppEnums.ResourceStatus;
+import com.university.smartcampus.resource.ResourceDtos.PublicCatalogResourceItem;
+import com.university.smartcampus.resource.ResourceDtos.PublicCatalogTypeSummary;
 import com.university.smartcampus.resource.ResourceDtos.ResourceListItem;
 import com.university.smartcampus.resource.ResourceDtos.ResourceOption;
 
@@ -115,4 +117,115 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, UUID>,
     @EntityGraph(attributePaths = {"resourceType", "locationEntity", "locationEntity.building"})
     @Query("select r from ResourceEntity r where r.id = :id")
     Optional<ResourceEntity> findByIdWithTypeAndLocation(@Param("id") UUID id);
+
+    @Query("""
+        select new com.university.smartcampus.resource.ResourceDtos$PublicCatalogTypeSummary(
+            rt.id,
+            rt.code,
+            rt.name,
+            rt.category,
+            rt.description,
+            count(r.id)
+        )
+        from ResourceEntity r
+        join r.resourceType rt
+        left join r.locationEntity l
+        where r.status = :activeStatus
+        and (
+            :searchPattern is null
+            or (
+                ('RESOURCE_TYPES' = :filterMode)
+                and (
+                    lower(rt.name) like :searchPattern
+                    or lower(rt.code) like :searchPattern
+                    or lower(coalesce(rt.description, '')) like :searchPattern
+                )
+            )
+            or (
+                ('RESOURCES' = :filterMode)
+                and (
+                    lower(r.code) like :searchPattern
+                    or lower(r.name) like :searchPattern
+                    or lower(coalesce(r.location, '')) like :searchPattern
+                    or lower(coalesce(l.locationName, '')) like :searchPattern
+                )
+            )
+            or (
+                ('ALL' = :filterMode)
+                and (
+                    lower(rt.name) like :searchPattern
+                    or lower(rt.code) like :searchPattern
+                    or lower(coalesce(rt.description, '')) like :searchPattern
+                    or lower(r.code) like :searchPattern
+                    or lower(r.name) like :searchPattern
+                    or lower(coalesce(r.location, '')) like :searchPattern
+                    or lower(coalesce(l.locationName, '')) like :searchPattern
+                )
+            )
+        )
+        group by rt.id, rt.code, rt.name, rt.category, rt.description
+        order by rt.name asc
+        """)
+    List<PublicCatalogTypeSummary> findPublicCatalogTypeSummaries(
+        @Param("activeStatus") ResourceStatus activeStatus,
+        @Param("searchPattern") String searchPattern,
+        @Param("filterMode") String filterMode
+    );
+
+    @Query("""
+        select new com.university.smartcampus.resource.ResourceDtos$PublicCatalogResourceItem(
+            r.id,
+            r.code,
+            r.name,
+            r.category,
+            coalesce(l.locationName, r.location, ''),
+            r.capacity,
+            r.bookable
+        )
+        from ResourceEntity r
+        join r.resourceType rt
+        left join r.locationEntity l
+        where r.status = :activeStatus
+        and rt.id = :typeId
+        and (
+            :searchPattern is null
+            or (
+                ('RESOURCE_TYPES' = :filterMode)
+                and (
+                    lower(rt.name) like :searchPattern
+                    or lower(rt.code) like :searchPattern
+                    or lower(coalesce(rt.description, '')) like :searchPattern
+                )
+            )
+            or (
+                ('RESOURCES' = :filterMode)
+                and (
+                    lower(r.code) like :searchPattern
+                    or lower(r.name) like :searchPattern
+                    or lower(coalesce(r.location, '')) like :searchPattern
+                    or lower(coalesce(l.locationName, '')) like :searchPattern
+                )
+            )
+            or (
+                ('ALL' = :filterMode)
+                and (
+                    lower(rt.name) like :searchPattern
+                    or lower(rt.code) like :searchPattern
+                    or lower(coalesce(rt.description, '')) like :searchPattern
+                    or lower(r.code) like :searchPattern
+                    or lower(r.name) like :searchPattern
+                    or lower(coalesce(r.location, '')) like :searchPattern
+                    or lower(coalesce(l.locationName, '')) like :searchPattern
+                )
+            )
+        )
+        order by r.code asc
+        """)
+    Page<PublicCatalogResourceItem> findPublicCatalogResourcesByType(
+        @Param("typeId") UUID typeId,
+        @Param("activeStatus") ResourceStatus activeStatus,
+        @Param("searchPattern") String searchPattern,
+        @Param("filterMode") String filterMode,
+        Pageable pageable
+    );
 }

@@ -26,6 +26,38 @@ public final class ResourceDtos {
     ) {
     }
 
+    /** Public marketing catalogue: one row per resource type that has at least one active resource. */
+    public record PublicCatalogTypeSummary(
+        UUID id,
+        String code,
+        String name,
+        ResourceCategory category,
+        String description,
+        long activeResourceCount
+    ) {
+    }
+
+    /** Public marketing catalogue: minimal fields for an active resource row. */
+    public record PublicCatalogResourceItem(
+        UUID id,
+        String code,
+        String name,
+        ResourceCategory category,
+        String locationLabel,
+        Integer capacity,
+        boolean bookable
+    ) {
+    }
+
+    public record PublicCatalogResourcePage(
+        List<PublicCatalogResourceItem> items,
+        int page,
+        int size,
+        long totalItems,
+        int totalPages
+    ) {
+    }
+
     public record CreateResourceRequest(
         @NotBlank String code,
         @NotBlank String name,
