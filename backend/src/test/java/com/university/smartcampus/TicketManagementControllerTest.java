@@ -135,8 +135,8 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                 .andExpect(jsonPath("$._links.self.href").exists());
 
         TicketEntity persisted = ticketRepository.findAll().get(0);
-        assertThat(persisted.getResourceId()).isNull();
-        assertThat(persisted.getLocationId()).isNull();
+        assertThat(persisted.resolveResourceId()).isNull();
+        assertThat(persisted.resolveLocationId()).isNull();
     }
 
     @Test
@@ -156,8 +156,8 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                 .andExpect(jsonPath("$.locationId").value(location.getId().toString()));
 
         TicketEntity persisted = ticketRepository.findAll().get(0);
-        assertThat(persisted.getResourceId()).isEqualTo(resource.getId());
-        assertThat(persisted.getLocationId()).isEqualTo(location.getId());
+        assertThat(persisted.resolveResourceId()).isEqualTo(resource.getId());
+        assertThat(persisted.resolveLocationId()).isEqualTo(location.getId());
     }
 
     @Test
@@ -176,8 +176,8 @@ class TicketManagementControllerTest extends AbstractPostgresIntegrationTest {
                 .andExpect(jsonPath("$.locationId").value(org.hamcrest.Matchers.nullValue()));
 
         TicketEntity persisted = ticketRepository.findAll().get(0);
-        assertThat(persisted.getResourceId()).isEqualTo(resource.getId());
-        assertThat(persisted.getLocationId()).isNull();
+        assertThat(persisted.resolveResourceId()).isEqualTo(resource.getId());
+        assertThat(persisted.resolveLocationId()).isNull();
     }
 
     @Test

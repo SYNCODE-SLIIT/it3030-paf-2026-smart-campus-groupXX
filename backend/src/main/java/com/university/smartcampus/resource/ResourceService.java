@@ -17,14 +17,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import com.university.smartcampus.AppEnums.BookingStatus;
 import com.university.smartcampus.AppEnums.ResourceCategory;
 import com.university.smartcampus.AppEnums.ResourceStatus;
+import com.university.smartcampus.booking.BookingModificationRepository;
+import com.university.smartcampus.booking.BookingRepository;
+import com.university.smartcampus.booking.RecurringBookingRepository;
 import com.university.smartcampus.common.dto.ApiDtos.MessageResponse;
+import com.university.smartcampus.common.enums.AppEnums.TicketStatus;
 import com.university.smartcampus.common.exception.BadRequestException;
 import com.university.smartcampus.common.exception.ConflictException;
 import com.university.smartcampus.common.exception.NotFoundException;
+import com.university.smartcampus.notification.NotificationEventLinkRepository;
 import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.resource.ResourceDtos.AvailabilityWindowRequest;
+import com.university.smartcampus.ticket.entity.TicketEntity;
+import com.university.smartcampus.ticket.repository.TicketRepository;
 import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
 import com.university.smartcampus.resource.ResourceDtos.LocationOption;
 import com.university.smartcampus.resource.ResourceDtos.ManagedByRoleOption;
@@ -67,12 +75,28 @@ public class ResourceService {
         "TRANSPORT_MANAGER"
     );
 
+    private static final List<BookingStatus> ACTIVE_BOOKING_STATUSES = List.of(
+        BookingStatus.PENDING,
+        BookingStatus.APPROVED,
+        BookingStatus.CHECKED_IN
+    );
+
+    private static final List<TicketStatus> UNRESOLVED_TICKET_STATUSES = List.of(
+        TicketStatus.OPEN,
+        TicketStatus.IN_PROGRESS
+    );
+
     private final ResourceRepository resourceRepository;
     private final ResourceTypeRepository resourceTypeRepository;
     private final LocationRepository locationRepository;
     private final ResourceFeatureRepository resourceFeatureRepository;
     private final ResourceMapper resourceMapper;
     private final NotificationService notificationService;
+    private final BookingRepository bookingRepository;
+    private final BookingModificationRepository bookingModificationRepository;
+    private final RecurringBookingRepository recurringBookingRepository;
+    private final NotificationEventLinkRepository notificationEventLinkRepository;
+    private final TicketRepository ticketRepository;
 
     public ResourceService(
         ResourceRepository resourceRepository,
@@ -80,7 +104,12 @@ public class ResourceService {
         LocationRepository locationRepository,
         ResourceFeatureRepository resourceFeatureRepository,
         ResourceMapper resourceMapper,
-        NotificationService notificationService
+        NotificationService notificationService,
+        BookingRepository bookingRepository,
+        BookingModificationRepository bookingModificationRepository,
+        RecurringBookingRepository recurringBookingRepository,
+        NotificationEventLinkRepository notificationEventLinkRepository,
+        TicketRepository ticketRepository
     ) {
         this.resourceRepository = resourceRepository;
         this.resourceTypeRepository = resourceTypeRepository;
@@ -88,6 +117,11 @@ public class ResourceService {
         this.resourceFeatureRepository = resourceFeatureRepository;
         this.resourceMapper = resourceMapper;
         this.notificationService = notificationService;
+        this.bookingRepository = bookingRepository;
+        this.bookingModificationRepository = bookingModificationRepository;
+        this.recurringBookingRepository = recurringBookingRepository;
+        this.notificationEventLinkRepository = notificationEventLinkRepository;
+        this.ticketRepository = ticketRepository;
     }
 
     @Transactional
@@ -351,6 +385,83 @@ public class ResourceService {
         resource.setStatus(ResourceStatus.INACTIVE);
         notificationService.notifyResourceStatusChanged(resource, oldStatus, actor);
         return new MessageResponse("Resource removed.");
+    }
+
+    /**
+     * Permanently removes a resource along with its dependent catalogue records.
+     *
+     * Safety rules:
+     *   - Blocks the delete when any active or upcoming bookings exist
+     *     (PENDING / APPROVED / CHECKED_IN).
+     *   - Blocks the delete when unresolved tickets (OPEN / IN_PROGRESS) reference
+     *     the resource.
+     *
+     * Cascade behaviour when the delete is allowed:
+     *   - Historical bookings, their booking modifications, and recurring bookings
+     *     for this resource are hard-deleted.
+     *   - {@code resource_images}, {@code resource_availability_windows}, and
+     *     {@code resource_feature_map} rows are removed through JPA cascade /
+     *     orphan removal on {@link ResourceEntity}.
+     *   - {@code notification_event_links} rows pointing at the resource,
+     *     its bookings, or its booking modifications have their references
+     *     nullified so that the notification audit trail is preserved.
+     *   - Tickets that previously pointed at this resource keep their history but
+     *     have {@code resource_id} nulled so they survive for audit.
+     */
+    @Transactional
+    public MessageResponse permanentlyDeleteResource(UUID id, UserEntity actor) {
+        ResourceEntity resource = getResourceEntity(id);
+
+        if (bookingRepository.existsByResourceIdAndStatusIn(resource.getId(), ACTIVE_BOOKING_STATUSES)) {
+            throw new ConflictException(
+                "This resource has active or upcoming bookings. Cancel them or deactivate the resource instead."
+            );
+        }
+
+        if (ticketRepository.existsByResourceIdAndStatusIn(resource.getId(), UNRESOLVED_TICKET_STATUSES)) {
+            throw new ConflictException(
+                "This resource is referenced by unresolved tickets. Close those tickets or deactivate the resource instead."
+            );
+        }
+
+        List<UUID> bookingIds = bookingRepository.findIdsByResourceId(resource.getId());
+        if (!bookingIds.isEmpty()) {
+            List<UUID> modificationIds = bookingModificationRepository.findIdsByBookingIdIn(bookingIds);
+            if (!modificationIds.isEmpty()) {
+                notificationEventLinkRepository.deleteOrphanBookingModificationReferences(modificationIds);
+                notificationEventLinkRepository.clearBookingModificationReferences(modificationIds);
+                bookingModificationRepository.deleteByBookingIdIn(bookingIds);
+            }
+            notificationEventLinkRepository.deleteOrphanBookingReferences(bookingIds);
+            notificationEventLinkRepository.clearBookingReferences(bookingIds);
+            bookingRepository.deleteByResourceId(resource.getId());
+        }
+
+        recurringBookingRepository.deleteByResourceId(resource.getId());
+
+        List<TicketEntity> ticketsReferencingResource = ticketRepository.findAllByResourceId(resource.getId());
+        if (!ticketsReferencingResource.isEmpty()) {
+            for (TicketEntity ticket : ticketsReferencingResource) {
+                ticket.setResource(null);
+            }
+            ticketRepository.saveAll(ticketsReferencingResource);
+            ticketRepository.flush();
+        }
+
+        notificationEventLinkRepository.deleteOrphanResourceReferences(resource.getId());
+        notificationEventLinkRepository.clearResourceReferences(resource.getId());
+
+        resource.getFeatures().clear();
+        resource.getImages().clear();
+        resource.getAvailabilityWindows().clear();
+        resourceRepository.saveAndFlush(resource);
+
+        notificationService.notifyResourceDeleted(resource, actor);
+
+        resourceRepository.delete(resource);
+        resourceRepository.flush();
+
+        return new MessageResponse("Resource permanently deleted.");
     }
 
     @Transactional(readOnly = true)

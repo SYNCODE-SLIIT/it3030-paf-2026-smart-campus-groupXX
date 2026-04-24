@@ -7,7 +7,7 @@ type HomePathUser = Pick<UserResponse, 'userType'> & Partial<Pick<UserResponse, 
 export function getManagerDashboardPath(managerRole?: ManagerRole | null) {
   switch (managerRole) {
     case 'CATALOG_MANAGER':
-      return '/managers/catalog';
+      return '/managers/catalog/dashboard';
     case 'BOOKING_MANAGER':
       return '/booking-managers';
     case 'TICKET_MANAGER':
@@ -43,6 +43,37 @@ export function getPostAuthRedirect(user: UserResponse, nextStep: NextStep) {
   }
 
   return getUserHomePath(user);
+}
+
+/**
+ * Returns a safe, same-origin path for post-login redirects, or null if the
+ * provided value is missing or looks unsafe (e.g. absolute URLs, protocol-relative,
+ * or empty). Only paths that start with a single `/` are accepted.
+ */
+export function sanitizeRedirectPath(raw: string | null | undefined) {
+  if (!raw) {
+    return null;
+  }
+
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('/')) {
+    return null;
+  }
+
+  if (trimmed.startsWith('//') || trimmed.startsWith('/\\')) {
+    return null;
+  }
+
+  if (trimmed === '/login' || trimmed.startsWith('/login?')) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+export function buildLoginRedirectHref(redirectTo: string | null | undefined) {
+  const safe = sanitizeRedirectPath(redirectTo);
+  return safe ? `/login?redirect=${encodeURIComponent(safe)}` : '/login';
 }
 
 export function getLoginReasonAlert(reason: string | null) {

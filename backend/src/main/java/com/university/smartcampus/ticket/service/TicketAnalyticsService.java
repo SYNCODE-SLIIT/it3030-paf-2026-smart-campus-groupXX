@@ -822,6 +822,4 @@ public class TicketAnalyticsService {
         return user.getEmail();
     }
 
-    private record BucketWindow(Instant start, Instant end) {
-    }
 }

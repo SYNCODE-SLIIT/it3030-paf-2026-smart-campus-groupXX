@@ -530,6 +530,39 @@ public class NotificationService {
     }
 
     @Transactional
+    public void notifyResourceDeleted(ResourceEntity resource, UserEntity actor) {
+        Objects.requireNonNull(resource, "Resource is required.");
+
+        List<RecipientTarget> recipients = activeAdminsAndCatalogManagers().stream()
+            .filter(user -> actor == null || !user.getId().equals(actor.getId()))
+            .map(user -> new RecipientTarget(user, resourceActionUrl(user)))
+            .toList();
+
+        List<NotificationLink> links = new ArrayList<>();
+        if (resource.getLocationEntity() != null) {
+            links.add(NotificationLink.location(resource.getLocationEntity().getId()));
+            if (resource.getLocationEntity().getBuilding() != null) {
+                links.add(NotificationLink.building(resource.getLocationEntity().getBuilding().getId()));
+            }
+        }
+        if (resource.getResourceType() != null) {
+            links.add(NotificationLink.resourceType(resource.getResourceType().getId()));
+        }
+
+        createEvent(new NotificationRequest(
+            NotificationDomain.CATALOG,
+            "RESOURCE_DELETED",
+            NotificationSeverity.WARNING,
+            "Resource permanently removed",
+            resource.getCode() + " was permanently deleted from the catalogue.",
+            actor,
+            "resource-deleted:" + resource.getId() + ":" + Instant.now().toEpochMilli(),
+            recipients,
+            links
+        ));
+    }
+
+    @Transactional
     public void notifyResourceStatusChanged(ResourceEntity resource, ResourceStatus oldStatus, UserEntity actor) {
         if (resource == null || oldStatus == resource.getStatus()) {
             return;
@@ -1024,11 +1057,11 @@ public class NotificationService {
         if (comment != null) {
             links.add(NotificationLink.ticketComment(comment.getId()));
         }
-        if (ticket.getResourceId() != null) {
-            links.add(NotificationLink.resource(ticket.getResourceId()));
+        if (ticket.resolveResourceId() != null) {
+            links.add(NotificationLink.resource(ticket.resolveResourceId()));
         }
-        if (ticket.getLocationId() != null) {
-            links.add(NotificationLink.location(ticket.getLocationId()));
+        if (ticket.resolveLocationId() != null) {
+            links.add(NotificationLink.location(ticket.resolveLocationId()));
         }
         return links;
     }

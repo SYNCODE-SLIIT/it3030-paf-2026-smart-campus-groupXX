@@ -322,6 +322,8 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
             onEditComment={handleEditComment}
           />
           <TicketAttachmentsCard attachments={attachments} />
+          <TicketLifecycleCard ticket={ticket} history={history} />
+          <TicketHistoryCard history={history} />
         </div>
 
         {/* Sidebar */}
@@ -355,14 +357,13 @@ export function AdminTicketDetailScreen({ ticketRef }: { ticketRef: string }) {
           {resource && (
             <TicketResourceCard
               resource={resource}
+              viewResourceHref={`/admin/resources/${resource.id}?returnTo=${encodeURIComponent(`/admin/tickets/${ticketRef}`)}`}
               canDeactivate
               onDeactivate={() => { void handleDeactivateResource(); }}
               deactivating={deactivatingResource}
             />
           )}
           <TicketDetailsCard ticket={ticket} />
-          <TicketLifecycleCard ticket={ticket} history={history} />
-          <TicketHistoryCard history={history} />
         </div>
       </div>
 

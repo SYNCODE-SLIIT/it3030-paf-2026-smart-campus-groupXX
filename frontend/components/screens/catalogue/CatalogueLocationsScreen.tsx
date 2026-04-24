@@ -5,6 +5,7 @@ import { MapPinned, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
 import { LocationFormModal } from '@/components/screens/catalogue/locations/LocationFormModal';
 import { Alert, Button, Card, Chip, IconButton, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import {
@@ -23,6 +24,8 @@ import type {
   UpdateLocationRequest,
 } from '@/lib/api-types';
 import { formatBuildingOptionLabel, getLocationTypeLabel, getWingLabel, locationTypeOptions } from '@/lib/location-display';
+
+const LOCATION_PAGE_SIZE = 50;
 
 export function CatalogueLocationsScreen({
   embedded = false,
@@ -45,11 +48,18 @@ export function CatalogueLocationsScreen({
   const [editingLocation, setEditingLocation] = React.useState<CatalogueLocationResponse | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [confirmDeleteLocation, setConfirmDeleteLocation] = React.useState<CatalogueLocationResponse | null>(null);
+  const [confirmError, setConfirmError] = React.useState<string | null>(null);
   const [searchText, setSearchText] = React.useState('');
   const [buildingFilter, setBuildingFilter] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState('');
+  const [page, setPage] = React.useState(0);
 
   const deferredSearch = React.useDeferredValue(searchText);
+
+  React.useEffect(() => {
+    setPage(0);
+  }, [deferredSearch, buildingFilter, typeFilter]);
   const isControlled = onAddOpenChange !== undefined;
   const formOpen = isControlled ? (addOpen ?? false) : internalFormOpen;
 
@@ -114,6 +124,16 @@ export function CatalogueLocationsScreen({
     });
   }, [buildingFilter, deferredSearch, locations, typeFilter]);
 
+  const totalFiltered = filteredLocations.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / LOCATION_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pageStart = totalFiltered === 0 ? 0 : currentPage * LOCATION_PAGE_SIZE + 1;
+  const pageEnd = Math.min((currentPage + 1) * LOCATION_PAGE_SIZE, totalFiltered);
+  const pagedLocations = React.useMemo(
+    () => filteredLocations.slice(currentPage * LOCATION_PAGE_SIZE, currentPage * LOCATION_PAGE_SIZE + LOCATION_PAGE_SIZE),
+    [currentPage, filteredLocations],
+  );
+
   async function handleSave(payload: CreateLocationRequest | UpdateLocationRequest) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
@@ -140,22 +160,21 @@ export function CatalogueLocationsScreen({
     }
   }
 
-  async function handleDelete(location: CatalogueLocationResponse) {
+  async function executeDelete(location: CatalogueLocationResponse) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
-    const confirmed = window.confirm(`Remove ${location.locationName}? Locations already linked to resources cannot be removed.`);
-    if (!confirmed) return;
-
     setDeletingId(location.id);
     try {
       await deleteCatalogueLocation(accessToken, location.id);
       showToast('success', 'Location removed', `${location.locationName} was removed.`);
+      setConfirmDeleteLocation(null);
+      setConfirmError(null);
       await reloadData();
     } catch (error) {
-      showToast('error', 'Remove failed', getErrorMessage(error, 'We could not remove the location.'));
+      setConfirmError(getErrorMessage(error, 'We could not remove the location.'));
     } finally {
       setDeletingId(null);
     }
@@ -251,6 +270,27 @@ export function CatalogueLocationsScreen({
               await handleSave(payload);
             }}
           />
+          <AdminConfirmDialog
+            open={Boolean(confirmDeleteLocation)}
+            title="Delete Location"
+            description={
+              confirmDeleteLocation
+                ? `Delete ${confirmDeleteLocation.locationName}? Locations linked to resources cannot be removed.`
+                : ''
+            }
+            confirmLabel="Delete"
+            confirmVariant="danger"
+            loading={Boolean(confirmDeleteLocation && deletingId === confirmDeleteLocation.id)}
+            errorMessage={confirmError}
+            onClose={() => {
+              setConfirmDeleteLocation(null);
+              setConfirmError(null);
+            }}
+            onConfirm={() => {
+              if (!confirmDeleteLocation) return;
+              void executeDelete(confirmDeleteLocation);
+            }}
+          />
 
           <div style={{ overflowX: 'auto' }}>
             <Table>
@@ -270,12 +310,12 @@ export function CatalogueLocationsScreen({
                   <TableRow>
                     <TableCell colSpan={7}>Loading locations…</TableCell>
                   </TableRow>
-                ) : filteredLocations.length === 0 ? (
+                ) : pagedLocations.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>No locations match the current filters.</TableCell>
                   </TableRow>
                 ) : (
-                  filteredLocations.map((location) => (
+                  pagedLocations.map((location) => (
                     <TableRow key={location.id}>
                       <TableCell>
                         <div style={{ display: 'grid', gap: 2 }}>
@@ -310,7 +350,10 @@ export function CatalogueLocationsScreen({
                             title="Delete location"
                             aria-label={`Delete ${location.locationName}`}
                             loading={deletingId === location.id}
-                            onClick={() => void handleDelete(location)}
+                            onClick={() => {
+                              setConfirmError(null);
+                              setConfirmDeleteLocation(location);
+                            }}
                           />
                         </div>
                       </TableCell>
@@ -320,6 +363,32 @@ export function CatalogueLocationsScreen({
               </TableBody>
             </Table>
           </div>
+
+          {!loading && totalFiltered > LOCATION_PAGE_SIZE && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                Showing {pageStart}-{pageEnd} of {totalFiltered}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  disabled={currentPage <= 0}
+                  onClick={() => setPage((current) => Math.max(current - 1, 0))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  disabled={currentPage >= totalPages - 1}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
     </div>

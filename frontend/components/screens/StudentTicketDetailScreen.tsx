@@ -320,13 +320,13 @@ export function RequesterTicketDetailScreen({
             onUpload={handleUpload}
             onDelete={handleDeleteAttachment}
           />
+          <TicketHistoryCard history={history} />
         </div>
 
         {/* Sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {resource && <TicketResourceCard resource={resource} />}
           <TicketDetailsCard ticket={ticket} />
-          <TicketHistoryCard history={history} />
 
           {canDelete && (
             <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px' }}>

@@ -134,4 +134,36 @@ public final class AdminDtos {
         List<BulkStudentImportRowResult> results
     ) {
     }
+
+    public record AdminDashboardResponse(
+        long totalUsers,
+        long activeUsers,
+        long invitedUsers,
+        long suspendedUsers,
+        long activeThisWeek,
+        long studentUsers,
+        long facultyUsers,
+        long managerUsers,
+        long adminUsers,
+        long openTickets,
+        long inProgressTickets,
+        long pendingBookings,
+        long approvedBookings,
+        long totalResources,
+        long activeResources,
+        long maintenanceResources,
+        long outOfServiceResources,
+        long totalBuildings,
+        long activeBuildings,
+        long unreadNotifications,
+        List<DashboardQuickLink> quickLinks
+    ) {
+    }
+
+    public record DashboardQuickLink(
+        String label,
+        String href,
+        String description
+    ) {
+    }
 }

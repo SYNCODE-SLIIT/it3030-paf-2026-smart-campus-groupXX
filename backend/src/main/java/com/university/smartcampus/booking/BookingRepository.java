@@ -9,8 +9,13 @@ import com.university.smartcampus.AppEnums.BookingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface BookingRepository extends JpaRepository<BookingEntity, UUID>, JpaSpecificationExecutor<BookingEntity> {
+
+    long countByStatus(BookingStatus status);
 
     boolean existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
         UUID resourceId,
@@ -18,6 +23,15 @@ public interface BookingRepository extends JpaRepository<BookingEntity, UUID>, J
         Instant endTime,
         Instant startTime
     );
+
+    boolean existsByResourceIdAndStatusIn(UUID resourceId, List<BookingStatus> statuses);
+
+    @Query("select b.id from BookingEntity b where b.resource.id = :resourceId")
+    List<UUID> findIdsByResourceId(@Param("resourceId") UUID resourceId);
+
+    @Modifying
+    @Query("delete from BookingEntity b where b.resource.id = :resourceId")
+    int deleteByResourceId(@Param("resourceId") UUID resourceId);
 
     boolean existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThanAndIdNot(
         UUID resourceId,

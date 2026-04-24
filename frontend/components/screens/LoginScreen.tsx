@@ -22,7 +22,13 @@ type AlertState = {
   message: string;
 } | null;
 
-export function LoginScreen({ reason }: { reason: string | null }) {
+export function LoginScreen({
+  reason,
+  redirectTo,
+}: {
+  reason: string | null;
+  redirectTo?: string | null;
+}) {
   const router = useRouter();
   const { authConfigured, refreshMe, signInWithGoogle, signInWithMicrosoft, signInWithPassword } = useAuth();
   const initialAlert = React.useMemo(() => getLoginReasonAlert(reason), [reason]);
@@ -101,7 +107,7 @@ export function LoginScreen({ reason }: { reason: string | null }) {
         if (needsStudentOnboarding(currentUser)) {
           router.replace(STUDENT_ONBOARDING_PATH);
         } else {
-          router.replace(getUserHomePath(currentUser));
+          router.replace(redirectTo ?? getUserHomePath(currentUser));
         }
         return;
       }

@@ -73,12 +73,40 @@ function hasNestedPathMatch(href: string) {
   return href.split('/').filter(Boolean).length > 1;
 }
 
-function isHrefActive(href: string, activePath: string) {
+function hrefMatchScore(href: string, activePath: string) {
   if (href === activePath) {
-    return true;
+    // Exact match wins over any prefix match, regardless of length.
+    return Number.MAX_SAFE_INTEGER;
   }
 
-  return hasNestedPathMatch(href) && activePath.startsWith(`${href}/`);
+  if (hasNestedPathMatch(href) && activePath.startsWith(`${href}/`)) {
+    return href.length;
+  }
+
+  return -1;
+}
+
+/**
+ * Returns the index of the single nav item that should be highlighted as
+ * active. We pick the most specific (longest) href that still matches the
+ * current path. This prevents two parent items from staying highlighted at
+ * the same time when they share a common URL prefix or accidentally point at
+ * the same href.
+ */
+function computeActiveHrefIndex(items: NavItem[], activePath: string) {
+  let bestScore = -1;
+  let bestIndex = -1;
+
+  items.forEach((item, index) => {
+    if (!item.href) return;
+    const score = hrefMatchScore(item.href, activePath);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  });
+
+  return bestIndex;
 }
 
 function SidebarNavItem({
@@ -175,6 +203,18 @@ export function Sidebar({
     setActive(item.label);
     onNavigate?.(item);
   }
+
+  const flattenedItems = React.useMemo<NavItem[]>(
+    () => sections.flatMap((section) => section.items),
+    [sections],
+  );
+
+  const activeHrefIndex = React.useMemo(
+    () => computeActiveHrefIndex(flattenedItems, activePath),
+    [flattenedItems, activePath],
+  );
+
+  const activeHrefRef = activeHrefIndex >= 0 ? flattenedItems[activeHrefIndex] : null;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -280,7 +320,7 @@ export function Sidebar({
                 <SidebarNavItem
                   key={item.label}
                   item={item}
-                  active={item.href ? isHrefActive(item.href, activePath) : active === item.label}
+                  active={item.href ? item === activeHrefRef : active === item.label}
                   onClick={() => handleNav(item)}
                 />
               ))}

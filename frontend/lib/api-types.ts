@@ -16,6 +16,7 @@ export type AdminAction =
   | 'MANAGER_ROLE_CHANGED';
 
 export type BookingStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'CHECKED_IN' | 'COMPLETED' | 'NO_SHOW';
+export type BookingAnalyticsBucket = 'DAY' | 'WEEK' | 'MONTH';
 
 export type RecurrencePattern = 'NONE' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 
@@ -499,6 +500,80 @@ export interface BookingResponse {
   checkedInAt: string | null;
 }
 
+export interface BookingAnalyticsQuery {
+  from?: string;
+  to?: string;
+  bucket?: BookingAnalyticsBucket;
+  category?: ResourceCategory;
+  resourceId?: string;
+}
+
+export interface BookingAnalyticsLiveQueue {
+  pendingApprovals: number;
+  stalePendingApprovals: number;
+  pendingModifications: number;
+}
+
+export interface BookingAnalyticsWindowSummary {
+  totalScheduled: number;
+  approved: number;
+  attended: number;
+  noShow: number;
+  rejected: number;
+  cancelled: number;
+  approvalRate: number | null;
+  attendanceRate: number | null;
+  noShowRate: number | null;
+  hoursBooked: number | null;
+}
+
+export interface BookingAnalyticsBreakdownRow {
+  key: string;
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface BookingAnalyticsTrendPoint {
+  bucketStart: string;
+  bucketEnd: string;
+  scheduled: number;
+  approved: number;
+  attended: number;
+  noShow: number;
+  cancelled: number;
+}
+
+export interface BookingAnalyticsTopResource {
+  resourceId: string;
+  code: string;
+  name: string;
+  category: ResourceCategory;
+  bookingCount: number;
+  hoursBooked: number;
+  noShowCount: number;
+}
+
+export interface BookingAnalyticsHeatmapCell {
+  dayOfWeek: string;
+  hourOfDay: number;
+  bookingCount: number;
+  hoursBooked: number;
+}
+
+export interface BookingAnalyticsResponse {
+  from: string;
+  to: string;
+  bucket: BookingAnalyticsBucket;
+  liveQueue: BookingAnalyticsLiveQueue;
+  windowSummary: BookingAnalyticsWindowSummary;
+  statusBreakdown: BookingAnalyticsBreakdownRow[];
+  categoryBreakdown: BookingAnalyticsBreakdownRow[];
+  topResources: BookingAnalyticsTopResource[];
+  trends: BookingAnalyticsTrendPoint[];
+  utilizationHeatmap: BookingAnalyticsHeatmapCell[];
+}
+
 export interface TimeRangeResponse {
   startTime: string;
   endTime: string;
@@ -630,6 +705,36 @@ export interface NotificationDeliveryResponse {
   failedAt: string | null;
   failureReason: string | null;
   createdAt: string;
+}
+
+export interface AdminDashboardResponse {
+  totalUsers: number;
+  activeUsers: number;
+  invitedUsers: number;
+  suspendedUsers: number;
+  activeThisWeek: number;
+  studentUsers: number;
+  facultyUsers: number;
+  managerUsers: number;
+  adminUsers: number;
+  openTickets: number;
+  inProgressTickets: number;
+  pendingBookings: number;
+  approvedBookings: number;
+  totalResources: number;
+  activeResources: number;
+  maintenanceResources: number;
+  outOfServiceResources: number;
+  totalBuildings: number;
+  activeBuildings: number;
+  unreadNotifications: number;
+  quickLinks: DashboardQuickLink[];
+}
+
+export interface DashboardQuickLink {
+  label: string;
+  href: string;
+  description: string;
 }
 
 export interface ErrorResponse {

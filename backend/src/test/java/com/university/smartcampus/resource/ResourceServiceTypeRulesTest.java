@@ -21,12 +21,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.university.smartcampus.AppEnums.ResourceCategory;
 import com.university.smartcampus.AppEnums.ResourceStatus;
+import com.university.smartcampus.booking.BookingModificationRepository;
+import com.university.smartcampus.booking.BookingRepository;
+import com.university.smartcampus.booking.RecurringBookingRepository;
 import com.university.smartcampus.common.exception.BadRequestException;
+import com.university.smartcampus.notification.NotificationEventLinkRepository;
 import com.university.smartcampus.notification.NotificationService;
 import com.university.smartcampus.resource.ResourceDtos.AvailabilityWindowRequest;
 import com.university.smartcampus.resource.ResourceDtos.CreateResourceRequest;
 import com.university.smartcampus.resource.ResourceDtos.ResourceResponse;
 import com.university.smartcampus.resource.ResourceDtos.UpdateResourceRequest;
+import com.university.smartcampus.ticket.repository.TicketRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ResourceServiceTypeRulesTest {
@@ -46,6 +51,21 @@ class ResourceServiceTypeRulesTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private BookingRepository bookingRepository;
+
+    @Mock
+    private BookingModificationRepository bookingModificationRepository;
+
+    @Mock
+    private RecurringBookingRepository recurringBookingRepository;
+
+    @Mock
+    private NotificationEventLinkRepository notificationEventLinkRepository;
+
+    @Mock
+    private TicketRepository ticketRepository;
+
     private ResourceService resourceService;
 
     @BeforeEach
@@ -56,7 +76,12 @@ class ResourceServiceTypeRulesTest {
             locationRepository,
             resourceFeatureRepository,
             new ResourceMapper(),
-            notificationService
+            notificationService,
+            bookingRepository,
+            bookingModificationRepository,
+            recurringBookingRepository,
+            notificationEventLinkRepository,
+            ticketRepository
         );
     }
 

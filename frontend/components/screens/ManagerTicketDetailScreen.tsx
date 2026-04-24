@@ -247,6 +247,8 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             onEditComment={handleEditComment}
           />
           <TicketAttachmentsCard attachments={attachments} />
+          <TicketLifecycleCard ticket={ticket} history={history} />
+          <TicketHistoryCard history={history} />
         </div>
 
         {/* Sidebar */}
@@ -265,8 +267,6 @@ export function ManagerTicketDetailScreen({ ticketRef }: { ticketRef: string }) 
             <TicketResourceCard resource={resource} />
           )}
           <TicketDetailsCard ticket={ticket} />
-          <TicketLifecycleCard ticket={ticket} history={history} />
-          <TicketHistoryCard history={history} />
         </div>
       </div>
 
