@@ -5,6 +5,7 @@ import { MapPinned, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
 import { LocationFormModal } from '@/components/screens/catalogue/locations/LocationFormModal';
 import { Alert, Button, Card, Chip, IconButton, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import {
@@ -47,6 +48,8 @@ export function CatalogueLocationsScreen({
   const [editingLocation, setEditingLocation] = React.useState<CatalogueLocationResponse | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [confirmDeleteLocation, setConfirmDeleteLocation] = React.useState<CatalogueLocationResponse | null>(null);
+  const [confirmError, setConfirmError] = React.useState<string | null>(null);
   const [searchText, setSearchText] = React.useState('');
   const [buildingFilter, setBuildingFilter] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState('');
@@ -157,22 +160,21 @@ export function CatalogueLocationsScreen({
     }
   }
 
-  async function handleDelete(location: CatalogueLocationResponse) {
+  async function executeDelete(location: CatalogueLocationResponse) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
       return;
     }
 
-    const confirmed = window.confirm(`Remove ${location.locationName}? Locations already linked to resources cannot be removed.`);
-    if (!confirmed) return;
-
     setDeletingId(location.id);
     try {
       await deleteCatalogueLocation(accessToken, location.id);
       showToast('success', 'Location removed', `${location.locationName} was removed.`);
+      setConfirmDeleteLocation(null);
+      setConfirmError(null);
       await reloadData();
     } catch (error) {
-      showToast('error', 'Remove failed', getErrorMessage(error, 'We could not remove the location.'));
+      setConfirmError(getErrorMessage(error, 'We could not remove the location.'));
     } finally {
       setDeletingId(null);
     }
@@ -268,6 +270,27 @@ export function CatalogueLocationsScreen({
               await handleSave(payload);
             }}
           />
+          <AdminConfirmDialog
+            open={Boolean(confirmDeleteLocation)}
+            title="Delete Location"
+            description={
+              confirmDeleteLocation
+                ? `Delete ${confirmDeleteLocation.locationName}? Locations linked to resources cannot be removed.`
+                : ''
+            }
+            confirmLabel="Delete"
+            confirmVariant="danger"
+            loading={Boolean(confirmDeleteLocation && deletingId === confirmDeleteLocation.id)}
+            errorMessage={confirmError}
+            onClose={() => {
+              setConfirmDeleteLocation(null);
+              setConfirmError(null);
+            }}
+            onConfirm={() => {
+              if (!confirmDeleteLocation) return;
+              void executeDelete(confirmDeleteLocation);
+            }}
+          />
 
           <div style={{ overflowX: 'auto' }}>
             <Table>
@@ -327,7 +350,10 @@ export function CatalogueLocationsScreen({
                             title="Delete location"
                             aria-label={`Delete ${location.locationName}`}
                             loading={deletingId === location.id}
-                            onClick={() => void handleDelete(location)}
+                            onClick={() => {
+                              setConfirmError(null);
+                              setConfirmDeleteLocation(location);
+                            }}
                           />
                         </div>
                       </TableCell>

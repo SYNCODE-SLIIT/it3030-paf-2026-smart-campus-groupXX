@@ -5,6 +5,7 @@ import { Building2, CircleSlash, Pencil, Plus, Search } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast } from '@/components/providers/ToastProvider';
+import { AdminConfirmDialog } from '@/components/screens/admin/AdminConfirmDialog';
 import { BuildingFormModal } from '@/components/screens/admin/buildings/BuildingFormModal';
 import { Alert, Button, Card, Chip, IconButton, Input, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import { createBuilding, deactivateBuilding, getErrorMessage, listBuildings, updateBuilding } from '@/lib/api-client';
@@ -26,6 +27,8 @@ export function AdminBuildingsScreen() {
   const [editingBuilding, setEditingBuilding] = React.useState<BuildingResponse | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [deactivatingId, setDeactivatingId] = React.useState<string | null>(null);
+  const [confirmDeactivateBuilding, setConfirmDeactivateBuilding] = React.useState<BuildingResponse | null>(null);
+  const [confirmError, setConfirmError] = React.useState<string | null>(null);
 
   const deferredSearch = React.useDeferredValue(searchText);
 
@@ -113,16 +116,15 @@ export function AdminBuildingsScreen() {
       return;
     }
 
-    const confirmed = window.confirm(`Deactivate ${building.buildingName}? Existing references are kept, but the building will be marked inactive.`);
-    if (!confirmed) return;
-
     setDeactivatingId(building.id);
     try {
       await deactivateBuilding(accessToken, building.id);
       showToast('success', 'Building deactivated', `${building.buildingName} is now inactive.`);
+      setConfirmDeactivateBuilding(null);
+      setConfirmError(null);
       await reloadBuildings();
     } catch (error) {
-      showToast('error', 'Deactivate failed', getErrorMessage(error, 'We could not deactivate the building.'));
+      setConfirmError(getErrorMessage(error, 'We could not deactivate the building.'));
     } finally {
       setDeactivatingId(null);
     }
@@ -225,6 +227,27 @@ export function AdminBuildingsScreen() {
               await handleSave(payload);
             }}
           />
+          <AdminConfirmDialog
+            open={Boolean(confirmDeactivateBuilding)}
+            title="Deactivate Building"
+            description={
+              confirmDeactivateBuilding
+                ? `Deactivate ${confirmDeactivateBuilding.buildingName}? Existing references are kept, but the building will be marked inactive.`
+                : ''
+            }
+            confirmLabel="Deactivate"
+            confirmVariant="info"
+            loading={Boolean(confirmDeactivateBuilding && deactivatingId === confirmDeactivateBuilding.id)}
+            errorMessage={confirmError}
+            onClose={() => {
+              setConfirmDeactivateBuilding(null);
+              setConfirmError(null);
+            }}
+            onConfirm={() => {
+              if (!confirmDeactivateBuilding) return;
+              void handleDeactivate(confirmDeactivateBuilding);
+            }}
+          />
 
           <div style={{ overflowX: 'auto' }}>
             <Table>
@@ -283,7 +306,10 @@ export function AdminBuildingsScreen() {
                             aria-label={`Deactivate ${building.buildingName}`}
                             disabled={!building.isActive}
                             loading={deactivatingId === building.id}
-                            onClick={() => void handleDeactivate(building)}
+                            onClick={() => {
+                              setConfirmError(null);
+                              setConfirmDeactivateBuilding(building);
+                            }}
                           />
                         </div>
                       </TableCell>
