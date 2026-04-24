@@ -199,6 +199,29 @@ export function AdminResourcesScreen({
     }
   }
 
+  const validateResourceCode = React.useCallback(async (code: string) => {
+    if (!accessToken) {
+      return 'Session unavailable. Please sign in again.';
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+    if (!normalizedCode) {
+      return 'Code is required.';
+    }
+
+    try {
+      const result = await listResourcePage(accessToken, {
+        search: normalizedCode,
+        page: 0,
+        size: 50,
+      });
+      const exists = result.items.some((item) => item.code.toUpperCase() === normalizedCode);
+      return exists ? 'A resource with this code already exists.' : null;
+    } catch {
+      return 'Could not validate code right now. Please try again.';
+    }
+  }, [accessToken]);
+
   async function handleDelete(resource: ResourceListItem) {
     if (!accessToken) {
       showToast('error', 'Session unavailable', 'Please sign in again.');
@@ -375,6 +398,7 @@ export function AdminResourcesScreen({
             managedByRoleOptions={managedByRoleOptions}
             lookupsLoading={lookupLoading}
             lookupError={lookupError}
+            onValidateCode={validateResourceCode}
             onClose={() => {
               setFormOpen(false);
               setEditingResource(null);

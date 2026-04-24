@@ -170,6 +170,7 @@ export function ResourceFormModal({
   managedByRoleOptions,
   lookupsLoading,
   lookupError,
+  onValidateCode,
   onSubmit,
   onClose,
 }: {
@@ -183,6 +184,7 @@ export function ResourceFormModal({
   managedByRoleOptions: ManagedByRoleOption[];
   lookupsLoading: boolean;
   lookupError: string | null;
+  onValidateCode: (code: string) => Promise<string | null>;
   onSubmit: (payload: CreateResourceRequest | UpdateResourceRequest) => Promise<void>;
   onClose: () => void;
 }) {
@@ -190,6 +192,7 @@ export function ResourceFormModal({
   const [values, setValues] = React.useState<ResourceFormValues>(() => valuesFromResource(resource));
   const [errors, setErrors] = React.useState<ResourceFormErrors>({});
   const [managedByRoleTouched, setManagedByRoleTouched] = React.useState(false);
+  const [validatingCode, setValidatingCode] = React.useState(false);
 
   const selectedResourceType = React.useMemo(
     () => resourceTypeOptions.find((option) => option.id === values.resourceTypeId) ?? null,
@@ -236,6 +239,9 @@ export function ResourceFormModal({
 
     if (targetStep === 1) {
       if (!resource && !next.code.trim()) nextErrors.code = 'Code is required.';
+      if (!resource && next.code.trim() && !/^[A-Z0-9]+$/.test(next.code.trim())) {
+        nextErrors.code = 'Code can contain only letters and numbers.';
+      }
       if (!next.name.trim()) nextErrors.name = 'Name is required.';
       if (!next.resourceTypeId) nextErrors.resourceTypeId = 'Resource type is required.';
     }
@@ -248,8 +254,10 @@ export function ResourceFormModal({
       if (nextShowCapacity) {
         if (nextResourceType?.capacityRequired && !next.capacity.trim()) {
           nextErrors.capacity = 'Capacity is required for this resource type.';
-        } else if (next.capacity.trim() && parseOptionalNumber(next.capacity) === null) {
-          nextErrors.capacity = 'Capacity must be a valid number.';
+        } else if (next.capacity.trim() && !/^\d+$/.test(next.capacity.trim())) {
+          nextErrors.capacity = 'Capacity must be a non-negative whole number.';
+        } else if (next.capacity.trim() && (parseOptionalNumber(next.capacity) ?? -1) < 0) {
+          nextErrors.capacity = 'Capacity must be greater than or equal to 0.';
         }
       }
 
@@ -319,10 +327,28 @@ export function ResourceFormModal({
     return 3;
   }
 
-  function handleNext() {
+  async function handleNext() {
     const nextErrors = validateStep(values, step);
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    if (step === 1 && !resource) {
+      setValidatingCode(true);
+      try {
+        const normalizedCode = values.code.trim().toUpperCase();
+        const codeError = await onValidateCode(normalizedCode);
+        if (codeError) {
+          setErrors((current) => ({ ...current, code: codeError }));
+          return;
+        }
+      } finally {
+        setValidatingCode(false);
+      }
+    }
+
+    setErrors({});
     setStep((current) => Math.min(3, current + 1));
   }
 
@@ -331,8 +357,13 @@ export function ResourceFormModal({
     onClose();
   }
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleSubmit(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (step < 3) {
+      await handleNext();
+      return;
+    }
+
     const nextErrors = validate(values);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -366,7 +397,7 @@ export function ResourceFormModal({
         movable: values.movable,
         availableFrom: null,
         availableTo: null,
-        managedByRole: (values.managedByRole || null) as ResourceManagedByRole | null,
+        managedByRole: (values.managedByRole || 'CATALOG_MANAGER') as ResourceManagedByRole,
         featureCodes: normalizedFeatureCodes,
         availabilityWindows: normalizedAvailabilityWindows,
       };
@@ -415,7 +446,7 @@ export function ResourceFormModal({
   ];
 
   const managedByRoleSelectOptions = [
-    { value: '', label: 'No managed role' },
+    { value: '', label: 'Default (Catalog Manager)' },
     ...managedByRoleOptions.map((option) => ({
       value: option.value,
       label: option.label,
@@ -498,7 +529,13 @@ export function ResourceFormModal({
               <Input
                 label="Code"
                 value={values.code}
-                onChange={(event) => setValues((current) => ({ ...current, code: event.target.value }))}
+                onChange={(event) => {
+                  const normalizedCode = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                  setValues((current) => ({ ...current, code: normalizedCode }));
+                  if (errors.code) {
+                    setErrors((current) => ({ ...current, code: undefined }));
+                  }
+                }}
                 error={errors.code}
                 required={!resource}
                 disabled={Boolean(resource)}
@@ -548,7 +585,10 @@ export function ResourceFormModal({
                   type="number"
                   min={0}
                   value={values.capacity}
-                  onChange={(event) => setValues((current) => ({ ...current, capacity: event.target.value }))}
+                  onChange={(event) => {
+                    const normalizedCapacity = event.target.value.replace(/[^\d]/g, '');
+                    setValues((current) => ({ ...current, capacity: normalizedCapacity }));
+                  }}
                   error={errors.capacity}
                   hint={selectedResourceType?.capacityRequired ? 'Required by the selected resource type.' : undefined}
                 />
@@ -812,11 +852,18 @@ export function ResourceFormModal({
               Cancel
             </Button>
             {step < 3 ? (
-              <Button type="button" size="sm" onClick={handleNext} disabled={lookupsLoading}>
+              <Button type="button" size="sm" onClick={() => void handleNext()} disabled={lookupsLoading || validatingCode}>
                 Next
               </Button>
             ) : (
-              <Button type="submit" size="sm" variant="glass" loading={submitting} disabled={lookupsLoading}>
+              <Button
+                type="button"
+                size="sm"
+                variant="glass"
+                loading={submitting}
+                disabled={lookupsLoading}
+                onClick={() => void handleSubmit()}
+              >
                 {resource ? 'Update Resource' : 'Create Resource'}
               </Button>
             )}
