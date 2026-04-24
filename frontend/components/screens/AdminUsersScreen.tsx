@@ -144,7 +144,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
     setPendingUserAction(null);
   }
 
-  // Derive stats from loaded users
   const now = Date.now();
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => u.accountStatus === 'ACTIVE').length;
@@ -202,7 +201,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
       `}</style>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-        {/* Page header */}
         <div>
           <p
             style={{
@@ -241,7 +239,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
           </Alert>
         )}
 
-        {/* Stats */}
         <UserStatsGrid
           totalUsers={totalUsers}
           activeUsers={activeUsers}
@@ -249,7 +246,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
           newThisWeek={newThisWeek}
         />
 
-        {/* Role tabs */}
         <Tabs
           variant="pill"
           tabs={roleTabs.map((t) => ({ value: t.value, label: t.label }))}
@@ -257,7 +253,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
           onChange={(v) => setRoleTab(v as RoleTab)}
         />
 
-        {/* Toolbar */}
         <div
           style={{
             display: 'flex',
@@ -302,7 +297,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
           </div>
         </div>
 
-        {/* Table */}
         <UserTableCard
           users={users}
           loading={loadingUsers}
@@ -356,7 +350,6 @@ export function AdminUsersScreen({ currentUser }: { currentUser?: UserResponse }
         </AdminConfirmDialog>
       )}
 
-      {/* Create user dialog */}
       {isCreateDialogOpen && (
         <div className="admin-dialog-overlay" onClick={() => setIsCreateDialogOpen(false)}>
           <div

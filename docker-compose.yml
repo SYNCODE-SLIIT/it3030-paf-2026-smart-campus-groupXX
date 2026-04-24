@@ -1,10 +1,29 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartcampus}
+      POSTGRES_USER: ${POSTGRES_USER:-smartcampus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartcampus}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     image: maven:3.9.6-eclipse-temurin-21
     working_dir: /app
     command: mvn -q -DskipTests spring-boot:run
     ports:
       - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
@@ -13,9 +32,9 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: none
       SPRING_MAIN_LAZY_INITIALIZATION: "true"
       MAVEN_OPTS: "-Xms128m -Xmx512m -XX:MaxMetaspaceSize=256m"
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smartcampus}}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-${POSTGRES_USER:-smartcampus}}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-${POSTGRES_PASSWORD:-smartcampus}}
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       APP_TICKET_ATTACHMENTS_BUCKET: ${APP_TICKET_ATTACHMENTS_BUCKET:-ticket-attachments}
@@ -33,10 +52,10 @@ services:
           "CMD-SHELL",
           "status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/health || true); [ \"$$status\" = \"200\" ]"
         ]
-      interval: 3s
-      timeout: 5s
-      retries: 20
-      start_period: 20s
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
 
   frontend:
     build: ./frontend
@@ -51,7 +70,10 @@ services:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - ./frontend:/app
       - /app/node_modules
+
+volumes:
+  postgres-data:

@@ -3,6 +3,7 @@ package com.university.smartcampus.ticket.repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -34,6 +35,10 @@ public interface TicketRepository extends JpaRepository<TicketEntity, UUID>, Jpa
     List<TicketEntity> findByReportedById(UUID reportedById);
 
     List<TicketEntity> findByStatusIn(List<TicketStatus> statuses);
+
+    long countByStatus(TicketStatus status);
+
+    long countByStatusIn(Collection<TicketStatus> statuses);
 
     @Query(value = "SELECT nextval('public.ticket_code_seq')", nativeQuery = true)
     Long nextTicketCodeSequence();

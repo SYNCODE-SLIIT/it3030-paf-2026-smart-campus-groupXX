@@ -632,6 +632,36 @@ export interface NotificationDeliveryResponse {
   createdAt: string;
 }
 
+export interface AdminDashboardResponse {
+  totalUsers: number;
+  activeUsers: number;
+  invitedUsers: number;
+  suspendedUsers: number;
+  activeThisWeek: number;
+  studentUsers: number;
+  facultyUsers: number;
+  managerUsers: number;
+  adminUsers: number;
+  openTickets: number;
+  inProgressTickets: number;
+  pendingBookings: number;
+  approvedBookings: number;
+  totalResources: number;
+  activeResources: number;
+  maintenanceResources: number;
+  outOfServiceResources: number;
+  totalBuildings: number;
+  activeBuildings: number;
+  unreadNotifications: number;
+  quickLinks: DashboardQuickLink[];
+}
+
+export interface DashboardQuickLink {
+  label: string;
+  href: string;
+  description: string;
+}
+
 export interface ErrorResponse {
   timestamp: string;
   status: number;

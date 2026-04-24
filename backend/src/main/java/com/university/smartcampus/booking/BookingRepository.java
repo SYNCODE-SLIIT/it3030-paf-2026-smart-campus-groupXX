@@ -12,6 +12,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 
 public interface BookingRepository extends JpaRepository<BookingEntity, UUID>, JpaSpecificationExecutor<BookingEntity> {
 
+    long countByStatus(BookingStatus status);
+
     boolean existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
         UUID resourceId,
         List<BookingStatus> statuses,
