@@ -46,6 +46,8 @@ export function DonutChart({
   emptyLabel = 'No data yet',
   showLegend = true,
 }: DonutChartProps) {
+  const uid = React.useId();
+  const filterId = `donut-shadow-${uid.replace(/:/g, '')}`;
   const total = data.reduce((sum, slice) => sum + Math.max(0, slice.value), 0);
   const radius = (size - thickness) / 2;
   const cx = size / 2;
@@ -100,11 +102,11 @@ export function DonutChart({
   }, []);
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div style={{ display: 'grid', gap: 18, width: showLegend ? undefined : size, flexShrink: 0 }}>
       <div style={{ position: 'relative', width: size, height: size, alignSelf: 'center', margin: '0 auto' }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <defs>
-            <filter id="donut-shadow" x="-30%" y="-30%" width="160%" height="160%">
+            <filter id={filterId} x="-30%" y="-30%" width="160%" height="160%">
               <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
               <feOffset dx="0" dy="2" result="offsetblur" />
               <feComponentTransfer>
@@ -138,7 +140,7 @@ export function DonutChart({
                 transition: 'stroke-width .2s ease, opacity .2s ease',
                 opacity: hovered === null || hovered === seg.index ? 1 : 0.45,
                 cursor: 'pointer',
-                filter: 'url(#donut-shadow)',
+                filter: `url(#${filterId})`,
               }}
               onMouseEnter={() => setHovered(seg.index)}
               onMouseLeave={() => setHovered(null)}
