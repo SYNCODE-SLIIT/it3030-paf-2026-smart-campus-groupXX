@@ -35,6 +35,8 @@ public interface TicketRepository extends JpaRepository<TicketEntity, UUID>, Jpa
 
     List<TicketEntity> findByReportedById(UUID reportedById);
 
+    long countByStatus(TicketStatus status);
+
     List<TicketEntity> findByStatusIn(List<TicketStatus> statuses);
 
     @Query("""
