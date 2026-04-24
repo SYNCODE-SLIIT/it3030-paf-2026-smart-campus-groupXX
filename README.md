@@ -2,7 +2,7 @@
 
 **Project by:** SYNCODE
 
-A full-stack automated campus management system built with a microservice-inspired layered architecture. The frontend and backend run in Docker, and database integration is deferred for now.
+A full-stack automated campus management system built with a microservice-inspired layered architecture. The frontend, backend, and a local PostgreSQL database run together in Docker for development.
 
 ## 🏗️ Project Structure
 
@@ -10,7 +10,7 @@ The repository is split into three main components (plus a Docker Compose orches
 
 - **`frontend/`**: Next.js 16 (React) application for the user interface.
 - **`backend/`**: Spring Boot (Java 21) REST API handling business logic.
-- **Database**: Not wired yet.
+- **Database**: PostgreSQL (local Docker container by default for development).
 - **`docker-compose.yml`**: Runs the frontend and backend locally.
 
 ## 📂 Where the "Actual Code" Happens
@@ -83,7 +83,7 @@ docker compose up --build
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8080/api/health
-- **Database**: Not connected yet
+- **Database**: PostgreSQL on `localhost:5432` (via Docker Compose)
 
 To stop the stack:
 
@@ -100,9 +100,17 @@ docker compose down
 
 ### Database Integration
 
-Persistence is intentionally not configured in the current repository. When you later add Supabase or another database, introduce the required entity/repository packages and the matching backend configuration in the same change.
+The backend now expects PostgreSQL when running with the `local` Spring profile.
 
-If you are using Supabase now, put the database connection in the backend container, not in the frontend app.
+By default, `docker compose up --build` starts a local Postgres container and wires the backend to it automatically using:
+
+```dotenv
+SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/smartcampus
+SPRING_DATASOURCE_USERNAME=smartcampus
+SPRING_DATASOURCE_PASSWORD=smartcampus
+```
+
+If you are using Supabase instead of the bundled local database, put the database connection in the backend container, not in the frontend app.
 
 For Supabase session pooler, use these values from the Supabase "Connect" panel:
 
@@ -132,7 +140,7 @@ SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key> # server-side only
 
 Do not put your pooled Postgres `DATABASE_URL` in `frontend/.env.local` for this project. This repo's database access belongs in the Spring Boot backend.
 
-Note: the current backend still does not include PostgreSQL/JDBC/JPA dependencies, so these environment values set the correct secret locations first. You still need to add the actual persistence layer in the backend before it can query Supabase.
+The repository already includes PostgreSQL/JDBC/JPA/Flyway support, so the backend will try to connect and migrate on startup.
 
 ## Supabase Auth Email and Core Staff Bootstrap
 

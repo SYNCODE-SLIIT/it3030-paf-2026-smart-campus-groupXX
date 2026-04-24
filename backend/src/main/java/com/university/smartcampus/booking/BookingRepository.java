@@ -15,6 +15,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface BookingRepository extends JpaRepository<BookingEntity, UUID>, JpaSpecificationExecutor<BookingEntity> {
 
+    long countByStatus(BookingStatus status);
+
     boolean existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
         UUID resourceId,
         List<BookingStatus> statuses,
@@ -39,13 +41,13 @@ public interface BookingRepository extends JpaRepository<BookingEntity, UUID>, J
         UUID id
     );
 
-    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile" })
+    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile", "recurringBooking" })
     List<BookingEntity> findAllByRequesterIdOrderByStartTimeDesc(UUID requesterId);
 
-    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile" })
+    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile", "recurringBooking" })
     List<BookingEntity> findAllByOrderByStartTimeDesc();
 
-    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile" })
+    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile", "recurringBooking" })
     List<BookingEntity> findAllByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThanOrderByStartTimeAsc(
         UUID resourceId,
         List<BookingStatus> statuses,
@@ -53,28 +55,31 @@ public interface BookingRepository extends JpaRepository<BookingEntity, UUID>, J
         Instant startTime
     );
 
-    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile" })
+    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile", "recurringBooking" })
     List<BookingEntity> findAllByResourceIdAndStatusInAndStartTimeAfterOrderByStartTimeAsc(
         UUID resourceId,
         List<BookingStatus> statuses,
         Instant startTime
     );
 
-    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile" })
+    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile", "recurringBooking" })
     List<BookingEntity> findAllByStatusAndStartTimeBetweenOrderByStartTimeAsc(
         BookingStatus status,
         Instant startTime,
         Instant endTime
     );
 
-    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile" })
+    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile", "recurringBooking" })
     List<BookingEntity> findAllByStatusAndEndTimeLessThanEqualOrderByEndTimeAsc(
         BookingStatus status,
         Instant endTime
     );
 
+    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile", "recurringBooking" })
+    List<BookingEntity> findAllByRecurringBookingIdOrderByStartTimeAsc(UUID recurringBookingId);
+
     @Override
-    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile" })
+    @EntityGraph(attributePaths = { "resource", "requester", "requester.studentProfile", "requester.facultyProfile", "recurringBooking" })
     java.util.Optional<BookingEntity> findById(UUID id);
 
 }

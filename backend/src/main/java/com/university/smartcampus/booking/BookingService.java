@@ -242,6 +242,8 @@ public class BookingService {
             resourceService.toSummary(booking.getResource()),
             booking.getRequester() != null ? booking.getRequester().getId() : null,
             resolveRequesterRegistrationNumber(booking.getRequester()),
+            booking.getRecurringBooking() != null ? booking.getRecurringBooking().getId() : null,
+            booking.getRecurringBooking() != null ? booking.getRecurringBooking().getRecurrencePattern() : null,
             booking.getStatus(),
             booking.getStartTime(),
             booking.getEndTime(),

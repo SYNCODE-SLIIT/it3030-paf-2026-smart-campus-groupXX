@@ -3,6 +3,7 @@ import {
   type AuditLogPageResponse,
   type AccountStatus,
   type AddCommentRequest,
+  type AdminDashboardResponse,
   type UpdateCommentRequest,
   type AssignTicketRequest,
   type BuildingResponse,
@@ -99,11 +100,13 @@ interface RequestOptions {
   body?: unknown;
   cache?: RequestCache;
   retryOnUpstreamFailure?: boolean;
+  timeoutMs?: number;
 }
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
 const ONBOARDING_REQUIRED_ERROR_CODE = 'ONBOARDING_REQUIRED';
 const STUDENT_ONBOARDING_PATH = '/students/onboarding';
+const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
 
 const STATUS_MESSAGES: Partial<Record<number, string>> = {
   0: 'Cannot reach the backend service. Please check that the backend is running and try again.',
@@ -136,6 +139,10 @@ function normalizeErrorMessage(message: string) {
 
   if (lower.includes('networkerror') || lower.includes('failed to fetch') || lower.includes('load failed')) {
     return 'The request could not reach the service. Check your connection and try again.';
+  }
+
+  if (lower.includes('aborted') || lower.includes('timed out') || lower.includes('timeout')) {
+    return 'The backend took too long to respond. Please try again.';
   }
 
   if (lower.includes('jwt expired') || lower.includes('invalid jwt') || lower.includes('unauthorized')) {
@@ -213,14 +220,24 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   let response: Response | null = null;
 
   for (let attempt = 0; attempt <= 1; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
+
     try {
       response = await fetch(buildApiUrl(path), {
         method: options.method ?? 'GET',
         headers,
         body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
         cache: options.cache ?? 'no-store',
+        signal: controller.signal,
       });
     } catch (error) {
+      clearTimeout(timeoutId);
+
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new ApiError(504, 'The backend API request timed out.');
+      }
+
       if (error instanceof TypeError && shouldRetryNetworkError(options, attempt)) {
         await waitBeforeRetry();
         continue;
@@ -234,6 +251,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       }
 
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (response.ok || !shouldRetryRequest(response, options, attempt)) {
@@ -341,6 +360,14 @@ export async function listUsers(accessToken: string, filters: UserFilters = {}) 
   const query = params.toString();
   return request<UserResponse[]>(`/api/admin/users${query ? `?${query}` : ''}`, {
     accessToken,
+    timeoutMs: 20000,
+  });
+}
+
+export async function getAdminDashboard(accessToken: string) {
+  return request<AdminDashboardResponse>('/api/admin/dashboard', {
+    accessToken,
+    timeoutMs: 20000,
   });
 }
 
@@ -814,6 +841,25 @@ export async function cancelApprovedBookingAsManager(
   });
 }
 
+export async function approvePendingRecurringBooking(accessToken: string, recurringBookingId: string) {
+  return request<RecurringBookingResponse>(`/api/admin/recurring-bookings/${recurringBookingId}/approve-pending`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function cancelFutureRecurringBooking(
+  accessToken: string,
+  recurringBookingId: string,
+  payload?: CancelBookingRequest,
+) {
+  return request<RecurringBookingResponse>(`/api/admin/recurring-bookings/${recurringBookingId}/cancel-future`, {
+    method: 'POST',
+    accessToken,
+    body: payload,
+  });
+}
+
 // Recurring Bookings
 export async function createRecurringBooking(accessToken: string, payload: CreateRecurringBookingRequest) {
   return request<RecurringBookingResponse>('/api/recurring-bookings', {
@@ -988,6 +1034,8 @@ export async function uploadStudentProfileImage(accessToken: string, file: File)
   formData.set('file', file);
 
   let response: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
 
   try {
     response = await fetch(buildApiUrl(path), {
@@ -998,8 +1046,15 @@ export async function uploadStudentProfileImage(accessToken: string, file: File)
       },
       body: formData,
       cache: 'no-store',
+      signal: controller.signal,
     });
   } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError(504, 'The backend API request timed out.');
+    }
+
     if (error instanceof TypeError) {
       throw new ApiError(
         0,
@@ -1008,6 +1063,8 @@ export async function uploadStudentProfileImage(accessToken: string, file: File)
     }
 
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!response.ok) {
@@ -1148,6 +1205,8 @@ export async function uploadTicketAttachment(
   formData.set('file', file);
 
   let response: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
 
   try {
     response = await fetch(buildApiUrl(path), {
@@ -1155,12 +1214,21 @@ export async function uploadTicketAttachment(
       headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
       body: formData,
       cache: 'no-store',
+      signal: controller.signal,
     });
   } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError(504, 'The backend API request timed out.');
+    }
+
     if (error instanceof TypeError) {
       throw new ApiError(0, 'Cannot reach the backend API. Make sure NEXT_PUBLIC_API_URL points to the running backend service.');
     }
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!response.ok) {

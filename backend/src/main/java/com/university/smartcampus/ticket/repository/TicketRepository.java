@@ -3,6 +3,7 @@ package com.university.smartcampus.ticket.repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
