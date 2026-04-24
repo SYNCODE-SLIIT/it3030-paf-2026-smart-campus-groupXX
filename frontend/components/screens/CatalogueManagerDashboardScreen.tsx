@@ -30,7 +30,7 @@ import {
 import {
   getErrorMessage,
   getResourceStats,
-  listBuildings,
+  listCatalogueBuildings,
   listCatalogueLocations,
   listCatalogueResourceTypes,
   listMyTickets,
@@ -320,7 +320,7 @@ export function CatalogueManagerDashboardScreen({
         listResources(accessToken),
         listCatalogueResourceTypes(accessToken),
         listCatalogueLocations(accessToken),
-        listBuildings(accessToken).catch(() => [] as BuildingResponse[]),
+        listCatalogueBuildings(accessToken),
         listMyTickets(accessToken, { scope: 'REPORTED' }).catch(
           () => [] as TicketSummaryResponse[],
         ),
@@ -338,6 +338,7 @@ export function CatalogueManagerDashboardScreen({
         resourcesResult,
         resourceTypesResult,
         locationsResult,
+        buildingsResult,
       ].find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined;
 
       if (firstError) {
@@ -368,6 +369,8 @@ export function CatalogueManagerDashboardScreen({
       locations: stats?.locationCount ?? locations.length,
       buildings: buildings.length,
       activeBuildings: buildings.filter((b) => b.isActive).length,
+      wingBasedBuildings: buildings.filter((b) => b.hasWings).length,
+      outdoorBuildings: buildings.filter((b) => b.buildingType === 'OUTDOOR').length,
       tickets: tickets.length,
       openTickets: tickets.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length,
       resolvedTickets: tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
@@ -673,6 +676,20 @@ export function CatalogueManagerDashboardScreen({
           caption={`${totals.activeBuildings} currently active in the system.`}
           icon={Building2}
           accentColor="#F95A50"
+        />
+        <KpiCard
+          label="Wing-based Buildings"
+          value={totals.wingBasedBuildings}
+          caption="Buildings configured with left and right wing prefixes."
+          icon={Layers}
+          accentColor="#4D8EF7"
+        />
+        <KpiCard
+          label="Outdoor Buildings"
+          value={totals.outdoorBuildings}
+          caption="Outdoor building records used by open-space locations."
+          icon={MapPinned}
+          accentColor="#FF9520"
         />
         <KpiCard
           label="Tickets"
