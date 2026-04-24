@@ -361,13 +361,13 @@ export function StudentDashboardScreen() {
             <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800, color: 'var(--text-h)' }}>Bookings Breakdown</h2>
             {bookingDonutData.length > 0 ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                <DonutChart data={bookingDonutData} size={120} thickness={18} centerValue={bookings.length} centerLabel="total" />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <DonutChart data={bookingDonutData} size={120} thickness={18} centerValue={bookings.length} centerLabel="total" showLegend={false} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1, minWidth: 0 }}>
                   {bookingDonutData.map((d) => (
                     <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, color: 'var(--text-body)' }}>{d.label}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-h)', marginLeft: 'auto' }}>{d.value}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-body)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-h)', flexShrink: 0 }}>{d.value}</span>
                     </div>
                   ))}
                 </div>
@@ -381,13 +381,13 @@ export function StudentDashboardScreen() {
             <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800, color: 'var(--text-h)' }}>Tickets Breakdown</h2>
             {ticketDonutData.length > 0 ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                <DonutChart data={ticketDonutData} size={120} thickness={18} centerValue={tickets.length} centerLabel="total" />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <DonutChart data={ticketDonutData} size={120} thickness={18} centerValue={tickets.length} centerLabel="total" showLegend={false} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1, minWidth: 0 }}>
                   {ticketDonutData.map((d) => (
                     <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, color: 'var(--text-body)' }}>{d.label}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-h)', marginLeft: 'auto' }}>{d.value}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-body)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-h)', flexShrink: 0 }}>{d.value}</span>
                     </div>
                   ))}
                 </div>
